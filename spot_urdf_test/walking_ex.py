@@ -11,43 +11,6 @@ import pybullet_data
 from PIL import Image
 from iGibson.examples.demo.raibert_walking_controller import Raibert_controller_turn as Raibert_controller
 
-def get_camera_image(scene,
-        camera_orientation=[1.57, -1.57, 1.57],
-        camera_position=[3, 3, 3],
-        camera_img_size=512,
-        render_shadows=True,
-    ):
-    """ gets image from fixed location """
-    camera_t_R = p.getMatrixFromQuaternion(
-        p.getQuaternionFromEuler(camera_orientation)
-    )
-    matrix_cam = np.array(camera_t_R)
-    cam_look_at = [
-        matrix_cam[2] + camera_position[0],
-        matrix_cam[5] + camera_position[1],
-        matrix_cam[8] + camera_position[2],
-    ]
-    cam_up = [matrix_cam[1], matrix_cam[4], matrix_cam[7]]
-    camera_loc = np.array(camera_position)
-    view_matrix = p.computeViewMatrix(
-        camera_loc.tolist(), cam_look_at, cam_up
-    )
-    proj_matrix = p.computeProjectionMatrixFOV(
-        fov=60, aspect=1, nearVal=0.01, farVal=10.0
-    )
-    width, height, rgbImg, depthImg, segImg = p.getCameraImage(
-        camera_img_size,
-        camera_img_size,
-        view_matrix,
-        proj_matrix,
-        shadow=1 if render_shadows else 0,
-        flags=p.ER_SEGMENTATION_MASK_OBJECT_AND_LINKINDEX,
-    )
-    img = np.asarray(rgbImg)
-    print(img.shape)
-    img = img[(height*width):].reshape((3,height, width)).transpose((2,1,0))
-
-    return img
 
 def main():
     hz = 240
@@ -80,7 +43,7 @@ def main():
     print("base pos ", state['base_pos_x'], " ", state['base_pos_y'], state['base_pos_z'])
     print(spot.control)
     # last_ori = state['base_ori_euler'][2]
-    '''
+    
     for i in range(num_steps):
         lin = 0.35 # np.random.uniform(-0.75, 0.75, 1)
         ang = 0.15 #np.random.uniform(-0.5, 0.5, 1)
