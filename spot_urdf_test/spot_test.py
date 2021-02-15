@@ -210,7 +210,7 @@ def main(make_video=True, show_video=True):
     
     hip_motors_settings.position_target = 0
     knee_motors_settings.position_target = 0
-    hip_out_motors_settings.position_target = 1
+    hip_out_motors_settings.position_target = 0
 
 
     for joint_id in hip_ids:
