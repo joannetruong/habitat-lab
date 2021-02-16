@@ -1,7 +1,8 @@
 import gym, gym.spaces
 import numpy as np
 import habitat_sim 
-from utils import rotate_vector_3d
+from utilities.utils import rotate_vector_3d, euler_from_quaternion
+
 class Spot():
     def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0):
         self.config = config
@@ -55,20 +56,22 @@ class Spot():
         joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
         joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
         #robot_state = self.agent.get_state()
-        robot_state = self.sim.get_agent(0).state
+        robot_state = self.sim.get_agent(-1).state
         base_position = robot_state.position
-        base_velovity = robot_state.velocity
+        base_velocity = robot_state.velocity
         base_angular_velocity = robot_state.angular_velocity
         base_orientation_quat = robot_state.rotation
+        base_orientation_euler = euler_from_quaternion(base_orientation_quat)
+        
         return {
             'base_pos_x': base_position[0:1],
             'base_pos_y': base_position[1:2],
             'base_pos_z': base_position[2:],
             'base_pos': base_position,
-            #'base_ori_euler': base_orientation_euler,
+            'base_ori_euler': base_orientation_euler,
             'base_ori_quat': base_orientation_quat,
-            #'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-            #'base_ang_vel': rotate_vector_3d(base_angular_velocity, *base_orientation_euler),
+            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
+            'base_ang_vel': rotate_vector_3d(base_angular_velocity, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities,
             #'j_eff': joint_effort,

@@ -178,14 +178,19 @@ def main(make_video=True, show_video=True):
 
     
     spot = Spot({}, urdf_file=urdf_files["spot_bd"],sim= sim,agent=agent, robot_id=robot_id)
-    spot.apply_action(np.ones(12,)*.1)
-    observations += simulate(sim, dt=3, get_frames=make_video)
+    # spot.apply_action(np.ones(12,)*.1)
+    # observations += simulate(sim, dt=3, get_frames=make_video)
     spot.apply_action(-np.ones(12,)*.1)
-    for i in range(10):
-        observations += spot.step(np.ones(12,)*.1*((-1)**float(i)), dt=1.0)
+    for i in range(5):
+        observations += spot.step(np.random.random(12,)*((-1)**float(i)), dt=1.0)
+        st = sim.get_articulated_object_root_state(robot_id)
+        st = habitat_sim.AgentState(robot_id)
+        print(dir(agent))
+        print(agent.agent_config)
 
-    
-    
+  
+
+
 
     if make_video:
         vut.make_video(
