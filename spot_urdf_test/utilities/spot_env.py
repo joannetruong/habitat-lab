@@ -94,7 +94,7 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 0.1, 0,.1, 10)
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 0.01, 0,.1, 10)
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:

@@ -28,6 +28,7 @@ def place_agent(sim):
     # place our agent in the scene
     agent_state = habitat_sim.AgentState()
     agent_state.position = [-0.15, -0.7, 1.0]
+    #agent_state.position = [-0.15, -0.7, 1.0]
     # agent_state.position = [-0.15, -1.6, 1.0]
     agent_state.rotation = np.quaternion(-0.83147, 0, 0.55557, 0)
     agent = sim.initialize_agent(0, agent_state)
@@ -140,12 +141,13 @@ def main(make_video=True, show_video=True):
     robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
 
     # place the robot root state relative to the agent
-    local_base_pos = np.array([-4, 2, -4.0])
-    
+    #local_base_pos = np.array([-4, 2, -4.0])
+    local_base_pos = np.array([-2.0,2,-2.0])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    
+    transform2 = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(0, 0, 1).normalized())
+    base_transform = base_transform.__matmul__(transform2)
     base_transform.translation = agent_transform.transform_point(local_base_pos)
     
     
@@ -181,12 +183,19 @@ def main(make_video=True, show_video=True):
     # spot.apply_action(np.ones(12,)*.1)
     # observations += simulate(sim, dt=3, get_frames=make_video)
     spot.apply_action(-np.ones(12,)*.1)
-    for i in range(5):
-        observations += spot.step(np.random.random(12,)*((-1)**float(i)), dt=1.0)
+    for i in range(1,5):
+        observations += spot.step(np.array([0,.45/i,-1,
+                                            0,.45/i,-1,
+                                            0,.45/i,-1,
+                                            0,.45/i,-1]), dt=1.0)
         st = sim.get_articulated_object_root_state(robot_id)
         st = habitat_sim.AgentState(robot_id)
-        print(dir(agent))
-        print(agent.agent_config)
+        # st = sim.get_angular_velocity(robot_id)
+        link_state = sim.get_articulated_link_rigid_state(robot_id, 0)
+        print('\n\n\n\n')
+
+        # print(dir(link_state.translation))
+        print(st)
 
   
 

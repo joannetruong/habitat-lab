@@ -227,49 +227,49 @@ def main(make_video=True, show_video=True):
     observations += simulate(sim, dt=3, get_frames=make_video)
     print(sim.get_articulated_object_positions(robot_id))
     # # get/set motiontype (KINEMATIC vs. DYNAMIC)
-    # sim.set_articulated_object_motion_type(
-    #     robot_id, habitat_sim.physics.MotionType.KINEMATIC
-    # )
-    # assert (
-    #     sim.get_articulated_object_motion_type(robot_id)
-    #     == habitat_sim.physics.MotionType.KINEMATIC
-    # )
+    sim.set_articulated_object_motion_type(
+        robot_id, habitat_sim.physics.MotionType.KINEMATIC
+    )
+    assert (
+        sim.get_articulated_object_motion_type(robot_id)
+        == habitat_sim.physics.MotionType.KINEMATIC
+    )
     
-    # # reset the object state (sets dof positions/velocities/forces to 0, recomputes forward kinematics, udpate collision state)
-    # sim.reset_articulated_object(robot_id)
-    # # note: reset does not change the robot base state, do this manually
-    # sim.set_articulated_object_root_state(robot_id, base_transform)
+    # reset the object state (sets dof positions/velocities/forces to 0, recomputes forward kinematics, udpate collision state)
+    sim.reset_articulated_object(robot_id)
+    # note: reset does not change the robot base state, do this manually
+    sim.set_articulated_object_root_state(robot_id, base_transform)
 
-    # # get rigid state of robot links and show proxy object at each link COM
-    # obj_mgr = sim.get_object_template_manager()
-    # cube_id = sim.add_object_by_handle(obj_mgr.get_template_handles("cube")[0])
-    # sim.set_object_motion_type(habitat_sim.physics.MotionType.KINEMATIC, cube_id)
-    # sim.set_object_is_collidable(False, cube_id)
-    # num_links = sim.get_num_articulated_links(robot_id)
-    # for link_id in range(num_links):
-    #     link_rigid_state = sim.get_articulated_link_rigid_state(robot_id, link_id)
-    #     sim.set_translation(link_rigid_state.translation, cube_id)
-    #     sim.set_rotation(link_rigid_state.rotation, cube_id)
-    #     # get the link friction
-    #     print(
-    #         "Link "
-    #         + str(link_id)
-    #         + " friction coefficient = "
-    #         + str(sim.get_articulated_link_friction(robot_id, link_id))
-    #     )
-    #     # Note: set this with 'sim.get_articulated_link_friction(robot_id, link_id, friction)'
-    #     observations += simulate(sim, dt=0.5, get_frames=make_video)
-    # sim.remove_object(cube_id)
+    # get rigid state of robot links and show proxy object at each link COM
+    obj_mgr = sim.get_object_template_manager()
+    cube_id = sim.add_object_by_handle(obj_mgr.get_template_handles("cube")[0])
+    sim.set_object_motion_type(habitat_sim.physics.MotionType.KINEMATIC, cube_id)
+    sim.set_object_is_collidable(False, cube_id)
+    num_links = sim.get_num_articulated_links(robot_id)
+    for link_id in range(num_links):
+        link_rigid_state = sim.get_articulated_link_rigid_state(robot_id, link_id)
+        sim.set_translation(link_rigid_state.translation, cube_id)
+        sim.set_rotation(link_rigid_state.rotation, cube_id)
+        # get the link friction
+        print(
+            "Link "
+            + str(link_id)
+            + " friction coefficient = "
+            + str(sim.get_articulated_link_friction(robot_id, link_id))
+        )
+        # Note: set this with 'sim.get_articulated_link_friction(robot_id, link_id, friction)'
+        observations += simulate(sim, dt=0.5, get_frames=make_video)
+    sim.remove_object(cube_id)
 
-    # sim.set_articulated_object_motion_type(
-    #     robot_id, habitat_sim.physics.MotionType.DYNAMIC
-    # )
-    # assert (
-    #     sim.get_articulated_object_motion_type(robot_id)
-    #     == habitat_sim.physics.MotionType.DYNAMIC
-    # )
+    sim.set_articulated_object_motion_type(
+        robot_id, habitat_sim.physics.MotionType.DYNAMIC
+    )
+    assert (
+        sim.get_articulated_object_motion_type(robot_id)
+        == habitat_sim.physics.MotionType.DYNAMIC
+    )
     
-    '''
+    
     # get/set forces and velocities
     tau = sim.get_articulated_object_forces(robot_id)
     sim.set_articulated_object_forces(robot_id, tau)
@@ -338,7 +338,7 @@ def main(make_video=True, show_video=True):
         sim.get_articulated_object_motion_type(robot_id)
         == habitat_sim.physics.MotionType.DYNAMIC
     )
-    '''
+    
 
     if make_video:
         vut.make_video(
@@ -348,7 +348,7 @@ def main(make_video=True, show_video=True):
             output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
             open_vid=show_video,
         )
-    '''
+    
     # clear all robots
     for robot_id in sim.get_existing_articulated_object_ids():
         sim.remove_articulated_object(robot_id)
@@ -450,7 +450,7 @@ def main(make_video=True, show_video=True):
     # [/joint motors]
 
     remove_all_objects(sim)
-    '''
+    
 
 if __name__ == "__main__":
     main(make_video=True, show_video=True)
