@@ -1,9 +1,7 @@
 import math
 import numpy as np
 
-from gibson2.utils.quadruped_kinematics import quadruped_kinematics_solver
-from gibson2.utils.hexapod_kinematics import hexapod_kinematics_solver
-from gibson2.utils.quadruped_daisy_kinematics import quadruped_daisy_kinematics_solver
+from .quad_kinematics_solver import quadruped_kinematics_solver
 
 EPSILON = 1e-4
 
@@ -77,6 +75,10 @@ class Raibert_controller():
         if action_limit is None:
             self.action_limit[:, 0] = np.zeros(self.n_dof) + np.pi / 2.0
             self.action_limit[:, 1] = np.zeros(self.n_dof) - np.pi / 2.0
+            
+            # Add clipping limit on hip joints...controller is wack
+            self.action_limit[[0,3,6,9], 0] = np.zeros(4) + np.pi / 20.0
+            self.action_limit[[0,3,6,9], 1] = np.zeros(4) - np.pi / 20.0
 
         if des_body_ori is None:
             self.des_body_ori = np.array([0,0,0]) # this is for des orientation at each timestep
@@ -91,6 +93,7 @@ class Raibert_controller():
             self.action_limit[:, 0] = j_pos + np.array([action_limits] * self.num_legs).reshape(self.n_dof)
             self.action_limit[:, 1] = j_pos - np.array([action_limits] * self.num_legs).reshape(self.n_dof)
         self.set_control_params(init_state)
+        print('Set initial state')
 
     def set_control_params(self, state):
         self.init_foot_pos = self.kinematics_solver.forward_kinematics_robot(state['j_pos']).reshape(self.num_legs, 3)

@@ -24,10 +24,10 @@ def euler_from_quaternion(quat):
         yaw is rotation around z in radians (counterclockwise)
         """
         
-        w = quat.w
-        x = quat.x
-        y = quat.y
-        z = quat.z
+        w = quat.scalar
+        x = quat.vector.x
+        y = quat.vector.y
+        z = quat.vector.z
         t0 = +2.0 * (w * x + y * z)
         t1 = +1.0 - 2.0 * (x * x + y * y)
         roll_x = math.atan2(t0, t1)

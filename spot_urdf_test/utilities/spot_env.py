@@ -13,10 +13,14 @@ class Spot():
         self.robot_id = robot_id
         self.control = "position"
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
-        self._initial_joint_positions = [0, 0.45, -1,
-                                         0, 0.45, -1,
-                                         0, 0.45, -1,
-                                         0, 0.45, -1]
+        self._initial_joint_positions = [-.124, 0.876, -1.5,
+                                         0.124, 0.876, -1.5,
+                                         -0.124, 0.876, -1.5,
+                                         0.124, 0.876, -1.5]
+        # self._initial_joint_positions = [0, 0.45, -1,
+        #                                  0, 0.45, -1,
+        #                                  0, 0.45, -1,
+        #                                  0, 0.45, -1]
         #  hip_ids = [1,4,7,10]
         #  hip_out_ids = [0, 3, 6, 9]
         #  knee_ids = [2, 5, 8, 11]
@@ -56,22 +60,26 @@ class Spot():
         joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
         joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
         #robot_state = self.agent.get_state()
-        robot_state = self.sim.get_agent(-1).state
-        base_position = robot_state.position
-        base_velocity = robot_state.velocity
-        base_angular_velocity = robot_state.angular_velocity
-        base_orientation_quat = robot_state.rotation
-        base_orientation_euler = euler_from_quaternion(base_orientation_quat)
+        robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         
+        base_position = robot_state.translation
+        base_velocity = base_position
+
+        base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+
+        base_orientation_quat = robot_state.rotation
+       
+        base_orientation_euler = euler_from_quaternion(base_orientation_quat)
+   
         return {
-            'base_pos_x': base_position[0:1],
-            'base_pos_y': base_position[1:2],
-            'base_pos_z': base_position[2:],
-            'base_pos': base_position,
+            'base_pos_x': base_position.x,
+            'base_pos_y': base_position.y,
+            'base_pos_z': base_position.z,
+            'base_pos': np.array([base_position.x,base_position.y,base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
             'base_ori_quat': base_orientation_quat,
             'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-            'base_ang_vel': rotate_vector_3d(base_angular_velocity, *base_orientation_euler),
+            'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities,
             #'j_eff': joint_effort,
@@ -94,29 +102,29 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 0.01, 0,.1, 10)
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 0.05, 0,1, 10) # .01 in pos gain
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:
                 print('not implemented yet')
 
     def robot_specific_reset(self, joint_pos=None):
-        print('NOt implemented yet')
-        return False
-        # if joint_pos is None:
-        #     joint_pos = self._initial_joint_positions
+        if joint_pos is None:
+            joint_pos = self._initial_joint_positions
+            self.sim.set_articulated_object_positions(self.robot_id, joint_pos)
         # for n, j in enumerate(self.ordered_joints):
         #     a = joint_pos[n]
         #     j.reset_joint_state(position=a, velocity=0.0)
 
-    def step(self, action, dt=1.0/30.0, get_frames=True):
+    def step(self, action, dt=1.0/30.0, verbose=False, get_frames=True):
         self.apply_robot_action(action=action)
             # simulate dt seconds at 60Hz to the nearest fixed timestep
-        print("Simulating " + str(dt) + " world seconds.")
+        if verbose:
+            print("Simulating " + str(dt) + " world seconds.")
         observations = []
         start_time = self.sim.get_world_time()
         while self.sim.get_world_time() < start_time + dt:
-            self.sim.step_physics(1.0 / 60.0)
+            self.sim.step_physics(dt)
             if get_frames:
                 observations.append(self.sim.get_sensor_observations())
 

@@ -9,6 +9,7 @@ import habitat_sim
 # import habitat_sim.utils.common as ut
 import habitat_sim.utils.viz_utils as vut
 from utilities.spot_env import Spot
+from utilities.raibert_controller import Raibert_controller
 
 
 
@@ -142,11 +143,11 @@ def main(make_video=True, show_video=True):
 
     # place the robot root state relative to the agent
     #local_base_pos = np.array([-4, 2, -4.0])
-    local_base_pos = np.array([-2.0,2,-2.0])
+    local_base_pos = np.array([-2.0,1.5,-2.0])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    transform2 = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(0, 0, 1).normalized())
+    transform2 = mn.Matrix4.rotation(mn.Rad(-.01), mn.Vector3(0, 0, 1).normalized())
     base_transform = base_transform.__matmul__(transform2)
     base_transform.translation = agent_transform.transform_point(local_base_pos)
     
@@ -155,17 +156,19 @@ def main(make_video=True, show_video=True):
 
 
 
-    # set a better initial joint state for the aliengo
-    if (robot_file == urdf_files["spot_bd"]) or (robot_file == urdf_files["aliengo"]):
-        pose = sim.get_articulated_object_positions(robot_id)
-        calfDofs = [2, 5, 8, 11]
-        for dof in calfDofs:
-            # pose[dof] = -1
-            # pose[dof - 1] = 0.45
-            pose[dof] = 0.1
-            pose[dof-1] = 0
-            # also set a thigh
-        sim.set_articulated_object_positions(robot_id, pose)
+    # # set a better initial joint state for the aliengo
+    # if (robot_file == urdf_files["spot_bd"]) or (robot_file == urdf_files["aliengo"]):
+    #     pose = sim.get_articulated_object_positions(robot_id)
+    #     calfDofs = [2, 5, 8, 11]
+    #     for dof in calfDofs:
+    #         pose[dof] = -.8
+    #         pose[dof - 1] = 0.35
+    #         #pose[dof] = 0.1
+    #         #pose[dof-1] = 0
+    #         # also set a thigh
+    #     sim.set_articulated_object_positions(robot_id, pose)
+
+
 
     # simulate
     #observations += simulate(sim, dt=1.5, get_frames=make_video)
@@ -180,22 +183,54 @@ def main(make_video=True, show_video=True):
 
     
     spot = Spot({}, urdf_file=urdf_files["spot_bd"],sim= sim,agent=agent, robot_id=robot_id)
+    spot.robot_specific_reset()
+    time_per_step = 36
+    raibert_controller = Raibert_controller(control_frequency=240, num_timestep_per_HL_action=time_per_step, robot="Spot")
+
     # spot.apply_action(np.ones(12,)*.1)
     # observations += simulate(sim, dt=3, get_frames=make_video)
-    spot.apply_action(-np.ones(12,)*.1)
-    for i in range(1,5):
-        observations += spot.step(np.array([0,.45/i,-1,
-                                            0,.45/i,-1,
-                                            0,.45/i,-1,
-                                            0,.45/i,-1]), dt=1.0)
-        st = sim.get_articulated_object_root_state(robot_id)
-        st = habitat_sim.AgentState(robot_id)
-        # st = sim.get_angular_velocity(robot_id)
-        link_state = sim.get_articulated_link_rigid_state(robot_id, 0)
-        print('\n\n\n\n')
+    state = spot.calc_state()
+    # spot.reset(state['j_pos'])
+    init_state = state
+    raibert_controller.set_init_state(init_state)
 
-        # print(dir(link_state.translation))
-        print(st)
+    lin = 2 # np.random.uniform(-0.75, 0.75, 1)
+    ang = 0 #np.random.uniform(-0.5, 0.5, 1)
+    hl_action = np.append(lin, ang)
+    target_speed = np.array([hl_action[0], 0])
+    target_ang_vel = hl_action[1]
+    latent_action = raibert_controller.plan_latent_action(state, target_speed) #, target_ang_vel=target_ang_vel)
+    
+    
+    for i in range(20):
+
+        raibert_controller.update_latent_action(state, latent_action)
+        
+        for j in range(time_per_step):
+            # action = expert_control(phase=i, offset=1, const=constants)+action_init
+            # action = np.random.rand(12)
+            action = raibert_controller.get_action(state, j+1)
+            
+            observations += spot.step(action, 1/time_per_step, verbose=True)
+            state = spot.calc_state()
+
+
+    
+    spot.apply_action(-np.ones(12,)*.1)
+    # for i in range(1,5):
+    #     observations += spot.step(np.array([0,.45/i,-1,
+    #                                         0,.45/i,-1,
+    #                                         0,.45/i,-1,
+    #                                         0,.45/i,-1]), dt=1.0)
+    #     st = sim.get_articulated_object_root_state(robot_id)
+    #     st = habitat_sim.AgentState(robot_id)
+    #     # st = sim.get_angular_velocity(robot_id)
+    #     # link_state = sim.get_articulated_link_rigid_state(robot_id, 0)
+        
+    #     # link_vel = sim.get_articulated_link_angular_velocity(robot_id, 11)
+    #     state = spot.calc_state()
+    #     print(state)
+
 
   
 

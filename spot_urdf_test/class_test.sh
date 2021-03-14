@@ -1,7 +1,7 @@
 #/bin/bash
 
 
-#export PYTHONPATH=$PYTHONPATH:/nethome/mrudolph8/Documents/haburdf/habitat-sim/
+export PYTHONPATH=$PYTHONPATH:/nethome/mrudolph8/Documents/haburdf/habitat-sim/
 cd /nethome/mrudolph8/Documents/haburdf/habitat-sim
 
 ln -s /srv/share3/mrudolph8/data/data/datasets /nethome/mrudolph8/Documents/haburdf/habitat-sim/data/
