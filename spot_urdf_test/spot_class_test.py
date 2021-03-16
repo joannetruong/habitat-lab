@@ -184,8 +184,15 @@ def main(make_video=True, show_video=True):
     
     spot = Spot({}, urdf_file=urdf_files["spot_bd"],sim= sim,agent=agent, robot_id=robot_id)
     spot.robot_specific_reset()
-    time_per_step = 36
-    raibert_controller = Raibert_controller(control_frequency=240, num_timestep_per_HL_action=time_per_step, robot="Spot")
+    seconds_per_step = 1
+    time_per_step = np.round(30*seconds_per_step)
+
+    action_limit = np.zeros((12, 2))
+    action_limit[:, 0] = np.zeros(12) + np.pi / 2
+    action_limit[:, 1] = np.zeros(12) - np.pi / 2
+    action_limit[[0,3,6,9], 1] = np.zeros(4) - np.pi / 10
+    action_limit[[0,3,6,9], 0] = np.zeros(4) + np.pi / 10
+    raibert_controller = Raibert_controller(control_frequency=240, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
 
     # spot.apply_action(np.ones(12,)*.1)
     # observations += simulate(sim, dt=3, get_frames=make_video)
@@ -194,12 +201,12 @@ def main(make_video=True, show_video=True):
     init_state = state
     raibert_controller.set_init_state(init_state)
 
-    lin = 2 # np.random.uniform(-0.75, 0.75, 1)
+    lin = 1.5 # np.random.uniform(-0.75, 0.75, 1)
     ang = 0 #np.random.uniform(-0.5, 0.5, 1)
     hl_action = np.append(lin, ang)
     target_speed = np.array([hl_action[0], 0])
     target_ang_vel = hl_action[1]
-    latent_action = raibert_controller.plan_latent_action(state, target_speed) #, target_ang_vel=target_ang_vel)
+    latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0) #, target_ang_vel=target_ang_vel)
     
     
     for i in range(20):
@@ -207,16 +214,16 @@ def main(make_video=True, show_video=True):
         raibert_controller.update_latent_action(state, latent_action)
         
         for j in range(time_per_step):
-            # action = expert_control(phase=i, offset=1, const=constants)+action_init
-            # action = np.random.rand(12)
+   
             action = raibert_controller.get_action(state, j+1)
             
-            observations += spot.step(action, 1/time_per_step, verbose=True)
+            observations += spot.step(action, dt=1/time_per_step)
             state = spot.calc_state()
 
 
     
     spot.apply_action(-np.ones(12,)*.1)
+
     # for i in range(1,5):
     #     observations += spot.step(np.array([0,.45/i,-1,
     #                                         0,.45/i,-1,

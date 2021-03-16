@@ -71,8 +71,9 @@ class Raibert_controller():
         else:
             self.target = target
 
-        self.action_limit = np.zeros((self.n_dof, 2))
+        
         if action_limit is None:
+            self.action_limit = np.zeros((self.n_dof, 2))
             self.action_limit[:, 0] = np.zeros(self.n_dof) + np.pi / 2.0
             self.action_limit[:, 1] = np.zeros(self.n_dof) - np.pi / 2.0
             
@@ -126,6 +127,7 @@ class Raibert_controller():
         des_footstep = (speed_term + acceleration_term)
         self.latent_action[0:2] = des_footstep
         self.latent_action[2] = orientation_speed_term
+        print(self.latent_action)
         return self.latent_action
 
     def switch_swing_stance(self):
@@ -209,6 +211,7 @@ class Raibert_controller_turn(Raibert_controller):
         des_footstep = acceleration_term
         self.latent_action[0:2] = des_footstep
         self.latent_action[2] = orientation_speed_term
+        print(self.latent_action)
         return self.latent_action
 
     def update_latent_action(self, state, latent_action):
