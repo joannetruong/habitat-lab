@@ -139,7 +139,7 @@ def main(make_video=True, show_video=True):
     robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
 
     # place the robot root state relative to the agent
-    local_base_pos = np.array([-4, 2, -4.0])
+    local_base_pos = np.array([-8, 3, -4.0])
     
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
@@ -229,13 +229,46 @@ def main(make_video=True, show_video=True):
     
     
 
+    # if make_video:
+    #     vut.make_video(
+    #         observations,
+    #         "depth_camera_1stperson",
+    #         "depth",
+    #         output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
+    #         open_vid=show_video,
+    #     )
+
     if make_video:
+        sensor_dims = (
+            sim.get_agent(0).agent_config.sensor_specifications[0].resolution
+        )
+        overlay_dims = (int(sensor_dims[1] / 4), int(sensor_dims[0] / 4))
+        overlay_settings = [
+            {
+                "obs": "rgba_camera_1stperson",
+                "type": "color",
+                "dims": overlay_dims,
+                "pos": (10, 10),
+                "border": 2,
+            },
+            {
+                "obs": "depth_camera_1stperson",
+                "type": "depth",
+                "dims": overlay_dims,
+                "pos": (10, 30 + overlay_dims[1]),
+                "border": 2,
+            },
+        ]
+
         vut.make_video(
-            observations,
-            "rgba_camera_3rdperson",
-            "color",
-            output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
+            observations=observations,
+            primary_obs="rgba_camera_3rdperson",
+            primary_obs_type="color",
+            video_file=output_path + video_prefix,
+            fps=60,
             open_vid=show_video,
+            overlay_settings=overlay_settings,
+            depth_clip=10.0,
         )
 
 

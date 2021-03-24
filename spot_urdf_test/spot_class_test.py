@@ -131,6 +131,9 @@ def main(make_video=True, show_video=True):
         ),
         "spot_bd": os.path.join(
             data_path, "URDF_demo_assets/spot_bd/model.urdf"
+        ),
+        "spot_mass": os.path.join(
+            data_path, "URDF_demo_assets/spot_mass/spot_new.urdf"
         )
     }
 
@@ -138,24 +141,26 @@ def main(make_video=True, show_video=True):
 
 
     # load a URDF file
-    robot_file = urdf_files["spot_bd"]
+    robot_file_name = "spot_bd"
+    robot_file = urdf_files[robot_file_name]
     robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
-
+    
     # place the robot root state relative to the agent
     #local_base_pos = np.array([-4, 2, -4.0])
+
+
+    # local_base_pos = np.array([-2.0,1.2,-2.0])
     local_base_pos = np.array([-2.0,1.5,-2.0])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    transform2 = mn.Matrix4.rotation(mn.Rad(-.01), mn.Vector3(0, 0, 1).normalized())
+    transform2 = mn.Matrix4.rotation(mn.Rad(-1.5), mn.Vector3(0, 0, 1).normalized())
     base_transform = base_transform.__matmul__(transform2)
     base_transform.translation = agent_transform.transform_point(local_base_pos)
     
     
     sim.set_articulated_object_root_state(robot_id, base_transform)
-
-
-
+    
     # # set a better initial joint state for the aliengo
     # if (robot_file == urdf_files["spot_bd"]) or (robot_file == urdf_files["aliengo"]):
     #     pose = sim.get_articulated_object_positions(robot_id)
@@ -167,11 +172,6 @@ def main(make_video=True, show_video=True):
     #         #pose[dof-1] = 0
     #         # also set a thigh
     #     sim.set_articulated_object_positions(robot_id, pose)
-
-
-
-    # simulate
-    #observations += simulate(sim, dt=1.5, get_frames=make_video)
     
     
     existing_joint_motors = sim.get_existing_joint_motors(robot_id)
@@ -179,46 +179,60 @@ def main(make_video=True, show_video=True):
     agent_config = habitat_sim.AgentConfiguration()
     scene_graph = habitat_sim.SceneGraph()
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
-    
 
-    
-    spot = Spot({}, urdf_file=urdf_files["spot_bd"],sim= sim,agent=agent, robot_id=robot_id)
+    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id)
     spot.robot_specific_reset()
-    seconds_per_step = 1
-    time_per_step = np.round(30*seconds_per_step)
+    
+    time_per_step = 72
 
     action_limit = np.zeros((12, 2))
     action_limit[:, 0] = np.zeros(12) + np.pi / 2
     action_limit[:, 1] = np.zeros(12) - np.pi / 2
-    action_limit[[0,3,6,9], 1] = np.zeros(4) - np.pi / 10
-    action_limit[[0,3,6,9], 0] = np.zeros(4) + np.pi / 10
-    raibert_controller = Raibert_controller(control_frequency=240, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
 
-    # spot.apply_action(np.ones(12,)*.1)
-    # observations += simulate(sim, dt=3, get_frames=make_video)
-    state = spot.calc_state()
-    # spot.reset(state['j_pos'])
+    ctrl_freq = 240
+    raibert_controller = Raibert_controller(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
+
+
+    lin = np.array([1, 0]) 
+    ang = 0 
+    target_speed = lin
+    target_ang_vel = ang
+    state = spot.calc_state(prev_ang_vel=np.array([0, 0, ang]), prev_lin_vel=np.append(target_speed, 0))
+
     init_state = state
     raibert_controller.set_init_state(init_state)
 
-    lin = 1.5 # np.random.uniform(-0.75, 0.75, 1)
-    ang = 0 #np.random.uniform(-0.5, 0.5, 1)
-    hl_action = np.append(lin, ang)
-    target_speed = np.array([hl_action[0], 0])
-    target_ang_vel = hl_action[1]
-    latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0) #, target_ang_vel=target_ang_vel)
-    
-    
-    for i in range(20):
 
+    
+ 
+
+    #latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+    latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+
+    # hl_action = np.append(lin, ang)
+    # target_speed = np.array([hl_action[0], hl_action[1]])
+    # target_ang_vel = hl_action[2]
+    # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+    
+    for i in range(4):
+        # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
         raibert_controller.update_latent_action(state, latent_action)
         
+        # lin = 1 # np.random.uniform(-0.75, 0.75, 1)
+        # ang = 0.15 #np.random.uniform(-0.5, 0.5, 1)
+        # hl_action = np.append(lin, ang)
+        # target_speed = np.array([hl_action[0], 0])
+        # target_ang_vel = hl_action[1]
+        # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+        # raibert_controller.update_latent_action(state, latent_action)
         for j in range(time_per_step):
    
             action = raibert_controller.get_action(state, j+1)
             
-            observations += spot.step(action, dt=1/time_per_step)
-            state = spot.calc_state()
+            observations += spot.step(action, dt=1/ctrl_freq)
+        
+            state = spot.calc_state(prev_ang_vel=np.array([0, 0, ang]), prev_lin_vel=np.append(target_speed, 0))
 
 
     
@@ -242,14 +256,15 @@ def main(make_video=True, show_video=True):
   
 
 
-
+    
     if make_video:
         vut.make_video(
-            observations,
+            observations[1::8],
             "rgba_camera_3rdperson",
             "color",
             output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
             open_vid=show_video,
+            fps=ctrl_freq,
         )
 
 

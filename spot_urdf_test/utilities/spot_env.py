@@ -1,5 +1,6 @@
 import gym, gym.spaces
 import numpy as np
+import magnum as mn
 import habitat_sim 
 from utilities.utils import rotate_vector_3d, euler_from_quaternion
 
@@ -43,7 +44,7 @@ class Spot():
     def set_up_discrete_action_space(self):
         assert False, "A1 does not support discrete actions"
 
-    def calc_state(self):
+    def calc_state(self, prev_lin_vel=None, prev_ang_vel=None):
         """Computes the state.
         Unlike the original gym environment, which returns only a single
         array, we return here a dict because this is much more intuitive later on.
@@ -63,9 +64,18 @@ class Spot():
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         
         base_position = robot_state.translation
-        base_velocity = base_position
 
-        base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+        if prev_lin_vel is None:
+            # TODO REPLACE WITH ACTUAL VELOCITY...NOT CORRECT
+            base_velocity = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+        else:
+            base_velocity = prev_lin_vel
+        
+        if prev_ang_vel is None:
+            base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+        else:
+            base_angular_velocity_euler = prev_ang_vel
+
 
         base_orientation_quat = robot_state.rotation
        
@@ -116,19 +126,47 @@ class Spot():
         #     a = joint_pos[n]
         #     j.reset_joint_state(position=a, velocity=0.0)
 
-    def step(self, action, dt=1.0/30.0, verbose=False, get_frames=True):
+    def step(self, action, dt=1.0/240, verbose=False, get_frames=True):
+        
         self.apply_robot_action(action=action)
             # simulate dt seconds at 60Hz to the nearest fixed timestep
         if verbose:
             print("Simulating " + str(dt) + " world seconds.")
         observations = []
         start_time = self.sim.get_world_time()
+        count = 0
+        #self._follow_robot()
         while self.sim.get_world_time() < start_time + dt:
             self.sim.step_physics(dt)
+            
             if get_frames:
                 observations.append(self.sim.get_sensor_observations())
+                
+    
 
         return observations
+
+    def _follow_robot(self):
+        robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
+
+        node = self.sim._default_agent.scene_node
+        self.h_offset = 0
+        cam_pos = mn.Vector3(0, 0.0, 1+self.h_offset)
+
+        look_at = mn.Vector3(1, 0.0, 0)
+        look_at = robot_state.transform_point(look_at)
+
+        cam_pos = robot_state.transform_point(cam_pos)
+
+        node.transformation = mn.Matrix4.look_at(
+                cam_pos,
+                look_at,
+                mn.Vector3(0, 1, 0))
+
+        self.cam_trans = node.transformation
+        self.cam_look_at = look_at
+        self.cam_pos = cam_pos
+
 
     def apply_action(self, action):
         self.apply_robot_action(action)

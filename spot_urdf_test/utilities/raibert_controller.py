@@ -30,7 +30,7 @@ spot_config = {
     'thigh_length': 0.42,
     'shank_length': 0.42,
     'hip_joint_pos': [0.29785, 0.05500, 0.0],
-    'thigh_joint_loc': -0.11,
+    'thigh_joint_loc': 0.11,
 }
 
 class Raibert_controller():
@@ -127,7 +127,7 @@ class Raibert_controller():
         des_footstep = (speed_term + acceleration_term)
         self.latent_action[0:2] = des_footstep
         self.latent_action[2] = orientation_speed_term
-        print(self.latent_action)
+        
         return self.latent_action
 
     def switch_swing_stance(self):
@@ -197,21 +197,23 @@ class Raibert_controller_turn(Raibert_controller):
             control_frequency=control_frequency, leg_set_1=leg_set_1, leg_set_2=leg_set_2, leg_clearance=leg_clearance,
             action_limit=action_limit
         )
+        
+
 
     def plan_latent_action(self, state, target_speed, target_ang_vel=0.0):
         current_speed = np.array([state['base_velocity'][0], state['base_velocity'][1]])
         current_yaw_rate = state['base_ang_vel'][2]
         self.latent_action = np.zeros(3)
         self.target_speed = target_speed[:2]
-        # print("target ", self.target_speed, "current ", current_speed)
-
         acceleration_term = self.speed_gain*(self.target_speed-current_speed) + 0.5*current_speed*self.num_timestep_per_HL_action / self.control_frequency
         orientation_speed_term = self.speed_gain*(target_ang_vel-current_yaw_rate) + 0.5*self.num_timestep_per_HL_action / self.control_frequency * current_yaw_rate
 
         des_footstep = acceleration_term
+
         self.latent_action[0:2] = des_footstep
+  
         self.latent_action[2] = orientation_speed_term
-        print(self.latent_action)
+        
         return self.latent_action
 
     def update_latent_action(self, state, latent_action):
@@ -243,6 +245,12 @@ class Raibert_controller_turn(Raibert_controller):
             target_delta_xy[3 * i + 2] = -self.standing_height
         self.target_delta_xyz_world = self.kinematics_solver.robot_frame_to_world_robot(self.last_com_ori,
                                                                                         target_delta_xy)
+
+    def get_action(self, state, t):
+        phase = float(t) / self.num_timestep_per_HL_action
+        action = self._get_action(state, phase)
+        action = np.clip(action, a_min=self.action_limit[:,1], a_max=self.action_limit[:,0])
+        return action
 
     def _get_action(self, state, phase):
         self.des_foot_position_com = np.array([])
