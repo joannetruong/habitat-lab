@@ -243,6 +243,7 @@ class Raibert_controller_turn(Raibert_controller):
                             self.init_r_yaw[i][0] * math.sin(angle + init_angle) - self.init_r_yaw[i][0] * math.sin(
                         init_angle))
             target_delta_xy[3 * i + 2] = -self.standing_height
+        
         self.target_delta_xyz_world = self.kinematics_solver.robot_frame_to_world_robot(self.last_com_ori,
                                                                                         target_delta_xy)
 
@@ -255,6 +256,7 @@ class Raibert_controller_turn(Raibert_controller):
     def _get_action(self, state, phase):
         self.des_foot_position_com = np.array([])
         self.des_body_ori = (self.final_des_body_ori - self.last_com_ori) * phase + self.last_com_ori
+        
         # this seems to be designed only when walking on a flat ground
         des_foot_height_delta = (self.leg_clearance * math.sin(math.pi * phase + EPSILON))
 
@@ -273,5 +275,5 @@ class Raibert_controller_turn(Raibert_controller):
             self.des_foot_position_com = np.append(self.des_foot_position_com,self.kinematics_solver.world_frame_to_robot_leg(self.des_body_ori, des_single_foot_pos))
 
         des_leg_pose = self.kinematics_solver.inverse_kinematics_robot(self.des_foot_position_com)
-
+        print(des_leg_pose)
         return des_leg_pose

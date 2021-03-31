@@ -5,7 +5,7 @@ import habitat_sim
 from utilities.utils import rotate_vector_3d, euler_from_quaternion
 
 class Spot():
-    def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0):
+    def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0, dt=1/60):
         self.config = config
         #self.torque = config.get("torque", 1.0)
         self.high_level_action_dim = 2
@@ -18,6 +18,7 @@ class Spot():
                                          0.124, 0.876, -1.5,
                                          -0.124, 0.876, -1.5,
                                          0.124, 0.876, -1.5]
+        self.dt = dt
         # self._initial_joint_positions = [0, 0.45, -1,
         #                                  0, 0.45, -1,
         #                                  0, 0.45, -1,
@@ -44,7 +45,7 @@ class Spot():
     def set_up_discrete_action_space(self):
         assert False, "A1 does not support discrete actions"
 
-    def calc_state(self, prev_lin_vel=None, prev_ang_vel=None):
+    def calc_state(self, prev_state=None):
         """Computes the state.
         Unlike the original gym environment, which returns only a single
         array, we return here a dict because this is much more intuitive later on.
@@ -56,31 +57,26 @@ class Spot():
                 in euler angles.
         """
 
-        # print('joints: ', [j.joint_index for j in self.ordered_joints], [j.body_index for j in self.ordered_joints])
-        # print('feet: ', [f.body_part_index for f in self.ordered_foot])
         joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
         joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
-        #robot_state = self.agent.get_state()
+
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         
         base_position = robot_state.translation
-
-        if prev_lin_vel is None:
-            # TODO REPLACE WITH ACTUAL VELOCITY...NOT CORRECT
-            base_velocity = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-        else:
-            base_velocity = prev_lin_vel
         
-        if prev_ang_vel is None:
-            base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-        else:
-            base_angular_velocity_euler = prev_ang_vel
-
-
         base_orientation_quat = robot_state.rotation
        
         base_orientation_euler = euler_from_quaternion(base_orientation_quat)
-   
+
+        if prev_state is None:
+            base_velocity = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+            base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+        else:
+            base_velocity = (base_position - prev_state['base_pos']) / self.dt
+            base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
+        
+        base_angular_velocity_euler = np.clip(base_angular_velocity_euler, -10, 10)
+
         return {
             'base_pos_x': base_position.x,
             'base_pos_y': base_position.y,
@@ -92,8 +88,6 @@ class Spot():
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities,
-            #'j_eff': joint_effort,
-            #'foot_pos': foot_pos,
         }
 
 
@@ -112,7 +106,7 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 0.05, 0,1, 10) # .01 in pos gain
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 1, 0,1, 10) # .01 in pos gain
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:
@@ -126,7 +120,7 @@ class Spot():
         #     a = joint_pos[n]
         #     j.reset_joint_state(position=a, velocity=0.0)
 
-    def step(self, action, dt=1.0/240, verbose=False, get_frames=True):
+    def step(self, action, dt=1.0/240, verbose=False, get_frames=True, follow_robot=False):
         
         self.apply_robot_action(action=action)
             # simulate dt seconds at 60Hz to the nearest fixed timestep
@@ -135,23 +129,25 @@ class Spot():
         observations = []
         start_time = self.sim.get_world_time()
         count = 0
-        #self._follow_robot()
-        while self.sim.get_world_time() < start_time + dt:
-            self.sim.step_physics(dt)
-            
-            if get_frames:
-                observations.append(self.sim.get_sensor_observations())
-                
-    
+        
+        if follow_robot:
+            self._follow_robot()
 
+
+        # while self.sim.get_world_time() < start_time + dt:
+        self.sim.step_physics(dt)
+        
+        if get_frames:
+            observations.append(self.sim.get_sensor_observations())
+                
         return observations
 
     def _follow_robot(self):
         robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
 
         node = self.sim._default_agent.scene_node
-        self.h_offset = 0
-        cam_pos = mn.Vector3(0, 0.0, 1+self.h_offset)
+        self.h_offset = .5
+        cam_pos = mn.Vector3(0, 0.0, 0+self.h_offset)
 
         look_at = mn.Vector3(1, 0.0, 0)
         look_at = robot_state.transform_point(look_at)

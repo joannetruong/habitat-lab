@@ -10,6 +10,7 @@ import habitat_sim
 import habitat_sim.utils.viz_utils as vut
 from utilities.spot_env import Spot
 from utilities.raibert_controller import Raibert_controller
+from utilities.raibert_controller import Raibert_controller_turn
 
 
 
@@ -56,7 +57,7 @@ def make_configuration():
         "depth_camera_1stperson": {
             "sensor_type": habitat_sim.SensorType.DEPTH,
             "resolution": camera_resolution,
-            "position": [0.0, 0.6, 0.0],
+            "position": [0,0,0.0],#[0.0, 0.6, 0.0],
             "orientation": [0.0, 0.0, 0.0],
         },
         "rgba_camera_3rdperson": {
@@ -143,14 +144,15 @@ def main(make_video=True, show_video=True):
     # load a URDF file
     robot_file_name = "spot_bd"
     robot_file = urdf_files[robot_file_name]
-    robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
+    robot_id = sim.add_articulated_object_from_urdf(robot_file, True)
+    turn_controller = True
     
     # place the robot root state relative to the agent
     #local_base_pos = np.array([-4, 2, -4.0])
 
 
     # local_base_pos = np.array([-2.0,1.2,-2.0])
-    local_base_pos = np.array([-2.0,1.5,-2.0])
+    local_base_pos = np.array([-2.0,1.3,-2.0])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
@@ -179,25 +181,30 @@ def main(make_video=True, show_video=True):
     agent_config = habitat_sim.AgentConfiguration()
     scene_graph = habitat_sim.SceneGraph()
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
-
-    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id)
+    
+    ctrl_freq = 120
+    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq)
     spot.robot_specific_reset()
     
-    time_per_step = 72
+    time_per_step = 36
 
     action_limit = np.zeros((12, 2))
     action_limit[:, 0] = np.zeros(12) + np.pi / 2
     action_limit[:, 1] = np.zeros(12) - np.pi / 2
 
-    ctrl_freq = 240
-    raibert_controller = Raibert_controller(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
+
+    if turn_controller:
+        raibert_controller = Raibert_controller_turn(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
+    else:
+        raibert_controller = Raibert_controller(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
+    
 
 
     lin = np.array([1, 0]) 
-    ang = 0 
+    ang = 0
     target_speed = lin
     target_ang_vel = ang
-    state = spot.calc_state(prev_ang_vel=np.array([0, 0, ang]), prev_lin_vel=np.append(target_speed, 0))
+    state = spot.calc_state()
 
     init_state = state
     raibert_controller.set_init_state(init_state)
@@ -205,68 +212,98 @@ def main(make_video=True, show_video=True):
 
     
  
+    if turn_controller:
+        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+    else:
+        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=1.5)
 
-    #latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
-    latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
-
-    # hl_action = np.append(lin, ang)
-    # target_speed = np.array([hl_action[0], hl_action[1]])
-    # target_ang_vel = hl_action[2]
-    # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
     
-    for i in range(4):
-        # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
-        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+    for i in range(20):
+
+        if turn_controller:
+            latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+        else:    
+            latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+
         raibert_controller.update_latent_action(state, latent_action)
-        
-        # lin = 1 # np.random.uniform(-0.75, 0.75, 1)
-        # ang = 0.15 #np.random.uniform(-0.5, 0.5, 1)
-        # hl_action = np.append(lin, ang)
-        # target_speed = np.array([hl_action[0], 0])
-        # target_ang_vel = hl_action[1]
-        # latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
-        # raibert_controller.update_latent_action(state, latent_action)
+              
         for j in range(time_per_step):
    
             action = raibert_controller.get_action(state, j+1)
             
-            observations += spot.step(action, dt=1/ctrl_freq)
-        
-            state = spot.calc_state(prev_ang_vel=np.array([0, 0, ang]), prev_lin_vel=np.append(target_speed, 0))
+            cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
+            observations += cur_obs
+
+            state = spot.calc_state(prev_state=state)
 
 
     
     spot.apply_action(-np.ones(12,)*.1)
-
-    # for i in range(1,5):
-    #     observations += spot.step(np.array([0,.45/i,-1,
-    #                                         0,.45/i,-1,
-    #                                         0,.45/i,-1,
-    #                                         0,.45/i,-1]), dt=1.0)
-    #     st = sim.get_articulated_object_root_state(robot_id)
-    #     st = habitat_sim.AgentState(robot_id)
-    #     # st = sim.get_angular_velocity(robot_id)
-    #     # link_state = sim.get_articulated_link_rigid_state(robot_id, 0)
-        
-    #     # link_vel = sim.get_articulated_link_angular_velocity(robot_id, 11)
-    #     state = spot.calc_state()
-    #     print(state)
-
-
-  
-
-
     
     if make_video:
+        time_str = datetime.now().strftime("_%d%m%y_%H_%M")
+        sensor_dims = (
+            sim.get_agent(0).agent_config.sensor_specifications[0].resolution
+        )
+        overlay_dims = (int(sensor_dims[1] / 4), int(sensor_dims[0] / 4))
+        overlay_settings = [
+            {
+                "obs": "rgba_camera_1stperson",
+                "type": "color",
+                "dims": overlay_dims,
+                "pos": (10, 10),
+                "border": 2,
+            },
+            {
+                "obs": "depth_camera_1stperson",
+                "type": "depth",
+                "dims": overlay_dims,
+                "pos": (10, 30 + overlay_dims[1]),
+                "border": 2,
+            },
+        ]
+
+        # vut.make_video(
+        #     observations=observations,
+        #     primary_obs="depth_camera_1stperson",
+        #     primary_obs_type="depth",
+        #     video_file=output_path + "depth_1st_" + time_str,
+        #     fps=60,
+        #     open_vid=show_video,
+        #     overlay_settings=overlay_settings,
+        #     depth_clip=10.0,
+        # )
+        
         vut.make_video(
-            observations[1::8],
-            "rgba_camera_3rdperson",
-            "color",
-            output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
+            observations=observations,
+            primary_obs="rgba_camera_3rdperson",
+            primary_obs_type="color",
+            video_file=output_path + "color_3rd_" + time_str,
             open_vid=show_video,
             fps=ctrl_freq,
+            overlay_settings=overlay_settings,
+            depth_clip=10.0,
         )
+        # vut.make_video(
+        #     observations=observations,
+        #     primary_obs="rgba_camera_1stperson",
+        #     primary_obs_type="color",
+        #     video_file=output_path + "color_1st_" + time_str,
+        #     fps=60,
+        #     open_vid=show_video,
+        #     overlay_settings=overlay_settings,
+        #     depth_clip=10.0,
+        # )
+    # if make_video:
+    #     vut.make_video(
+    #         observations,
+    #         "rgba_camera_3rdperson",
+    #         "color",
+    #         output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
+    #         open_vid=show_video,
+    #         fps=ctrl_freq,
+    #     )
 
 
 if __name__ == "__main__":
-    main(make_video=True, show_video=True)
+    main(make_video=True, show_video=False)
