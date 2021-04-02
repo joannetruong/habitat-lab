@@ -2,6 +2,7 @@ import numpy as np
 import math
 import quaternion
 from scipy.spatial.transform import Rotation as R
+import squaternion
 
 # File I/O related
 def parse_config(config):
@@ -15,6 +16,17 @@ def rotate_vector_3d(v, r, p, y):
     local_to_global = R.from_euler('xyz', [r, p, y]).as_dcm()
     global_to_local = local_to_global.T
     return np.dot(global_to_local, v)
+
+def get_rpy(rotation, inverse_transform=None):
+    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+    
+    
+    if inverse_transform is not None:
+        inverse_transform_quat = squaternion.Quaternion(inverse_transform.scalar, *inverse_transform.vector)
+        obs_quat = obs_quat * inverse_transform_quat
+    roll, yaw, pitch = obs_quat.to_euler()
+    return np.array([roll, yaw, pitch])
+
 
 def euler_from_quaternion(quat):
         """

@@ -141,7 +141,6 @@ class Raibert_controller():
 
         self.last_com_ori = state['base_ori_euler']
         self.final_des_body_ori[2] = self.last_com_ori[2] + self.latent_action[-1]
-
         target_delta_xy = np.zeros(self.num_legs*3)
         for i in range(self.num_legs):
             if i in self.swing_set:
@@ -275,5 +274,4 @@ class Raibert_controller_turn(Raibert_controller):
             self.des_foot_position_com = np.append(self.des_foot_position_com,self.kinematics_solver.world_frame_to_robot_leg(self.des_body_ori, des_single_foot_pos))
 
         des_leg_pose = self.kinematics_solver.inverse_kinematics_robot(self.des_foot_position_com)
-        print(des_leg_pose)
         return des_leg_pose

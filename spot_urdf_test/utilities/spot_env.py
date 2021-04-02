@@ -2,10 +2,10 @@ import gym, gym.spaces
 import numpy as np
 import magnum as mn
 import habitat_sim 
-from utilities.utils import rotate_vector_3d, euler_from_quaternion
+from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy
 
 class Spot():
-    def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0, dt=1/60):
+    def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0, dt=1/60, inverse_transform=None):
         self.config = config
         #self.torque = config.get("torque", 1.0)
         self.high_level_action_dim = 2
@@ -19,6 +19,7 @@ class Spot():
                                          -0.124, 0.876, -1.5,
                                          0.124, 0.876, -1.5]
         self.dt = dt
+        self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
         # self._initial_joint_positions = [0, 0.45, -1,
         #                                  0, 0.45, -1,
         #                                  0, 0.45, -1,
@@ -65,8 +66,11 @@ class Spot():
         base_position = robot_state.translation
         
         base_orientation_quat = robot_state.rotation
-       
-        base_orientation_euler = euler_from_quaternion(base_orientation_quat)
+        
+        # base_orientation_euler = euler_from_quaternion(base_orientation_quat)
+        
+        
+        base_orientation_euler = get_rpy(base_orientation_quat, inverse_transform=self.inverse_transform_quat)
 
         if prev_state is None:
             base_velocity = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
@@ -76,6 +80,8 @@ class Spot():
             base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
         
         base_angular_velocity_euler = np.clip(base_angular_velocity_euler, -10, 10)
+        
+        # base_velocity =  np.array([base_velocity.x,base_velocity.y,base_velocity.z]) 
 
         return {
             'base_pos_x': base_position.x,
@@ -106,7 +112,7 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 1, 0,1, 10) # .01 in pos gain
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), .1, 0,.1, 10) # .01 in pos gain
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:
@@ -132,7 +138,6 @@ class Spot():
         
         if follow_robot:
             self._follow_robot()
-
 
         # while self.sim.get_world_time() < start_time + dt:
         self.sim.step_physics(dt)

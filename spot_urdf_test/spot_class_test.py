@@ -131,10 +131,7 @@ def main(make_video=True, show_video=True):
             data_path, "URDF_demo_assets/spot/urdf/spot.urdf.xacro"
         ),
         "spot_bd": os.path.join(
-            data_path, "URDF_demo_assets/spot_bd/model.urdf"
-        ),
-        "spot_mass": os.path.join(
-            data_path, "URDF_demo_assets/spot_mass/spot_new.urdf"
+            data_path, "URDF_demo_assets/spot_bd/model_massless.urdf"
         )
     }
 
@@ -144,8 +141,8 @@ def main(make_video=True, show_video=True):
     # load a URDF file
     robot_file_name = "spot_bd"
     robot_file = urdf_files[robot_file_name]
-    robot_id = sim.add_articulated_object_from_urdf(robot_file, True)
-    turn_controller = True
+    robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
+    turn_controller = False
     
     # place the robot root state relative to the agent
     #local_base_pos = np.array([-4, 2, -4.0])
@@ -156,9 +153,11 @@ def main(make_video=True, show_video=True):
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    transform2 = mn.Matrix4.rotation(mn.Rad(-1.5), mn.Vector3(0, 0, 1).normalized())
+    transform2 = mn.Matrix4.rotation(mn.Rad(-.01), mn.Vector3(0, 0, 1).normalized())
     base_transform = base_transform.__matmul__(transform2)
+    inverse_transform = base_transform.inverted()
     base_transform.translation = agent_transform.transform_point(local_base_pos)
+    
     
     
     sim.set_articulated_object_root_state(robot_id, base_transform)
@@ -182,11 +181,11 @@ def main(make_video=True, show_video=True):
     scene_graph = habitat_sim.SceneGraph()
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
     
-    ctrl_freq = 120
-    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq)
+    ctrl_freq = 240
+    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq, inverse_transform=inverse_transform)
     spot.robot_specific_reset()
     
-    time_per_step = 36
+    time_per_step = 72
 
     action_limit = np.zeros((12, 2))
     action_limit[:, 0] = np.zeros(12) + np.pi / 2
@@ -200,7 +199,7 @@ def main(make_video=True, show_video=True):
     
 
 
-    lin = np.array([1, 0]) 
+    lin = np.array([0, 0]) 
     ang = 0
     target_speed = lin
     target_ang_vel = ang
@@ -215,7 +214,7 @@ def main(make_video=True, show_video=True):
     if turn_controller:
         latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
     else:
-        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=1.5)
+        latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
 
     
     for i in range(20):
@@ -226,19 +225,22 @@ def main(make_video=True, show_video=True):
             latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
 
         raibert_controller.update_latent_action(state, latent_action)
-              
+        
         for j in range(time_per_step):
    
             action = raibert_controller.get_action(state, j+1)
             
             cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
             observations += cur_obs
-
             state = spot.calc_state(prev_state=state)
+            
+            
+            
+
 
 
     
-    spot.apply_action(-np.ones(12,)*.1)
+
     
     if make_video:
         time_str = datetime.now().strftime("_%d%m%y_%H_%M")
