@@ -64,7 +64,7 @@ class Spot():
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         
         base_position = robot_state.translation
-        
+        base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation
         
         # base_orientation_euler = euler_from_quaternion(base_orientation_quat)
@@ -73,12 +73,14 @@ class Spot():
         base_orientation_euler = get_rpy(base_orientation_quat, inverse_transform=self.inverse_transform_quat)
 
         if prev_state is None:
-            base_velocity = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-            base_angular_velocity_euler = self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+            base_velocity = mn.Vector3() #self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+            frame_pos = np.zeros((3))
+            base_angular_velocity_euler = mn.Vector3() # self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
         else:
             base_velocity = (base_position - prev_state['base_pos']) / self.dt
             base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
-        
+            frame_pos = rotate_vector_3d(base_velocity, *base_orientation_euler) * self.dt + prev_state['frame_pos']
+        base_velocity[1] = base_velocity[2]
         base_angular_velocity_euler = np.clip(base_angular_velocity_euler, -10, 10)
         
         # base_velocity =  np.array([base_velocity.x,base_velocity.y,base_velocity.z]) 
@@ -94,6 +96,7 @@ class Spot():
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities,
+            'frame_pos': frame_pos,
         }
 
 
@@ -112,7 +115,7 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), .1, 0,.1, 10) # .01 in pos gain
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 1, 0,1, 10) # .01 in pos gain
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:
