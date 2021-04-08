@@ -3,6 +3,7 @@ import numpy as np
 import magnum as mn
 import habitat_sim 
 from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy
+import squaternion
 
 class Spot():
     def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0, dt=1/60, inverse_transform=None):
@@ -69,9 +70,15 @@ class Spot():
         
         # base_orientation_euler = euler_from_quaternion(base_orientation_quat)
         
+        ivq = squaternion.Quaternion(self.inverse_transform_quat.scalar, *self.inverse_transform_quat.vector)
+        base_ori_quat_from_start = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector) * ivq
         
-        base_orientation_euler = get_rpy(base_orientation_quat, inverse_transform=self.inverse_transform_quat)
 
+        base_orientation_euler = get_rpy(base_orientation_quat, inverse_transform=self.inverse_transform_quat)
+        base_orientation_euler_origin = get_rpy(base_orientation_quat)
+        # temp = base_orientation_euler[2]
+        # base_orientation_euler[2] = base_orientation_euler[1]
+        # base_orientation_euler[1] = temp
         if prev_state is None:
             base_velocity = mn.Vector3() #self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
             frame_pos = np.zeros((3))
@@ -80,7 +87,9 @@ class Spot():
             base_velocity = (base_position - prev_state['base_pos']) / self.dt
             base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
             frame_pos = rotate_vector_3d(base_velocity, *base_orientation_euler) * self.dt + prev_state['frame_pos']
-        base_velocity[1] = base_velocity[2]
+
+        #base_velocity[1] = base_velocity[2]
+
         base_angular_velocity_euler = np.clip(base_angular_velocity_euler, -10, 10)
         
         # base_velocity =  np.array([base_velocity.x,base_velocity.y,base_velocity.z]) 
@@ -92,8 +101,9 @@ class Spot():
             'base_pos': np.array([base_position.x,base_position.y,base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
             'base_ori_quat': base_orientation_quat,
-            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-            'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
+            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler_origin),
+            'base_velocity_wrong': rotate_vector_3d(base_velocity, *base_orientation_euler),
+            'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler_origin),
             'j_pos': joint_positions,
             'j_vel': joint_velocities,
             'frame_pos': frame_pos,
@@ -115,7 +125,7 @@ class Spot():
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), 1, 0,1, 10) # .01 in pos gain
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), .1, 0,.2, 10) # .01 in pos gain
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
 
             else:

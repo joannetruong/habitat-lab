@@ -168,31 +168,38 @@ def main(make_video=True, show_video=True):
         "spot_alex": os.path.join(
             data_path, "URDF_demo_assets/spot_alex/habitat_spot_urdf/urdf/spot.urdf"
         ),
+        "spot_akshara": os.path.join(
+            data_path, "URDF_demo_assets/spot_akshara/spot_new.urdf"
+        ),
     }
 
     # [basics]
 
 
     # load a URDF file
-    robot_file_name = "spot_alex"
+    robot_file_name = "spot_akshara"
     robot_file = urdf_files[robot_file_name]
-    robot_id = sim.add_articulated_object_from_urdf(robot_file, False)
-    turn_controller = False
+    robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+    turn_controller = True
     
     # place the robot root state relative to the agent
     #local_base_pos = np.array([-4, 2, -4.0])
 
 
     # local_base_pos = np.array([-2.0,1.2,-2.0])
-    local_base_pos = np.array([-2,1.3,-2])
+    local_base_pos = np.array([-2,1.3,-4])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    transform2 = mn.Matrix4.rotation(mn.Rad(1.57), mn.Vector3(0, 0, 1).normalized())
+    inverse_transform = base_transform.inverted()
+    
+    transform2 = mn.Matrix4.rotation(mn.Rad(1.2), mn.Vector3(0, 0, 1).normalized())
     
     base_transform = base_transform.__matmul__(transform2)
+    
+    
+    
     inverse_transform = base_transform.inverted()
-    #inverse_transform = base_transform.inverted()
     base_transform.translation = agent_transform.transform_point(local_base_pos)
     
     
@@ -235,7 +242,7 @@ def main(make_video=True, show_video=True):
     
 
 
-    lin = np.array([0.4, 0]) 
+    lin = np.array([0.15, 0]) 
     ang = 0
     target_speed = lin
     target_ang_vel = ang
@@ -250,7 +257,8 @@ def main(make_video=True, show_video=True):
         latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
 
     text = []
-    for i in range(20):
+    
+    for i in range(30):
 
         if turn_controller:
             latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
@@ -265,14 +273,16 @@ def main(make_video=True, show_video=True):
             cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
             observations += cur_obs
             text_to_add = []
-            text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
-            ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
+            text_to_add.append("Pos: [" + str(np.round(state['base_velocity_wrong'][0], 3)) + ", " + str(np.round(state['base_velocity_wrong'][1], 3)) +\
+            ", " + str(np.round(state['base_velocity_wrong'][2], 3)) +  "]")
             text_to_add.append("Vel: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
             ", " + str(np.round(state['base_velocity'][2], 3)) +  "]")
             text_to_add.append("Ori: [" + str(np.round(state['base_ori_euler'][0], 3)) + ", " + str(np.round(state['base_ori_euler'][1], 3)) +\
             ", " + str(np.round(state['base_ori_euler'][2], 3)) +  "]")
+            text_to_add.append(str(state['base_ori_quat'].vector))
             text.append(text_to_add)
-            
+
+            print(str(state['base_ori_quat'].vector))
             state = spot.calc_state(prev_state=state)
 
     if make_video:
