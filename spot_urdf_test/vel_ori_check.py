@@ -192,31 +192,10 @@ def main(make_video=True, show_video=True):
     robot_file = urdf_files[robot_file_name]
     robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
     turn_controller = True
-    
-    # place the robot root state relative to the agent
-    #local_base_pos = np.array([-4, 2, -4.0])
 
-
-    # local_base_pos = np.array([-2.0,1.2,-2.0])
-    local_base_pos = np.array([-2,1.3,-4])
-    agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
-    
-    base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
-    inverse_transform = base_transform.inverted()
-    
-    transform2 = mn.Matrix4.rotation(mn.Rad(1.2), mn.Vector3(0, 0, 1).normalized())
-    
-    base_transform = base_transform.__matmul__(transform2)
-    
-    
-    
-    inverse_transform = base_transform.inverted()
-    base_transform.translation = agent_transform.transform_point(local_base_pos)
-    
-    
-    
-    sim.set_articulated_object_root_state(robot_id, base_transform)
-    
+    local_base_pos = np.array([0.0,0.0,0.0])
+    inverse = mn.Matrix4.rotation(mn.Rad(0.0), mn.Vector3(1, 0, 0).normalized())
+    inverse.translation = agent_transform.transform_point(local_base_pos)
     
     existing_joint_motors = sim.get_existing_joint_motors(robot_id)
     
@@ -225,7 +204,7 @@ def main(make_video=True, show_video=True):
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
     
     ctrl_freq = 120
-    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq, inverse_transform=inverse_transform)
+    spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq, inverse_transform=inverse)
     spot.robot_specific_reset()
     
     time_per_step = 72
@@ -260,100 +239,13 @@ def main(make_video=True, show_video=True):
     
     for i in range(30):
 
-        if turn_controller:
-            latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
-        else:    
-            latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
+        local_base_pos = np.array([0.0,0.0,0.0])
+        base_transform = mn.Matrix4.rotation(mn.Rad(0.0), mn.Vector3(1, 0, 0).normalized())
+        base_transform.translation = agent_transform.transform_point(local_base_pos)
+        print(base_transform)
+        sim.set_articulated_object_root_state(robot_id, base_transform)
+        state = spot.calc_state(prev_state=state)
 
-        raibert_controller.update_latent_action(state, latent_action)
-        
-        for j in range(time_per_step):
-            action = raibert_controller.get_action(state, j+1)
-            print(j)
-            cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
-            observations += cur_obs
-            text_to_add = []
-            text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
-            ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
-            text_to_add.append("Vel: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
-            ", " + str(np.round(state['base_velocity'][2], 3)) +  "]")
-            text_to_add.append("Ori: [" + str(np.round(state['base_ori_euler'][0], 3)) + ", " + str(np.round(state['base_ori_euler'][1], 3)) +\
-            ", " + str(np.round(state['base_ori_euler'][2], 3)) +  "]")
-            text_to_add.append("Commanded Vel (x,y,ang): (" + str(lin) + " " +str(ang) + ")")
-            text.append(text_to_add)
-
-        
-            state = spot.calc_state(prev_state=state)
-
-    if make_video:
-        time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
-        make_video_cv2(observations, ds=1, output_path='/srv/share3/mrudolph8/spot_videos/walking_test' +\
-             time_str +  "TEST", pov='rgba_camera_3rdperson',fps=30, text=text)
-
-    '''
-    if make_video:
-        time_str = datetime.now().strftime("_%d%m%y_%H_%M")
-        sensor_dims = (
-            sim.get_agent(0).agent_config.sensor_specifications[0].resolution
-        )
-        overlay_dims = (int(sensor_dims[1] / 4), int(sensor_dims[0] / 4))
-        overlay_settings = [
-            {
-                "obs": "rgba_camera_1stperson",
-                "type": "color",
-                "dims": overlay_dims,
-                "pos": (10, 10),
-                "border": 2,
-            },
-            {
-                "obs": "depth_camera_1stperson",
-                "type": "depth",
-                "dims": overlay_dims,
-                "pos": (10, 30 + overlay_dims[1]),
-                "border": 2,
-            },
-        ]
-
-        # vut.make_video(
-        #     observations=observations,
-        #     primary_obs="depth_camera_1stperson",
-        #     primary_obs_type="depth",
-        #     video_file=output_path + "depth_1st_" + time_str,
-        #     fps=60,
-        #     open_vid=show_video,
-        #     overlay_settings=overlay_settings,
-        #     depth_clip=10.0,
-        # )
-        
-        vut.make_video(
-            observations=observations,
-            primary_obs="rgba_camera_3rdperson",
-            primary_obs_type="color",
-            video_file=output_path + "color_3rd_" + time_str,
-            open_vid=show_video,
-            fps=ctrl_freq,
-            overlay_settings=overlay_settings,
-            depth_clip=10.0,
-        )
-        # vut.make_video(
-        #     observations=observations,
-        #     primary_obs="rgba_camera_1stperson",
-        #     primary_obs_type="color",
-        #     video_file=output_path + "color_1st_" + time_str,
-        #     fps=60,
-        #     open_vid=show_video,
-        #     overlay_settings=overlay_settings,
-        #     depth_clip=10.0,
-        # ) '''
-    # if make_video:
-    #     vut.make_video(
-    #         observations,
-    #         "rgba_camera_3rdperson",
-    #         "color",
-    #         output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
-    #         open_vid=show_video,
-    #         fps=ctrl_freq,
-    #     )
 
 
 if __name__ == "__main__":

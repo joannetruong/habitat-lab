@@ -5,6 +5,7 @@ import magnum as mn
 import numpy as np
 from datetime import datetime
 import habitat_sim
+import json
 
 # import habitat_sim.utils.common as ut
 import habitat_sim.utils.viz_utils as vut
@@ -88,18 +89,6 @@ def make_configuration():
 
     return habitat_sim.Configuration(backend_cfg, [agent_cfg])
 
-
-def simulate(sim, dt=1.0, get_frames=True):
-    # simulate dt seconds at 60Hz to the nearest fixed timestep
-    print("Simulating " + str(dt) + " world seconds.")
-    observations = []
-    start_time = sim.get_world_time()
-    while sim.get_world_time() < start_time + dt:
-        sim.step_physics(1.0 / 60.0)
-        if get_frames:
-            observations.append(sim.get_sensor_observations())
-
-    return observations
 
 def make_video_cv2(observations, ds=1, output_path = None, fps=60, pov="rgba_camera_3rdperson", text=None):
     if output_path is None:
@@ -193,11 +182,7 @@ def main(make_video=True, show_video=True):
     robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
     turn_controller = True
     
-    # place the robot root state relative to the agent
-    #local_base_pos = np.array([-4, 2, -4.0])
 
-
-    # local_base_pos = np.array([-2.0,1.2,-2.0])
     local_base_pos = np.array([-2,1.3,-4])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
@@ -224,16 +209,19 @@ def main(make_video=True, show_video=True):
     scene_graph = habitat_sim.SceneGraph()
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
     
-    ctrl_freq = 120
+    ctrl_freq = 240
     spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq, inverse_transform=inverse_transform)
     spot.robot_specific_reset()
     
-    time_per_step = 72
+    time_per_step = 80
 
     action_limit = np.zeros((12, 2))
     action_limit[:, 0] = np.zeros(12) + np.pi / 2
     action_limit[:, 1] = np.zeros(12) - np.pi / 2
 
+
+    f = open('/nethome/mrudolph8/Documents/haburdf/spot_urdf_test/controller_log.json')
+    data = json.load(f)
 
     if turn_controller:
         raibert_controller = Raibert_controller_turn(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
@@ -257,9 +245,20 @@ def main(make_video=True, show_video=True):
         latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
 
     text = []
-    
-    for i in range(30):
+    out_data = {}
 
+    for i in range(30):
+        action_num = i+1
+        cur_data = data[str(action_num)]
+        target_speed = cur_data["target_speed"]
+        target_ang_vel = cur_data["target_speed_ang"]
+        #state['j_pos'] = cur_data["input_joint_pos"]
+        state['base_ori_euler'] = cur_data["input_base_ori_euler"]
+        state['base_ang_vel'][2] = cur_data["input_current_yaw_rate"]
+        state['base_velocity'][0:2] = cur_data["input_current_speed"]
+        state['j_pos'] = cur_data["input_joint_pos"]
+        raibert_controller.set_init_state(state)
+        raibert_action = []
         if turn_controller:
             latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
         else:    
@@ -269,91 +268,31 @@ def main(make_video=True, show_video=True):
         
         for j in range(time_per_step):
             action = raibert_controller.get_action(state, j+1)
-            print(j)
+
             cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
             observations += cur_obs
-            text_to_add = []
-            text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
-            ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
-            text_to_add.append("Vel: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
-            ", " + str(np.round(state['base_velocity'][2], 3)) +  "]")
-            text_to_add.append("Ori: [" + str(np.round(state['base_ori_euler'][0], 3)) + ", " + str(np.round(state['base_ori_euler'][1], 3)) +\
-            ", " + str(np.round(state['base_ori_euler'][2], 3)) +  "]")
-            text_to_add.append("Commanded Vel (x,y,ang): (" + str(lin) + " " +str(ang) + ")")
-            text.append(text_to_add)
 
-        
+            raibert_action.append(list(action))
+
             state = spot.calc_state(prev_state=state)
+        out_data[str(action_num)]["target_speed"] = cur_data["target_speed"]
+        out_data[str(action_num)]["target_speed_ang"] = cur_data["target_speed_ang"]
+        out_data[str(action_num)]["input_base_ori_euler"] =  cur_data["input_base_ori_euler"]
+        out_data[str(action_num)]["input_current_yaw_rate"] = cur_data["input_current_yaw_rate"]
+        out_data[str(action_num)]["input_current_speed"] = cur_data["input_current_speed"]
+        out_data[str(action_num]["input_joint_pos"] = cur_data["input_joint_pos"]
+        out_data[str(action_num)]["latent_action_habitat"] = list(raibert_controller.latent_action)
+        out_data[str(action_num)]["raibert_action_habitat"] = raibert_action
+        
+
+    with open('/nethome/mrudolph8/Documents/haburdf/spot_urdf_test/output_action.json', 'w') as outfile:
+        json.dump(data, outfile, indent=4)
 
     if make_video:
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
         make_video_cv2(observations, ds=1, output_path='/srv/share3/mrudolph8/spot_videos/walking_test' +\
-             time_str +  "TEST", pov='rgba_camera_3rdperson',fps=30, text=text)
+             time_str +  "TEST", pov='rgba_camera_3rdperson',fps=30, text=None)
 
-    '''
-    if make_video:
-        time_str = datetime.now().strftime("_%d%m%y_%H_%M")
-        sensor_dims = (
-            sim.get_agent(0).agent_config.sensor_specifications[0].resolution
-        )
-        overlay_dims = (int(sensor_dims[1] / 4), int(sensor_dims[0] / 4))
-        overlay_settings = [
-            {
-                "obs": "rgba_camera_1stperson",
-                "type": "color",
-                "dims": overlay_dims,
-                "pos": (10, 10),
-                "border": 2,
-            },
-            {
-                "obs": "depth_camera_1stperson",
-                "type": "depth",
-                "dims": overlay_dims,
-                "pos": (10, 30 + overlay_dims[1]),
-                "border": 2,
-            },
-        ]
-
-        # vut.make_video(
-        #     observations=observations,
-        #     primary_obs="depth_camera_1stperson",
-        #     primary_obs_type="depth",
-        #     video_file=output_path + "depth_1st_" + time_str,
-        #     fps=60,
-        #     open_vid=show_video,
-        #     overlay_settings=overlay_settings,
-        #     depth_clip=10.0,
-        # )
-        
-        vut.make_video(
-            observations=observations,
-            primary_obs="rgba_camera_3rdperson",
-            primary_obs_type="color",
-            video_file=output_path + "color_3rd_" + time_str,
-            open_vid=show_video,
-            fps=ctrl_freq,
-            overlay_settings=overlay_settings,
-            depth_clip=10.0,
-        )
-        # vut.make_video(
-        #     observations=observations,
-        #     primary_obs="rgba_camera_1stperson",
-        #     primary_obs_type="color",
-        #     video_file=output_path + "color_1st_" + time_str,
-        #     fps=60,
-        #     open_vid=show_video,
-        #     overlay_settings=overlay_settings,
-        #     depth_clip=10.0,
-        # ) '''
-    # if make_video:
-    #     vut.make_video(
-    #         observations,
-    #         "rgba_camera_3rdperson",
-    #         "color",
-    #         output_path + "URDF_basics" + datetime.now().strftime("%d%m%y_%H_%M"),
-    #         open_vid=show_video,
-    #         fps=ctrl_freq,
-    #     )
 
 
 if __name__ == "__main__":

@@ -15,19 +15,14 @@ class Spot():
         self.robot_id = robot_id
         self.control = "position"
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
-        self._initial_joint_positions = [-.124, 0.876, -1.5,
-                                         0.124, 0.876, -1.5,
-                                         -0.124, 0.876, -1.5,
-                                         0.124, 0.876, -1.5]
+        self._initial_joint_positions = [-0.05, 0.60, -1.5,
+                                         0.05, 0.60, -1.5,
+                                         -0.05, 0.65, -1.5,
+                                         0.05, 0.65, -1.5]
+        self.robot_specific_reset()
         self.dt = dt
         self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
-        # self._initial_joint_positions = [0, 0.45, -1,
-        #                                  0, 0.45, -1,
-        #                                  0, 0.45, -1,
-        #                                  0, 0.45, -1]
-        #  hip_ids = [1,4,7,10]
-        #  hip_out_ids = [0, 3, 6, 9]
-        #  knee_ids = [2, 5, 8, 11]
+
 
 
     def set_up_continuous_action_space(self):
@@ -73,7 +68,7 @@ class Spot():
         ivq = squaternion.Quaternion(self.inverse_transform_quat.scalar, *self.inverse_transform_quat.vector)
         base_ori_quat_from_start = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector) * ivq
         
-
+        
         base_orientation_euler = get_rpy(base_orientation_quat, inverse_transform=self.inverse_transform_quat)
         base_orientation_euler_origin = get_rpy(base_orientation_quat)
         # temp = base_orientation_euler[2]
@@ -123,17 +118,17 @@ class Spot():
             if self.control == 'velocity':
                 joint_settings = habitat_sim.physics.JointMotorSettings(0, 0, float(np.clip(a, -1, +1)),.1, 10)
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
-
             elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), .1, 0,.2, 10) # .01 in pos gain
+                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), .08, 0,.2, 10) # .08 and .2
                 self.sim.update_joint_motor(self.robot_id, n, joint_settings)
-
             else:
                 print('not implemented yet')
 
     def robot_specific_reset(self, joint_pos=None):
         if joint_pos is None:
             joint_pos = self._initial_joint_positions
+            self.sim.set_articulated_object_positions(self.robot_id, joint_pos)
+        else:
             self.sim.set_articulated_object_positions(self.robot_id, joint_pos)
         # for n, j in enumerate(self.ordered_joints):
         #     a = joint_pos[n]

@@ -27,8 +27,8 @@ laikago_config = {
 }
 
 spot_config = {
-    'thigh_length': 0.42,
-    'shank_length': 0.42,
+    'thigh_length': 0.44,
+    'shank_length': 0.44,
     'hip_joint_pos': [0.29785, 0.05500, 0.0],
     'thigh_joint_loc': 0.11,
 }
