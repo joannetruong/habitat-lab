@@ -173,16 +173,12 @@ def main(make_video=True, show_video=True):
         ),
     }
 
-    # [basics]
-
-
     # load a URDF file
     robot_file_name = "spot_hybrid"
     robot_file = urdf_files[robot_file_name]
     robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
     turn_controller = True
     
-
     local_base_pos = np.array([-2,1.3,-4])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
     
@@ -286,7 +282,7 @@ def main(make_video=True, show_video=True):
         
 
     with open('/nethome/mrudolph8/Documents/haburdf/spot_urdf_test/output_action.json', 'w') as outfile:
-        json.dump(data, outfile, indent=4)
+        json.dump(out_data, outfile, indent=4)
 
     if make_video:
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")

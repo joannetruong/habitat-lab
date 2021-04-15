@@ -193,55 +193,40 @@ def main(make_video=True, show_video=True):
     robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
     turn_controller = True
     
-    # place the robot root state relative to the agent
-    #local_base_pos = np.array([-4, 2, -4.0])
 
-
-    # local_base_pos = np.array([-2.0,1.2,-2.0])
+    # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
     local_base_pos = np.array([-2,1.3,-4])
     agent_transform1 = sim.agents[0].scene_node.transformation_matrix()
-    
     base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
     inverse_transform = base_transform.inverted()
-    
     transform2 = mn.Matrix4.rotation(mn.Rad(1.2), mn.Vector3(0, 0, 1).normalized())
-    
     base_transform = base_transform.__matmul__(transform2)
-    
-    
-    
     inverse_transform = base_transform.inverted()
-    base_transform.translation = agent_transform.transform_point(local_base_pos)
-    
-    
-    
+    base_transform.translation = agent_transform.transform_point(local_base_pos)    
     sim.set_articulated_object_root_state(robot_id, base_transform)
-    
-    
-    existing_joint_motors = sim.get_existing_joint_motors(robot_id)
-    
+
+
+    existing_joint_motors = sim.get_existing_joint_motors(robot_id)    
     agent_config = habitat_sim.AgentConfiguration()
     scene_graph = habitat_sim.SceneGraph()
     agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
     
+    # Set up spot interface using the spot_env. Allows for control of joints and access to state information
     ctrl_freq = 120
     spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=agent, robot_id=robot_id, dt=1/ctrl_freq, inverse_transform=inverse_transform)
     spot.robot_specific_reset()
     
+    # Set up Raibert controller and link it to spot
     time_per_step = 72
-
     action_limit = np.zeros((12, 2))
     action_limit[:, 0] = np.zeros(12) + np.pi / 2
     action_limit[:, 1] = np.zeros(12) - np.pi / 2
-
-
     if turn_controller:
         raibert_controller = Raibert_controller_turn(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
     else:
         raibert_controller = Raibert_controller(control_frequency=ctrl_freq, num_timestep_per_HL_action=time_per_step, action_limit=action_limit, robot="Spot")
     
-
-
+    # Set desired linear and angular velocities
     lin = np.array([0.5, 0]) 
     ang = 0
     target_speed = lin
@@ -251,6 +236,7 @@ def main(make_video=True, show_video=True):
     init_state = state
     raibert_controller.set_init_state(init_state)
 
+    # Get initial latent action (not necessary)
     if turn_controller:
         latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
     else:
@@ -258,20 +244,28 @@ def main(make_video=True, show_video=True):
 
     text = []
     
+
     for i in range(30):
 
+        # Actually get latent action
         if turn_controller:
             latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
         else:    
             latent_action = raibert_controller.plan_latent_action(state, target_speed, target_ori=0)
 
+        # Update latent action in controller 
         raibert_controller.update_latent_action(state, latent_action)
         
         for j in range(time_per_step):
+
+            # Get actual joint actions 
             action = raibert_controller.get_action(state, j+1)
-            print(j)
+
+            # Simulate spot for 1/ctrl_freq seconds and return camera observation
             cur_obs = spot.step(action, dt=1/ctrl_freq, follow_robot=False)
             observations += cur_obs
+
+            # Get text to add to video
             text_to_add = []
             text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
             ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
@@ -282,7 +276,7 @@ def main(make_video=True, show_video=True):
             text_to_add.append("Commanded Vel (x,y,ang): (" + str(lin) + " " +str(ang) + ")")
             text.append(text_to_add)
 
-        
+            # Recalculate spot state for next action
             state = spot.calc_state(prev_state=state)
 
     if make_video:

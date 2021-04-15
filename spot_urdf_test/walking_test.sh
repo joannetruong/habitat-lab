@@ -8,5 +8,4 @@ ln -s /srv/share3/mrudolph8/data/data/datasets /nethome/mrudolph8/Documents/habu
 ln -s /srv/share3/mrudolph8/data/data/scene_datasets /nethome/mrudolph8/Documents/haburdf/habitat-sim/data/
 ln -s /srv/share3/mrudolph8/data/data/URDF_demo_assets /nethome/mrudolph8/Documents/haburdf/habitat-sim/data/
 
-
 python ../spot_urdf_test/spot_class_test.py
