@@ -1,8 +1,10 @@
 import numpy as np
 import math
-import quaternion
 from scipy.spatial.transform import Rotation as R
 import squaternion
+from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
+from habitat.tasks.utils import cartesian_to_polar
+import magnum as mn
 
 # File I/O related
 def parse_config(config):
@@ -17,16 +19,66 @@ def rotate_vector_3d(v, r, p, y):
     global_to_local = local_to_global.T
     return np.dot(global_to_local, v)
 
-def get_rpy(rotation, inverse_transform=None):
-    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
-    
-    
-    if inverse_transform is not None:
-        inverse_transform_quat = squaternion.Quaternion(inverse_transform.scalar, *inverse_transform.vector)
-        obs_quat = obs_quat * inverse_transform_quat
-    roll, yaw, pitch = obs_quat.to_euler()
-    return np.array([roll, yaw, pitch])
+def scalar_vector_to_quat(scalar, vector):
+    new_scalar = np.cos(scalar/2)
+    new_vector = np.array(vector)*np.sin(scalar/2)
+    quat = squaternion.Quaternion(new_scalar, *new_vector)
+    return quat
 
+def quaternion_from_coeff(coeffs: np.ndarray) -> np.quaternion:
+    r"""Creates a quaternions from coeffs in [x, y, z, w] format"""
+    quat = np.quaternion(0, 0, 0, 0)
+    quat.real = coeffs[3]
+    quat.imag = coeffs[0:3]
+    return quat
+
+def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
+    r"""Rotates a vector by a quaternion
+    Args:
+        quaternion: The quaternion to rotate by
+        v: The vector to rotate
+    Returns:
+        np.array: The rotated vector
+    """
+    vq = np.quaternion(0, 0, 0, 0)
+    vq.imag = v
+    return (quat * vq * quat.inverse()).imag
+
+def cartesian_to_polar(x, y):
+    rho = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    return rho, phi
+
+def get_rpy(rotation, transform=True):
+    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+    if transform:
+        inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
+        obs_quat = obs_quat*inverse_base_transform
+    roll, yaw, pitch = obs_quat.to_euler()
+    return np.array([roll, pitch, yaw])
+
+def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
+    a = np.quaternion(1, 0, 0, 0)
+    a.real = quat.scalar
+    a.imag = quat.vector
+    return a
+
+def quat_to_rad(rotation):
+    inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
+    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+    obs_quat = obs_quat*inverse_base_transform
+
+    # rotation = rotation*inverse_base_transform
+    rot = quat_from_magnum(rotation)
+
+    if isinstance(rotation, list):
+        rot = quaternion_from_coeff(np.array(rot))
+    heading_vector = quaternion_rotate_vector(
+       rot.inverse(), np.array([0, 0, -1])
+    )
+
+    # r,y,p = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+    return heading_vector
 
 def euler_from_quaternion(quat):
         """

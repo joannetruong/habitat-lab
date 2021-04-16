@@ -1,3 +1,4 @@
-
 /habitat-lab
-*.mp4
+/habitat-sim
+**/.mp4
+**/.pyc

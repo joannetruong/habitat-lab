@@ -201,7 +201,9 @@ class Raibert_controller_turn(Raibert_controller):
 
     def plan_latent_action(self, state, target_speed, target_ang_vel=0.0):
         current_speed = np.array([state['base_velocity'][0], state['base_velocity'][1]])
+        # current_speed = np.array(target_speed)
         current_yaw_rate = state['base_ang_vel'][2]
+        # current_yaw_rate = target_ang_vel
         self.latent_action = np.zeros(3)
         self.target_speed = target_speed[:2]
         acceleration_term = self.speed_gain*(self.target_speed-current_speed) + 0.5*current_speed*self.num_timestep_per_HL_action / self.control_frequency
