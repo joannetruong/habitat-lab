@@ -72,14 +72,10 @@ class Raibert_controller():
             self.target = target
 
         
+        self.action_limit = np.zeros((self.n_dof, 2))
         if action_limit is None:
-            self.action_limit = np.zeros((self.n_dof, 2))
             self.action_limit[:, 0] = np.zeros(self.n_dof) + np.pi / 2.0
             self.action_limit[:, 1] = np.zeros(self.n_dof) - np.pi / 2.0
-            
-            # Add clipping limit on hip joints...controller is wack
-            self.action_limit[[0,3,6,9], 0] = np.zeros(4) + np.pi / 20.0
-            self.action_limit[[0,3,6,9], 1] = np.zeros(4) - np.pi / 20.0
 
         if des_body_ori is None:
             self.des_body_ori = np.array([0,0,0]) # this is for des orientation at each timestep

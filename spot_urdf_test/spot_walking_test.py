@@ -28,7 +28,10 @@ class Workspace(object):
         self.pos_gain = 0.3
         self.vel_gain = 0.3
         self.num_steps = 5
+        self.ctrl_freq = 240
+        self.time_per_step = 80
         self.prev_state=None
+        self.finite_diff=False
         self.setup()
 
     def make_configuration(self):
@@ -122,6 +125,16 @@ class Workspace(object):
         base_transform.translation = agent_transform.transform_point(local_base_pos)
         sim.set_articulated_object_root_state(robot_id, base_transform)
 
+        jms = habitat_sim.physics.JointMotorSettings(
+                        0,  # position_target
+                        self.pos_gain,  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain,  # velocity_gain
+                        10.0,  # max_impulse
+                    )
+        for i in range(12):
+            sim.update_joint_motor(robot_id, i, jms)
+
         # base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
         # inverse_transform = base_transform.inverted()
         # transform2 = mn.Matrix4.rotation(mn.Rad(1.2), mn.Vector3(0, 0, 1).normalized())
@@ -131,21 +144,19 @@ class Workspace(object):
         # sim.set_articulated_object_root_state(robot_id, base_transform)
 
 
-        existing_joint_motors = sim.get_existing_joint_motors(robot_id)    
+        # existing_joint_motors = sim.get_existing_joint_motors(robot_id)    
         agent_config = habitat_sim.AgentConfiguration()
         scene_graph = habitat_sim.SceneGraph()
         agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
 
-        self.ctrl_freq = 240
         self.spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
         self.spot.robot_specific_reset()
         
         # Set up Raibert controller and link it to spot
-        self.time_per_step = 80
         action_limit = np.zeros((12, 2))
         action_limit[:, 0] = np.zeros(12) + np.pi / 2
         action_limit[:, 1] = np.zeros(12) - np.pi / 2
-        self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, action_limit=action_limit, robot="Spot")
+        self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot="Spot")
 
     def make_video_cv2(self, observations, ds=1, output_path = None, fps=60, pov="rgba_camera_3rdperson"):
         if output_path is None:
@@ -183,7 +194,7 @@ class Workspace(object):
 
     # [/setup]
     def reset_robot(self):
-        self.init_state = self.spot.calc_state()
+        self.init_state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         self.raibert_controller.set_init_state(self.init_state)
         time.sleep(1)
 
@@ -208,7 +219,7 @@ class Workspace(object):
             self.ep_id +=1
 
     def step_robot(self, action):
-        state = self.spot.calc_state(self.prev_state)
+        state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         target_speed = np.array([action[0], action[1]])
         target_ang_vel = action[2]
         self.target_speed = list(target_speed)
@@ -216,7 +227,7 @@ class Workspace(object):
         self.input_current_speed = state['base_velocity'][0:2]
         self.input_joint_pos = state['j_pos']
         self.input_current_yaw_rate = state['base_ang_vel'][2]
-        print('input current speed: ', self.input_current_speed, 'input_current_yaw_rate: ', self.input_current_yaw_rate)
+        # print('input current speed: ', self.input_current_speed, 'input_current_yaw_rate: ', self.input_current_yaw_rate)
 
         # Get initial latent action (not necessary)
         latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
@@ -242,8 +253,14 @@ class Workspace(object):
             text_to_add = []
             text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
             ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
-            text_to_add.append("Vel: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
+            text_to_add.append("Vel_lin: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
             ", " + str(np.round(state['base_velocity'][2], 3)) +  "]")
+            # text_to_add.append("Vel_lin_b: [" + str(np.round(state['base_velocity_b'][0], 3)) + ", " + str(np.round(state['base_velocity_b'][1], 3)) +\
+            # ", " + str(np.round(state['base_velocity_b'][2], 3)) +  "]")
+            text_to_add.append("Vel_ang: [" + str(np.round(state['base_ang_vel'][0], 3)) + ", " + str(np.round(state['base_ang_vel'][1], 3)) +\
+            ", " + str(np.round(state['base_ang_vel'][2], 3)) +  "]")
+            # text_to_add.append("Vel_ang_b: [" + str(np.round(state['base_ang_vel_b]'[0], 3)) + ", " + str(np.round(state['base_ang_vel_b'][1], 3)) +\
+            # ", " + str(np.round(state['base_ang_vel_b'][2], 3)) +  "]")
             text_to_add.append("Ori: [" + str(np.round(state['base_ori_euler'][0], 3)) + ", " + str(np.round(state['base_ori_euler'][1], 3)) +\
             ", " + str(np.round(state['base_ori_euler'][2], 3)) +  "]")
             text_to_add.append("Commanded Vel (x,y,ang): (" + str(target_speed) + " " +str(target_ang_vel) + ")")
@@ -251,8 +268,8 @@ class Workspace(object):
             self.text.append(text_to_add)
 
             # Recalculate spot state for next action
-            state = self.spot.calc_state(prev_state=self.prev_state)  
-            raibert_base_velocity.append(state['base_velocity'][0:2])
+            state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+            raibert_base_velocity.append(state['base_velocity'])
             raibert_actions_measured.append(state['j_pos'])
         self.raibert_action_commanded = raibert_actions_commanded
         self.raibert_action_measured = raibert_actions_measured
@@ -261,7 +278,7 @@ class Workspace(object):
     def make_video(self):
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
         self.make_video_cv2(self.observations, ds=1, output_path=output_path +\
-             time_str +  "TEST", pov='rgba_camera_3rdperson',fps=self.ctrl_freq)
+             time_str +  'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff), pov='rgba_camera_3rdperson',fps=self.ctrl_freq)
 
     # This is wrapped such that it can be added to a unit test
     def test_robot(self):

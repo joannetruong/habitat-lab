@@ -143,9 +143,10 @@ class quadruped_kinematics_solver():
         l_projected = math.sqrt(np.max([y**2 + z**2 - self.thigh_joint_loc**2, EPSILON]))
         
         if leg_index%2==1:
-            hip_pos = (math.asin(l_projected/(math.sqrt(y**2 + z**2)+EPSILON)) + math.asin(y/(math.sqrt(y**2 + z**2)+EPSILON))) -  math.pi/2.0
+            hip_pos = (math.asin(np.clip((l_projected/(math.sqrt(y**2 + z**2)+EPSILON)), a_max=1.0, a_min=-1.0)) 
+                + math.asin(np.clip((y/(math.sqrt(y**2 + z**2)+EPSILON)), a_max=1.0, a_min=-1.0))) -  math.pi/2.0
         else:
-            hip_pos = math.pi/2.0 - (math.asin(l_projected/(math.sqrt(y**2 + z**2)+EPSILON)) - math.asin(y/(math.sqrt(y**2 + z**2)+EPSILON)))
+            hip_pos = math.pi/2.0 - (math.asin(np.clip((l_projected/(math.sqrt(y**2 + z**2)+EPSILON)), a_max=1.0, a_min=-1.0)) - math.asin(np.clip((y/(math.sqrt(y**2 + z**2)+EPSILON)), a_max=1.0, a_min=-1.0)))
 
         thigh2foot = math.sqrt(l_projected**2 + x**2)
         l = (self.thigh_length**2 + self.shank_length**2 - thigh2foot**2)/ (2*self.thigh_length*self.shank_length+ EPSILON)
@@ -155,6 +156,3 @@ class quadruped_kinematics_solver():
         thigh_pos = math.acos(np.clip(l, a_max=1.0, a_min=-1.0)) - math.asin(np.clip(x/thigh2foot+ EPSILON, a_max=1, a_min=-1))
 
         return np.array([hip_pos, thigh_pos, shank_pos])
-
-
-

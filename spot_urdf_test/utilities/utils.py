@@ -64,11 +64,6 @@ def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
     return a
 
 def quat_to_rad(rotation):
-    inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
-    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
-    obs_quat = obs_quat*inverse_base_transform
-
-    # rotation = rotation*inverse_base_transform
     rot = quat_from_magnum(rotation)
 
     if isinstance(rotation, list):

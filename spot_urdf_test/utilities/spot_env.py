@@ -62,7 +62,7 @@ class Spot():
         # theta = self.quat_to_rad(rotation)
         return pos
 
-    def calc_state(self, prev_state=None):
+    def calc_state(self, prev_state=None, finite_diff=False):
         """Computes the state.
         Unlike the original gym environment, which returns only a single
         array, we return here a dict because this is much more intuitive later on.
@@ -78,7 +78,8 @@ class Spot():
         joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
 
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        
+        vels = self.sim.get_articulated_link_velocity(self.robot_id, 0)
+        lin_vel, ang_vel = vels[0], vels[1]
         base_pos = robot_state.translation
         # base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation
@@ -87,53 +88,49 @@ class Spot():
         base_position.x = base_pos_tmp[0]
         base_position.y = base_pos_tmp[1]
         base_position.z = base_pos_tmp[2]
-        # base_orientation_euler = euler_from_quaternion(base_orientation_quat)
-        
-        # ivq = squaternion.Quaternion(self.inverse_transform_quat.scalar, *self.inverse_transform_quat.vector)
-        # base_ori_quat_from_start = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector) * ivq
-        
-        
-        # print('base_orientation_quat: ', base_orientation_quat)
+
         base_orientation_euler = get_rpy(base_orientation_quat)
-        # print('base_orientation_euler: ', base_orientation_euler)
         base_orientation_euler_origin = get_rpy(base_orientation_quat, transform=False)
-        # temp = base_orientation_euler[2]
-        # base_orientation_euler[2] = base_orientation_euler[1]
-        # base_orientation_euler[1] = temp
-        if prev_state is None:
-            base_velocity = mn.Vector3() #self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-            frame_pos = np.zeros((3))
-            base_angular_velocity_euler = mn.Vector3() # self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+
+        if finite_diff:
+            if prev_state is None:
+                base_velocity = mn.Vector3() #self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+                frame_pos = np.zeros((3))
+                base_angular_velocity_euler = mn.Vector3() # self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
+            else:
+                # print(prev_state['base_pos'], base_position)
+                base_velocity = (base_position - prev_state['base_pos']) / self.dt
+                if base_velocity == mn.Vector3():
+                    base_velocity = mn.Vector3(prev_state['base_velocity'])
+                base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
         else:
-            # print(prev_state['base_pos'], base_position)
-            base_velocity = (base_position - prev_state['base_pos']) / self.dt
-            if base_velocity == mn.Vector3():
-                base_velocity = mn.Vector3(prev_state['base_velocity'])
-            base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
-            frame_pos = rotate_vector_3d(base_velocity, *base_orientation_euler) * self.dt + prev_state['frame_pos']
+            base_velocity = lin_vel
+            base_angular_velocity_euler = ang_vel
 
-        #base_velocity[1] = base_velocity[2]
-
-        # base_angular_velocity_euler = np.clip(base_angular_velocity_euler, -10, 10)
-        
-        # base_velocity =  np.array([base_velocity.x,base_velocity.y,base_velocity.z]) 
-        print('base_velocity: ', base_velocity, )
-        print('base_velocity_rot: ', rotate_vector_3d(base_velocity, *base_orientation_euler_origin))
         return {
             'base_pos_x': base_position.x,
             'base_pos_y': base_position.y,
             'base_pos_z': base_position.z,
-            'base_pos': np.array([base_position.x,base_position.y,base_position.z]) ,
+            'base_pos': np.array([base_position.x, base_position.y, base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
             'base_ori_quat': base_orientation_quat,
-            'base_velocity': list(base_velocity),
-            'base_velocity_wrong': rotate_vector_3d(base_velocity, *base_orientation_euler),
+            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler_origin),
+            # 'base_velocity': list(lin_vel),
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler_origin),
+            # 'base_ang_vel': list(ang_vel),
             'j_pos': joint_positions,
-            'j_vel': joint_velocities,
-            'frame_pos': frame_pos,
+            'j_vel': joint_velocities
         }
 
+    def set_mtr_pos(self, joint, ctrl):
+        jms = self.sim.get_joint_motor_settings(self.robot_id, joint)
+        jms.position_target = ctrl
+        self.sim.update_joint_motor(self.robot_id, joint, jms)
+
+    def set_joint_pos(self, joint_idx, angle):
+        set_pos = np.array(self.sim.get_articulated_object_positions(self.robot_id))
+        set_pos[joint_idx] = angle
+        self.sim.set_articulated_object_positions(self.robot_id, set_pos)
 
     def apply_robot_action(self, action, pos_gain, vel_gain):
         """Applies actions to the robot.
@@ -144,15 +141,8 @@ class Spot():
         assert (np.isfinite(action).all())
         assert len(action) == len(self.ordered_joints)
         for n, j in enumerate(self.ordered_joints):
-            a = action[n]
-            if self.control == 'velocity':
-                joint_settings = habitat_sim.physics.JointMotorSettings(0, 0, float(np.clip(a, -1, +1)),.1, 10)
-                self.sim.update_joint_motor(self.robot_id, n, joint_settings)
-            elif self.control == 'position':
-                joint_settings = habitat_sim.physics.JointMotorSettings(float(np.clip(a, -np.pi/2, np.pi/2)), pos_gain, 0, vel_gain, 10) # .08 and .2
-                self.sim.update_joint_motor(self.robot_id, n, joint_settings)
-            else:
-                print('not implemented yet')
+            a = float(np.clip(action[n], -np.pi/2, np.pi/2)) 
+            self.set_mtr_pos(n, a)
 
     def robot_specific_reset(self, joint_pos=None):
         if joint_pos is None:
@@ -179,7 +169,6 @@ class Spot():
 
         # while self.sim.get_world_time() < start_time + dt:
         self.sim.step_physics(dt)
-        
         if get_frames:
             observations.append(self.sim.get_sensor_observations())
                 
