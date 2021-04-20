@@ -114,9 +114,9 @@ class Spot():
             'base_pos': np.array([base_position.x, base_position.y, base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
             'base_ori_quat': base_orientation_quat,
-            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler_origin),
+            'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
             # 'base_velocity': list(lin_vel),
-            'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler_origin),
+            'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
             # 'base_ang_vel': list(ang_vel),
             'j_pos': joint_positions,
             'j_vel': joint_velocities

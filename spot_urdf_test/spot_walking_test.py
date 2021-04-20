@@ -25,13 +25,15 @@ class Workspace(object):
         self.ep_id = 1
         self.observations = []
         self.text = []
-        self.pos_gain = 0.3
-        self.vel_gain = 0.3
-        self.num_steps = 5
+        self.pos_gain = np.ones((3,)) * 0.2 # 0.2 
+        self.vel_gain = np.ones((3,)) * 1.5 # 1.5
+        self.pos_gain[2] = 0.7 # 0.7
+        self.vel_gain[2] = 1.5 # 1.5
+        self.num_steps = 30
         self.ctrl_freq = 240
         self.time_per_step = 80
         self.prev_state=None
-        self.finite_diff=False
+        self.finite_diff=True
         self.setup()
 
     def make_configuration(self):
@@ -121,19 +123,35 @@ class Workspace(object):
         # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
         local_base_pos = np.array([-2,1.3,-4])
         agent_transform = sim.agents[0].scene_node.transformation_matrix()
-        base_transform = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
+        base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
         base_transform.translation = agent_transform.transform_point(local_base_pos)
         sim.set_articulated_object_root_state(robot_id, base_transform)
 
-        jms = habitat_sim.physics.JointMotorSettings(
+        jms = []
+
+        jms.append(habitat_sim.physics.JointMotorSettings(
                         0,  # position_target
-                        self.pos_gain,  # position_gain
+                        self.pos_gain[0],  # position_gain
                         0,  # velocity_target
-                        self.vel_gain,  # velocity_gain
+                        self.vel_gain[0],  # velocity_gain
                         10.0,  # max_impulse
-                    )
+                    ))
+        jms.append(habitat_sim.physics.JointMotorSettings(
+                        0,  # position_target
+                        self.pos_gain[1],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[1],  # velocity_gain
+                        10.0,  # max_impulse
+                    ))
+        jms.append(habitat_sim.physics.JointMotorSettings(
+                        0,  # position_target
+                        self.pos_gain[2],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[2],  # velocity_gain
+                        10.0,  # max_impulse
+                    ))      
         for i in range(12):
-            sim.update_joint_motor(robot_id, i, jms)
+            sim.update_joint_motor(robot_id, i, jms[np.mod(i,3)])
 
         # base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1, 0, 0).normalized())
         # inverse_transform = base_transform.inverted()
@@ -284,18 +302,18 @@ class Workspace(object):
     def test_robot(self):
         self.reset_robot()
         # Set desired linear and angular velocities
-        print("MOVING FORWARD")
-        self.cmd_vel_xyt(0.35, 0.0, 0.0)
-        print("MOVING BACKWARDS")
-        self.cmd_vel_xyt(-0.35, 0.0, 0.0)
-        print("MOVING RIGHT")
-        self.cmd_vel_xyt(0.0, -0.35, 0.0)
+        # print("MOVING FORWARD")
+        # self.cmd_vel_xyt(0.35, 0.0, 0.0)
+        # print("MOVING BACKWARDS")
+        # self.cmd_vel_xyt(-0.35, 0.0, 0.0)
+        # print("MOVING RIGHT")
+        # self.cmd_vel_xyt(0.0, -0.35, 0.0)
         print("MOVING LEFT")
         self.cmd_vel_xyt(0.0, 0.35, 0.0)
-        print("MOVING FORWARD ARC RIGHT")
-        self.cmd_vel_xyt(0.35, 0.0, -0.15)
-        print("MOVING FORWARD ARC LEFT")
-        self.cmd_vel_xyt(0.35, 0.0, 0.15)
+        # print("MOVING FORWARD ARC RIGHT")
+        # self.cmd_vel_xyt(0.35, 0.0, -0.15)
+        # print("MOVING FORWARD ARC LEFT")
+        # self.cmd_vel_xyt(0.35, 0.0, 0.15)
 
         self.make_video()
         with open(os.path.join(output_path, 'controller_log.json'), 'w') as f:
