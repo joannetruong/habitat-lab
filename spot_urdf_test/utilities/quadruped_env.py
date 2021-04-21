@@ -9,9 +9,8 @@ from habitat_sim import geo
 from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
 import squaternion
 
-class Spot():
-    def __init__(self, config, urdf_file="", sim=None, agent=None,robot_id=0, dt=1/60):
-        self.config = config
+class A1():
+    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
         #self.torque = config.get("torque", 1.0)
         self.high_level_action_dim = 2
         self.sim = sim
@@ -199,4 +198,26 @@ class Spot():
     def apply_action(self, action):
         self.apply_robot_action(action)
 
+class AlienGo(A1):
+    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+        self._initial_joint_positions = [-0.1, 0.60, -1.5,
+                                         0.1, 0.60, -1.5,
+                                         -0.1, 0.6, -1.5,
+                                         0.1, 0.6, -1.5]
 
+class Laikago(A1):
+    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+        self._initial_joint_positions = [-0.1, 0.65, -1.2,
+                                         0.1, 0.65, -1.2,
+                                         -0.1, 0.65, -1.2,
+                                         0.1, 0.65, -1.2]
+
+class Spot(A1):
+    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+        self._initial_joint_positions = [-0.05, 0.60, -1.5,
+                                         0.05, 0.60, -1.5,
+                                         -0.05, 0.65, -1.5,
+                                         0.05, 0.65, -1.5]

@@ -1,26 +1,29 @@
 # [setup]
 import os
-
+import sys
 import magnum as mn
 import numpy as np
 from datetime import datetime
 import habitat_sim
+import squaternion
 
 # import habitat_sim.utils.common as ut
 import habitat_sim.utils.viz_utils as vut
-from utilities.spot_env import Spot
+from utilities.quadruped_env import A1, AlienGo, Laikago, Spot
+from utilities.daisy_env import Daisy, Daisy_4legged
 from utilities.raibert_controller import Raibert_controller
 from utilities.raibert_controller import Raibert_controller_turn
 import cv2
 import json
 import time
+from utilities import utils
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 data_path = os.path.join(dir_path, "../habitat-sim/data")
 output_path = os.path.join(dir_path, "spot_videos/")
 
 class Workspace(object):
-    def __init__(self):
+    def __init__(self, robot):
         self.raibert_infos = {}
         self.ep_id = 1
         self.observations = []
@@ -33,13 +36,15 @@ class Workspace(object):
         self.ctrl_freq = 240
         self.time_per_step = 80
         self.prev_state=None
-        self.finite_diff=True
+        self.finite_diff=False
+        self.robot_name = robot
         self.setup()
 
     def make_configuration(self):
         # simulator configuration
         backend_cfg = habitat_sim.SimulatorConfiguration()
         backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/empty_room.glb"
+        # backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/coda_hard.glb"
         backend_cfg.enable_physics = True
 
         # sensor configurations
@@ -62,11 +67,15 @@ class Workspace(object):
                 "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
             },
             "rgba_camera_3rdperson": {
-                "sensor_type": habitat_sim.SensorType.COLOR,
-                "resolution": camera_resolution,
-                "position": [-2.0,2.0,0.0],#[0.0, 1.0, 0.3],
-                "orientation": [0.0,0.0,0.0],#[-45, 0.0, 0.0],
-                "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
+            "sensor_type": habitat_sim.SensorType.COLOR,
+            "resolution": camera_resolution,
+            "position": [-2.0,2.0,0.0],#[0.0, 1.0, 0.3],
+            "orientation": [0.0,0.0,0.0],#[-45, 0.0, 0.0],
+            # "position": [0.0,3.0,1.0],#[0.0, 1.0, 0.3],
+            # "orientation": [0.0,np.deg2rad(90),np.deg2rad(20)],#[-45, 0.0, 0.0],
+            # "position": [-2.0,3.50,10.0],#[0.0, 1.0, 0.3],
+            # "orientation": [np.deg2rad(-10),np.deg2rad(20.0),0.0],#[-45, 0.0, 0.0],
+            "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
             },
         }
 
@@ -109,19 +118,37 @@ class Workspace(object):
 
         # [/initialize]
         urdf_files = {
-            "spot_hybrid": os.path.join(
+            "Spot": os.path.join(
                 data_path, "URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+            ),
+            "A1": os.path.join(
+                data_path, "URDF_demo_assets/a1/a1.urdf"
+            ),
+            "AlienGo": os.path.join(
+                data_path, "URDF_demo_assets/aliengo/urdf/aliengo.urdf"
+            ),
+            "Laikago": os.path.join(
+                data_path, "URDF_demo_assets/laikago/laikago.urdf"
+            ),
+            "Daisy": os.path.join(
+                data_path, "URDF_demo_assets/daisy/daisy_advanced_side.urdf"
+            ),
+            "Daisy4": os.path.join(
+                data_path, "URDF_demo_assets/daisy/daisy_advanced_4legged.urdf"
             ),
         }
 
         # [basics]
         # load a URDF file
-        robot_file_name = "spot_hybrid"
+        robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
         
         # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
-        local_base_pos = np.array([-2,1.3,-4])
+        # local_base_pos = np.array([0,1.3,-3]) # forward pillar collision
+        # local_base_pos = np.array([-1,1.3,-4]) # right pillar collision
+        # local_base_pos = np.array([-3.0,1.3,4.5])
+        local_base_pos = np.array([-2,1.3,-4]) # original 
         agent_transform = sim.agents[0].scene_node.transformation_matrix()
         base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
         base_transform.translation = agent_transform.transform_point(local_base_pos)
@@ -167,14 +194,26 @@ class Workspace(object):
         scene_graph = habitat_sim.SceneGraph()
         agent = habitat_sim.Agent(scene_graph.get_root_node().create_child(), agent_config)
 
-        self.spot = Spot({}, urdf_file=urdf_files[robot_file_name], sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
-        self.spot.robot_specific_reset()
+        if self.robot_name == 'A1':
+            self.robot = A1(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+        elif self.robot_name == 'AlienGo':
+            self.robot = AlienGo(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+        elif self.robot_name == 'Daisy':
+            self.robot = Daisy(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+        elif self.robot_name == 'Laikago':
+            self.robot = Laikago(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+        elif self.robot_name == 'Daisy_4legged':
+            self.robot = Daisy4(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+        elif self.robot_name == 'Spot':
+            self.robot = Spot(sim=sim, agent=self.agent, robot_id=robot_id, dt=1/self.ctrl_freq)
+            
+        self.robot.robot_specific_reset()
         
         # Set up Raibert controller and link it to spot
         action_limit = np.zeros((12, 2))
         action_limit[:, 0] = np.zeros(12) + np.pi / 2
         action_limit[:, 1] = np.zeros(12) - np.pi / 2
-        self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot="Spot")
+        self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
 
     def make_video_cv2(self, observations, ds=1, output_path = None, fps=60, pov="rgba_camera_3rdperson"):
         if output_path is None:
@@ -212,7 +251,7 @@ class Workspace(object):
 
     # [/setup]
     def reset_robot(self):
-        self.init_state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+        self.init_state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         self.raibert_controller.set_init_state(self.init_state)
         time.sleep(1)
 
@@ -237,7 +276,7 @@ class Workspace(object):
             self.ep_id +=1
 
     def step_robot(self, action):
-        state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+        state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         target_speed = np.array([action[0], action[1]])
         target_ang_vel = action[2]
         self.target_speed = list(target_speed)
@@ -264,7 +303,7 @@ class Workspace(object):
             raibert_action = self.raibert_controller.get_action(state, i+1)
             # Simulate spot for 1/ctrl_freq seconds and return camera observation
             raibert_actions_commanded.append(raibert_action)
-            cur_obs = self.spot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=False)
+            cur_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=False)
             self.observations += cur_obs
 
             # Get text to add to video
@@ -286,7 +325,7 @@ class Workspace(object):
             self.text.append(text_to_add)
 
             # Recalculate spot state for next action
-            state = self.spot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+            state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
             raibert_base_velocity.append(state['base_velocity'])
             raibert_actions_measured.append(state['j_pos'])
         self.raibert_action_commanded = raibert_actions_commanded
@@ -302,14 +341,14 @@ class Workspace(object):
     def test_robot(self):
         self.reset_robot()
         # Set desired linear and angular velocities
-        # print("MOVING FORWARD")
-        # self.cmd_vel_xyt(0.35, 0.0, 0.0)
+        print("MOVING FORWARD")
+        self.cmd_vel_xyt(0.35, 0.0, 0.0)
         # print("MOVING BACKWARDS")
         # self.cmd_vel_xyt(-0.35, 0.0, 0.0)
         # print("MOVING RIGHT")
         # self.cmd_vel_xyt(0.0, -0.35, 0.0)
-        print("MOVING LEFT")
-        self.cmd_vel_xyt(0.0, 0.35, 0.0)
+        # print("MOVING LEFT")
+        # self.cmd_vel_xyt(0.0, 0.35, 0.0)
         # print("MOVING FORWARD ARC RIGHT")
         # self.cmd_vel_xyt(0.35, 0.0, -0.15)
         # print("MOVING FORWARD ARC LEFT")
@@ -321,5 +360,6 @@ class Workspace(object):
             json.dump(self.raibert_infos, f)
 
 if __name__ == "__main__":
-    W = Workspace()
+    robot = sys.argv[1]
+    W = Workspace(robot)
     W.test_robot()

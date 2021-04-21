@@ -75,6 +75,17 @@ def quat_to_rad(rotation):
     # r,y,p = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
     return heading_vector
 
+def get_scalar_vector(quat):
+    scalar = np.arccos(quat.normalize.scalar)*2
+    vector = quat.normalize.vector/np.sin(scalar/2)
+    return scalar, vector
+
+def get_quat(scalar, vector):
+    new_scalar = np.cos(scalar/2)
+    new_vector = np.array(vector)*np.sin(scalar/2)
+    quat = squaternion.Quaternion(new_scalar, *new_vector)
+    return quat
+    
 def euler_from_quaternion(quat):
         """
         Convert a quaternion into euler angles (roll, pitch, yaw)
