@@ -1,0 +1,50 @@
+'0':
+  episode_dist: 6.71543289325507
+  initial_pos:
+  - -5.5
+  - -0.05
+  - 0.7
+  target_pos:
+  - -0.5
+  - 3.5
+  - 0.7
+'1':
+  episode_dist: 5.621320343559643
+  initial_pos:
+  - -0.5
+  - 3.5
+  - 0.7
+  target_pos:
+  - -5.5
+  - 5.0
+  - 0.7
+'2':
+  episode_dist: 7.156854249492379
+  initial_pos:
+  - -5.5
+  - 5.0
+  - 0.7
+  target_pos:
+  - -1.5
+  - -0.5
+  - 0.7
+'3':
+  episode_dist: 6.162741699796952
+  initial_pos:
+  - -1.5
+  - -0.5
+  - 0.7
+  target_pos:
+  - -3.02
+  - 6.0
+  - 0.7
+'4':
+  episode_dist: 6.611269837220809
+  initial_pos:
+  - -3.02
+  - 6.0
+  - 0.7
+  target_pos:
+  - -5.5
+  - -0.5
+  - 0.7

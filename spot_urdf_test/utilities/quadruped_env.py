@@ -2,11 +2,9 @@ import gym, gym.spaces
 import numpy as np
 import magnum as mn
 import habitat_sim 
-from habitat_sim.utils.common import quat_from_two_vectors, quat_rotate_vector
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from habitat_sim import geo
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
+from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_hab_pos
 import squaternion
 
 class A1():
@@ -53,13 +51,7 @@ class A1():
     def set_up_discrete_action_space(self):
         assert False, "A1 does not support discrete actions"
 
-    def rotate_hab_pos(self, position):
-        rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
-        pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
-        pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
-        # quat_rotation = quaternion_from_coeff(np.array(rotation))
-        # theta = self.quat_to_rad(rotation)
-        return pos
+    
 
     def calc_state(self, prev_state=None, finite_diff=False):
         """Computes the state.
@@ -83,7 +75,7 @@ class A1():
         # base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation
         base_position = base_pos
-        base_pos_tmp = self.rotate_hab_pos(base_pos)
+        base_pos_tmp = rotate_hab_pos(base_pos)
         base_position.x = base_pos_tmp[0]
         base_position.y = base_pos_tmp[1]
         base_position.z = base_pos_tmp[2]

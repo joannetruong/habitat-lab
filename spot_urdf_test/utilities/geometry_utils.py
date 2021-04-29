@@ -4,8 +4,6 @@ from scipy.spatial.transform import Rotation as R
 import squaternion
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from habitat_sim.utils.common import quat_from_two_vectors, quat_rotate_vector
-from habitat_sim import geo
 import magnum as mn
 
 # File I/O related
@@ -76,23 +74,6 @@ def quat_to_rad(rotation):
 
     # r,y,p = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
     return heading_vector
-
-def get_scalar_vector(quat):
-    scalar = np.arccos(quat.normalize.scalar)*2
-    vector = quat.normalize.vector/np.sin(scalar/2)
-    return scalar, vector
-
-def get_quat(scalar, vector):
-    new_scalar = np.cos(scalar/2)
-    new_vector = np.array(vector)*np.sin(scalar/2)
-    quat = squaternion.Quaternion(new_scalar, *new_vector)
-    return quat
-    
-def rotate_hab_pos(position):
-    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
-    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
-    pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
-    return pos
 
 def euler_from_quaternion(quat):
         """
