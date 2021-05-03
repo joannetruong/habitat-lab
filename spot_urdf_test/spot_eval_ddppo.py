@@ -50,8 +50,8 @@ class Workspace(object):
         self.episode_pth = 'spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
         self.linear_velocity_x = 0.35
-        self.linear_velocity_y = 0.35
-        self.angular_velocity = 0.15
+        self.linear_velocity_y = 0.15    
+        self.angular_velocity = 0.15    
         self.allow_backwards = False
         self.ctr = 0
         self.device = 'cuda:0'
@@ -62,7 +62,7 @@ class Workspace(object):
         # simulator configuration
         backend_cfg = habitat_sim.SimulatorConfiguration()
         # backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/empty_room.glb"
-        backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/coda_hard.glb"
+        backend_cfg.scene_id = "data/scene_datasets/coda/coda_hard.glb"
         backend_cfg.enable_physics = True
 
         # sensor configurations
@@ -76,14 +76,14 @@ class Workspace(object):
                 "resolution": camera_resolution_small,
                 "position": [0.0, 0.0, 0.0],
                 "orientation": [0.0, 0.0, 0.0],
-                "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
+                "sensor_subtype": habitat_sim.SensorSubType.PINHOLE,
             },
             "depth_camera_1stperson": {
                 "sensor_type": habitat_sim.SensorType.DEPTH,
                 "resolution": camera_resolution_small,
                 "position": [0,0,0.0],#[0.0, 0.6, 0.0],
                 "orientation": [0.0, 0.0, 0.0],
-                "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
+                "sensor_subtype": habitat_sim.SensorSubType.PINHOLE,
             },
             "rgba_camera_3rdperson": {
             "sensor_type": habitat_sim.SensorType.COLOR,
@@ -101,8 +101,6 @@ class Workspace(object):
         sensor_specs = []
         for sensor_uuid, sensor_params in sensors.items():
             sensor_spec = habitat_sim.CameraSensorSpec() #habitat_sim.SensorSpec()
-            if sensor_uuid != 'rgba_camera_3rdperson':
-                sensor_spec.fov = mn.Deg(70)
             sensor_spec.uuid = sensor_uuid
             sensor_spec.sensor_type = sensor_params["sensor_type"]
             sensor_spec.resolution = sensor_params["resolution"]
@@ -131,7 +129,7 @@ class Workspace(object):
         # [initialize]
         # create the simulator
         cfg = self.make_configuration()
-        
+
         self.sim = habitat_sim.Simulator(cfg)
         agent_transform = self.place_agent()
 
@@ -272,7 +270,7 @@ class Workspace(object):
             self.observations += observation
             # Recalculate spot state for next action
             state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
-        # self.save_img(observation)
+        self.save_img(observation)
         return observation[0]['depth_camera_1stperson'] 
 
     def save_img(self, observations):
@@ -283,9 +281,9 @@ class Workspace(object):
         frame_ext =  cv2.cvtColor(np.uint8(observations[0][pov_ext]),cv2.COLOR_RGB2BGR)
         frame_rgb =  cv2.cvtColor(np.uint8(observations[0][pov_rgb]),cv2.COLOR_RGB2BGR)
         frame_depth =  cv2.cvtColor(np.uint8(observations[0][pov_depth]/ 10 * 255),cv2.COLOR_RGB2BGR)
-        print('saved img')
         # cv2.imwrite(os.path.join(self.save_img_dir, 'img_' + str(self.ctr) + '.jpg'), frame_ext)
         cv2.imwrite(os.path.join(self.save_img_dir, 'rgb_img_' + str(self.ctr) + '.jpg'), frame_rgb)
+        print('saved img')
         # cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
         self.ctr +=1
 
