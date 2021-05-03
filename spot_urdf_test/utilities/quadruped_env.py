@@ -169,8 +169,8 @@ class A1():
         robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
 
         node = self.sim._default_agent.scene_node
-        self.h_offset = .5
-        cam_pos = mn.Vector3(0, 0.0, 0+self.h_offset)
+        self.h_offset = 0.69
+        cam_pos = mn.Vector3(0.1778, 0.0, 0+self.h_offset)
 
         look_at = mn.Vector3(1, 0.0, 0)
         look_at = robot_state.transform_point(look_at)

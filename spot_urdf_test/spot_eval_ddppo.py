@@ -13,7 +13,6 @@ from utilities.quadruped_env import A1, AlienGo, Laikago, Spot
 from utilities.daisy_env import Daisy, Daisy_4legged
 from utilities.raibert_controller import Raibert_controller
 from utilities.raibert_controller import Raibert_controller_turn
-from habitat_cont import evaluate_ddppo
 import cv2
 import json
 import time
@@ -21,7 +20,8 @@ import yaml
 import torch
 from gym import Space, spaces
 from collections import defaultdict, deque
-from habitat_cont.evaluate_ddppo import to_tensor
+from habitat_cont_v2 import evaluate_ddppo
+from habitat_cont_v2.evaluate_ddppo import to_tensor
 from utilities.utils import get_rpy, rotate_hab_pos
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -46,7 +46,7 @@ class Workspace(object):
         self.robot_name = robot
         self.setup()
         self.save_img_dir = 'ddppo_imgs/'
-        weights_dir = 'ddppo_policies/ckpt.45.json'
+        weights_dir = 'ddppo_policies/ckpt.15.json'
         self.episode_pth = 'spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
         self.linear_velocity_x = 0.35
@@ -55,7 +55,7 @@ class Workspace(object):
         self.allow_backwards = False
         self.ctr = 0
         self.device = 'cuda:0'
-        model = evaluate_ddppo.load_model(weights_dir, 2)
+        model = evaluate_ddppo.load_model(weights_dir, self.dim_actions)
         self.model = model.eval()
 
     def make_configuration(self):
@@ -81,7 +81,7 @@ class Workspace(object):
             "depth_camera_1stperson": {
                 "sensor_type": habitat_sim.SensorType.DEPTH,
                 "resolution": camera_resolution_small,
-                "position": [0,0,0.0],#[0.0, 0.6, 0.0],
+                "position": [0.0,0,0.0],#[0.0, 0.6, 0.0],
                 "orientation": [0.0, 0.0, 0.0],
                 "sensor_subtype": habitat_sim.SensorSubType.PINHOLE,
             },
@@ -370,13 +370,13 @@ class Workspace(object):
         num_actions = 0
         num_processes=1
         test_recurrent_hidden_states = torch.zeros(
+                1, 
                 self.model.net.num_recurrent_layers,
-                num_processes,
                 512,
                 device=self.device,
             )
         prev_actions = torch.zeros(num_processes, self.dim_actions, device=self.device)
-        not_done_masks = torch.zeros(num_processes, 1, device=self.device)
+        not_done_masks = torch.zeros(num_processes, 1, dtype=torch.bool, device=self.device)
         self.depth_obs = np.zeros((240, 320))
 
         while not self.done:
@@ -384,6 +384,7 @@ class Workspace(object):
 
             # observations["depth"] = self.depth_obs
             observations["depth"] = np.expand_dims(self.depth_obs, axis=2)
+            print(self.depth_obs.shape)
             observations["pointgoal_with_gps_compass"] = self.get_goal_sensor(goal_pos)
             observations = [observations]
 
@@ -398,15 +399,15 @@ class Workspace(object):
                     device=self.device, dtype=torch.float
                 )
             with torch.no_grad():
-                    _, actions, _, test_recurrent_hidden_states = self.model.act(
-                        batch,
-                        test_recurrent_hidden_states,
-                        prev_actions,
-                        not_done_masks,
-                        deterministic=True,
-                    )
+                _, actions, _, test_recurrent_hidden_states = self.model.act(
+                    batch,
+                    test_recurrent_hidden_states,
+                    prev_actions,
+                    not_done_masks,
+                    deterministic=True,
+                )
             prev_actions.copy_(actions)
-            not_done_masks = torch.ones(num_processes, 1, device=self.device)
+            not_done_masks = torch.ones(num_processes, 1, dtype=torch.bool, device=self.device)
 
             actions = actions.squeeze()
             print('gaussian actions: ', actions)

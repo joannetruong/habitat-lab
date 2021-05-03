@@ -44,7 +44,7 @@ class Workspace(object):
         # simulator configuration
         backend_cfg = habitat_sim.SimulatorConfiguration()
         # backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/empty_room.glb"
-        backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/coda_hard.glb"
+        backend_cfg.scene_id = "data/scene_datasets/coda/coda_hard.glb"
         backend_cfg.enable_physics = True
 
         # sensor configurations
@@ -307,6 +307,7 @@ class Workspace(object):
             raibert_actions_commanded.append(raibert_action)
             cur_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=True)
             self.observations += cur_obs
+            # print(cur_obs[0]['depth_camera_1stperson'], cur_obs[0]['depth_camera_1stperson'].shape)
 
             # Get text to add to video
             text_to_add = []
