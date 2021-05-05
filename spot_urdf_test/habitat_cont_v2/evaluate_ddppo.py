@@ -17,7 +17,7 @@ import random
 import numpy as np
 import torch
 from gym import spaces
-from gym.spaces.dict_space import Dict as SpaceDict
+from gym.spaces import Dict as SpaceDict
 from PIL import Image
 
 import time
@@ -27,7 +27,7 @@ import subprocess
 
 import yaml
 
-DEVICE = torch.device("cuda")
+DEVICE = torch.device("cpu")
 LOG_FILENAME = "exp.navigation.log"
 MAX_DEPTH = 10
 
@@ -72,10 +72,10 @@ def load_model(weights_path, dim_actions):
     )
     model.to(torch.device(DEVICE))
 
-    state_dict = OrderedDict()
-    with open(weights_path, 'r') as f:
-        state_dict = json.load(f)   
-    # state_dict = torch.load(weights_path, map_location=DEVICE) 
+    # state_dict = OrderedDict()
+    # with open(weights_path, 'r') as f:
+    #     state_dict = json.load(f)   
+    state_dict = torch.load(weights_path, map_location='cpu')['state_dict'] 
     # model.load_state_dict(state_dict["state_dict"])
     model.load_state_dict(
         {

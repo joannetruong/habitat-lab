@@ -4,7 +4,7 @@ import magnum as mn
 import habitat_sim 
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_hab_pos
+from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab
 import squaternion
 
 class A1():
@@ -75,7 +75,7 @@ class A1():
         # base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation
         base_position = base_pos
-        base_pos_tmp = rotate_hab_pos(base_pos)
+        base_pos_tmp = rotate_pos_from_hab(base_pos)
         base_position.x = base_pos_tmp[0]
         base_position.y = base_pos_tmp[1]
         base_position.z = base_pos_tmp[2]
@@ -167,10 +167,9 @@ class A1():
 
     def _follow_robot(self):
         robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
-
         node = self.sim._default_agent.scene_node
         self.h_offset = 0.69
-        cam_pos = mn.Vector3(0.1778, 0.0, 0+self.h_offset)
+        cam_pos = mn.Vector3(0, 0.0, 0)
 
         look_at = mn.Vector3(1, 0.0, 0)
         look_at = robot_state.transform_point(look_at)
@@ -185,7 +184,6 @@ class A1():
         self.cam_trans = node.transformation
         self.cam_look_at = look_at
         self.cam_pos = cam_pos
-
 
     def apply_action(self, action):
         self.apply_robot_action(action)

@@ -22,7 +22,7 @@ from gym import Space, spaces
 from collections import defaultdict, deque
 from habitat_cont_v2 import evaluate_ddppo
 from habitat_cont_v2.evaluate_ddppo import to_tensor
-from utilities.utils import get_rpy, rotate_hab_pos
+from utilities import utils
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 data_path = os.path.join(dir_path, "../habitat-sim/data")
@@ -45,16 +45,23 @@ class Workspace(object):
         self.finite_diff=False
         self.robot_name = robot
         self.setup()
-        self.save_img_dir = 'ddppo_imgs/'
-        weights_dir = 'ddppo_policies/ckpt.15.json'
+        self.save_img_dir = 'ddppo_imgs_11/'
+        self.save_img_ty = 'rgb_3rd'
+        weights_dir = 'ddppo_policies/ckpt.11.pth'
         self.episode_pth = 'spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
-        self.linear_velocity_x = 0.35
-        self.linear_velocity_y = 0.15    
-        self.angular_velocity = 0.15    
         self.allow_backwards = False
+        if self.allow_backwards:
+            self.linear_velocity_x_min, self.linear_velocity_x_max = -0.35, 0.35
+        else:
+            self.linear_velocity_x_min, self.linear_velocity_x_max = 0.0, 0.35
+        self.linear_velocity_y_min, self.linear_velocity_y_max = -0.35, 0.35
+        self.angular_velocity_min, self.angular_velocity_max = -0.15, 0.15
+
+        self.success_dist = 0.36
+        self.dist_to_goal = 100
         self.ctr = 0
-        self.device = 'cuda:0'
+        self.device = 'cpu'
         model = evaluate_ddppo.load_model(weights_dir, self.dim_actions)
         self.model = model.eval()
 
@@ -81,7 +88,8 @@ class Workspace(object):
             "depth_camera_1stperson": {
                 "sensor_type": habitat_sim.SensorType.DEPTH,
                 "resolution": camera_resolution_small,
-                "position": [0.0,0,0.0],#[0.0, 0.6, 0.0],
+                "position": [0.0,0.1862,-0.1778],#0.0762+0.11
+                # "position": [0.0,0.1862,0.],#0.0762+0.11
                 "orientation": [0.0, 0.0, 0.0],
                 "sensor_subtype": habitat_sim.SensorSubType.PINHOLE,
             },
@@ -101,6 +109,8 @@ class Workspace(object):
         sensor_specs = []
         for sensor_uuid, sensor_params in sensors.items():
             sensor_spec = habitat_sim.CameraSensorSpec() #habitat_sim.SensorSpec()
+            if sensor_uuid == 'depth_camera_1stperson':
+                sensor_spec.hfov = mn.Deg(70)
             sensor_spec.uuid = sensor_uuid
             sensor_spec.sensor_type = sensor_params["sensor_type"]
             sensor_spec.resolution = sensor_params["resolution"]
@@ -117,8 +127,8 @@ class Workspace(object):
     def place_agent(self):
         # place our agent in the scene
         agent_state = habitat_sim.AgentState()
-        agent_state.position = [-0.15, 0.7, 1.0]
-        agent_state.rotation = np.quaternion(-0.83147, 0, 0.55557, 0)
+        agent_state.position = [0.0, 0.7, 0.0]
+        agent_state.rotation = np.quaternion(1, 0, 0, 0)
         self.agent = self.sim.initialize_agent(0, agent_state)
         return self.agent.scene_node.transformation_matrix()
 
@@ -160,13 +170,16 @@ class Workspace(object):
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
-        
+        obj_mgr = self.sim.get_object_template_manager()
+        self.cube_id = self.sim.add_object_by_handle(obj_mgr.get_template_handles("cube")[0])
+        self.sim.set_object_motion_type(habitat_sim.physics.MotionType.KINEMATIC, self.cube_id)
+        self.sim.set_object_is_collidable(False, self.cube_id)
         # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
-        local_base_pos = np.array([-3,0.0,4.5]) 
-        agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
-        base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
-        base_transform.translation = agent_transform.transform_point(local_base_pos)
-        self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        # local_base_pos = np.array([-3,0.0,4.5]) 
+        # agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
+        # base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        # base_transform.translation = agent_transform.transform_point(local_base_pos)
+        # self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
 
         jms = []
 
@@ -231,10 +244,39 @@ class Workspace(object):
         position, orientation = self.get_robot_pos()
         print('position: ', position, 'orientation: ', orientation)
     # [/setup]
-    def reset_robot(self):
+    def reset_robot(self, start_pose):
+        link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        # new_state = link_rigid_state
+        # new_state.translatio  n.x = start_pose[0]
+        # new_state.translation.z = start_pose[1]
+        base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        base_transform.translation = mn.Vector3(*start_pose)
+        print('base transform translation: ', base_transform.translation)
+        self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+
+        # link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        # self.start_rotation = utils.quat_from_magnum(link_rigid_state.rotation)
+        # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
+        # base_quat = utils.get_quat(-np.pi/2,(1,0,0))
+        # new_quat = quat * base_quat
+        # scalar, vector = utils.get_scalar_vector(new_quat)
+        # base_transform = mn.Matrix4.rotation(mn.Rad(scalar), mn.Vector3(*vector))
+        # link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        # base_transform.translation = link_rigid_state.translation
+        # self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+
+
+        # base_transform_yaw = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        # base_transform_yaw.translation = base_transform.translation
+        # print('base transform translation yaw: ', base_transform_yaw.translation)
+        # self.sim.set_articulated_object_root_state(self.robot_id, base_transform_yaw)
+
         self.init_state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         self.raibert_controller.set_init_state(self.init_state)
         time.sleep(1)
+
+        pos, ori = self.get_robot_pos()
+        print('robot start pos: ', pos, ori)
 
     def log_raibert_controller(self):
         self.raibert_infos[str(self.ep_id)] = {}
@@ -270,6 +312,9 @@ class Workspace(object):
             self.observations += observation
             # Recalculate spot state for next action
             state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+            self.check_done(action, state)
+            if self.done:
+                break
         self.save_img(observation)
         return observation[0]['depth_camera_1stperson'] 
 
@@ -281,38 +326,14 @@ class Workspace(object):
         frame_ext =  cv2.cvtColor(np.uint8(observations[0][pov_ext]),cv2.COLOR_RGB2BGR)
         frame_rgb =  cv2.cvtColor(np.uint8(observations[0][pov_rgb]),cv2.COLOR_RGB2BGR)
         frame_depth =  cv2.cvtColor(np.uint8(observations[0][pov_depth]/ 10 * 255),cv2.COLOR_RGB2BGR)
-        # cv2.imwrite(os.path.join(self.save_img_dir, 'img_' + str(self.ctr) + '.jpg'), frame_ext)
-        cv2.imwrite(os.path.join(self.save_img_dir, 'rgb_img_' + str(self.ctr) + '.jpg'), frame_rgb)
+        if self.save_img_ty == 'rgb_3rd':
+            cv2.imwrite(os.path.join(self.save_img_dir, 'img_' + str(self.ctr) + '.jpg'), frame_ext)
+        elif self.save_img_ty == 'rgb_1st':
+            cv2.imwrite(os.path.join(self.save_img_dir, 'rgb_img_' + str(self.ctr) + '.jpg'), frame_rgb)
+        elif self.save_img_ty =='depth_1st':
+            cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
         print('saved img')
-        # cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
         self.ctr +=1
-
-    def make_video(self):
-        time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
-        self.make_video_cv2(self.observations, ds=1, output_path=output_path +\
-             time_str +  'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff), pov='rgba_camera_3rdperson',fps=self.ctrl_freq)
-
-    # This is wrapped such that it can be added to a unit test
-    def test_robot(self):
-        self.reset_robot()
-        # Set desired linear and angular velocities
-        print("MOVING FORWARD")
-        self.cmd_vel_xyt(0.35, 0.0, 0.0)
-        # print("MOVING BACKWARDS")
-        # self.cmd_vel_xyt(-0.35, 0.0, 0.0)
-        # print("MOVING RIGHT")
-        # self.cmd_vel_xyt(0.0, -0.35, 0.0)
-        # print("MOVING LEFT")
-        # self.cmd_vel_xyt(0.0, 0.35, 0.0)
-        # print("MOVING FORWARD ARC RIGHT")
-        # self.cmd_vel_xyt(0.35, 0.0, -0.15)
-        # print("MOVING FORWARD ARC LEFT")
-        # self.cmd_vel_xyt(0.35, 0.0, 0.15)
-
-        self.make_video()
-        with open(os.path.join(output_path, 'controller_log.json'), 'w') as f:
-            print('Dumping data!!!')
-            json.dump(self.raibert_infos, f)
 
     def get_episodes(self):
         start_poses = []
@@ -324,48 +345,86 @@ class Workspace(object):
             goal_poses.append(np.array(episode_dict[key]['target_pos']))
         return np.array(start_poses), np.array(goal_poses)
 
-    def get_robot_pos(self):
+    def get_robot_pos_hab(self):
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        base_pos_hab = rotate_hab_pos(robot_state.translation)
+        robot_position = np.array([*robot_state.translation])
 
-        robot_position = np.array([base_pos_hab[0], base_pos_hab[1], base_pos_hab[2]])
-        robot_ori = get_rpy(robot_state.rotation)
+        robot_ori = utils.quaternion_from_coeff(robot_state.rotation)
         return robot_position, robot_ori
 
-    def get_goal_sensor(self, goal_pos):
+    def get_robot_pos(self):
+        robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        base_pos_hab = utils.rotate_pos_from_hab(robot_state.translation)
+
+        robot_position = np.array([base_pos_hab[0], base_pos_hab[1], base_pos_hab[2]])
+        robot_ori = utils.get_rpy(robot_state.rotation)
+        return robot_position, robot_ori
+
+    def _compute_pointgoal(self, source_position, source_rotation, goal_position):
+        direction_vector = goal_position - source_position
+        direction_vector_agent = utils.quaternion_rotate_vector(
+            source_rotation.inverse(), direction_vector
+        )
+        rho, phi = utils.cartesian_to_polar(
+            -direction_vector_agent[2], direction_vector_agent[0]
+        )
+        phi -= np.pi/2
+        print('goal sensor: ', rho, np.rad2deg(-phi), goal_position)
+        return np.array([rho, -phi], dtype=np.float32)
+
+    def transform_angle(self, rotation):
+        obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+        inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
+        obs_quat = obs_quat*inverse_base_transform
+        return obs_quat
+
+    def get_goal_sensor(self, goal_position):
         """
         :return: non-perception observation, such as goal location
         """
-        robot_position, robot_ori = self.get_robot_pos()
-        print('robot position: ', robot_position)
-        agent_x, agent_y = robot_position[0], robot_position[1]
-        agent_rotation = robot_ori[-1]
-        goal_x, goal_y = goal_pos[0], goal_pos[1]
-        goal = np.array([goal_x, goal_y])
-        agent_coordinates = np.array([agent_x, agent_y])
-        rho = np.linalg.norm(agent_coordinates - goal)
-        theta = (
-            np.arctan2(
-                goal[1] - agent_coordinates[1], goal[0] - agent_coordinates[0]
-            )
-            - agent_rotation
+        agent_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        agent_position = agent_state.translation
+        agent_rotation = self.transform_angle(agent_state.rotation)
+        rotation_world_agent = utils.quat_from_magnum(agent_rotation)
+        print('robot state: ', agent_state.translation, np.rad2deg(utils.get_rpy(agent_state.rotation)[-1]))
+        return self._compute_pointgoal(
+            agent_position, rotation_world_agent, goal_position
         )
-        theta = theta % (2 * np.pi)
-        if theta >= np.pi:
-            theta = -((2 * np.pi) - theta)
-        print('goal: ', rho, theta, goal_pos)
-        return rho, theta
 
     def evaluate_ddppo(self):
         start_poses, goal_poses = self.get_episodes()
         num_episodes = len(start_poses)
         # for episode in range(num_episodes):
-        for episode in range(1):
+        for episode in range(2):
             self.evaluate_episode(start_poses[episode], goal_poses[episode])
 
+    def check_done(self, action, state):
+        linear_velocity, strafe_velocity, angular_velocity = action
+        if abs(linear_velocity) < 0.1 and abs(strafe_velocity) < 0.1 and abs(angular_velocity) < 0.1:
+            print('ROBOT CALLED STOP!')
+            self.done = True
+            if self.dist_to_goal < self.success_dist:
+                print('EPISODE SUCCESS')
+                self.success = True
+            else:
+                print('EPISODE FAIL')
+                self.success = False
+        # roll, pitch, _ = state['base_ori_euler']
+        # if (np.abs(roll) > 0.75 or np.abs(pitch) > 0.75):
+        #     print('FAIL, ROBOT FELL OVER')
+        #     self.done = True
+    
     def evaluate_episode(self, start_pos, goal_pos):
-        self.reset_robot()
+        self.reset_robot(start_pos)
+        link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        cube_1_translation = link_rigid_state.translation
+        cube_1_translation.x = goal_pos[0]
+        cube_1_translation.z = goal_pos[2]
+        self.sim.set_translation(cube_1_translation, self.cube_id)
+        self.sim.set_rotation(link_rigid_state.rotation, self.cube_id)
+
         self.done = False
+        self.success = False
         episode_reward = 0
         num_actions = 0
         num_processes=1
@@ -384,7 +443,6 @@ class Workspace(object):
 
             # observations["depth"] = self.depth_obs
             observations["depth"] = np.expand_dims(self.depth_obs, axis=2)
-            print(self.depth_obs.shape)
             observations["pointgoal_with_gps_compass"] = self.get_goal_sensor(goal_pos)
             observations = [observations]
 
@@ -406,32 +464,35 @@ class Workspace(object):
                     not_done_masks,
                     deterministic=True,
                 )
+            actions = actions.reshape([1, self.dim_actions]).to(device="cpu")
+            print('[actions]: {}'.format(actions))
             prev_actions.copy_(actions)
             not_done_masks = torch.ones(num_processes, 1, dtype=torch.bool, device=self.device)
-
-            actions = actions.squeeze()
-            print('gaussian actions: ', actions)
-            move_amount = -torch.tanh(actions[0]).item()
-            turn_amount = torch.tanh(actions[1]).item()
-            strafe_amount = torch.tanh(actions[2]).item() if self.dim_actions == 3 else 0
-            if self.allow_backwards:
-                move_amount *= self.linear_velocity_x
+            if self.dim_actions == 2:
+                linear_velocity, angular_velocity = torch.clip(actions[0], min=-1, max=1)
+                strafe_velocity = 0.0
             else:
-                move_amount = (move_amount+1.)/2.*self.linear_velocity_x
-            turn_amount *= self.angular_velocity
-            strafe_amount *= self.linear_velocity_y
-            print('[commands]: {} {} {}'.format(move_amount, strafe_amount, turn_amount))
+                linear_velocity, strafe_velocity, angular_velocity = torch.clip(actions[0], min=-1, max=1)
 
-            if move_amount/self.linear_velocity_x < 0.1 and strafe_amount/self.linear_velocity_x < 0.1 and abs(turn_amount/self.angular_velocity) < 0.05:
-                print('[STOP HAS BEEN CALLED]')
-                return
+            linear_velocity = (linear_velocity + 1.0) / 2.0
+            strafe_velocity = (strafe_velocity + 1.0) / 2.0
+            angular_velocity = (angular_velocity + 1.0) / 2.0
 
-            # observations = env.step(actions)
-            action = np.array([move_amount, strafe_amount, turn_amount])
+            linear_velocity = self.linear_velocity_x_min + linear_velocity * (
+            self.linear_velocity_x_max - self.linear_velocity_x_min
+            )
+            strafe_velocity = self.linear_velocity_y_min + strafe_velocity * (
+                self.linear_velocity_y_max - self.linear_velocity_y_min
+            )
+            angular_velocity = self.angular_velocity_min + angular_velocity * (
+                self.angular_velocity_max - self.angular_velocity_min
+            )
+            print('[commands]: {} {} {}'.format(linear_velocity, strafe_velocity, angular_velocity))
+
+            action = np.array([linear_velocity, strafe_velocity, angular_velocity])
             print('NUM_ACTIONS: ', num_actions)
             self.depth_obs = self.step_robot(action) 
             num_actions +=1
-            # episode_reward += reward
         # self.make_video()
 
 

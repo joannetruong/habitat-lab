@@ -88,11 +88,17 @@ def get_quat(scalar, vector):
     quat = squaternion.Quaternion(new_scalar, *new_vector)
     return quat
     
-def rotate_hab_pos(position):
+def rotate_pos_to_hab(position):
     rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
     pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
     pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
     return pos
+
+def rotate_pos_from_hab(position):
+    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, 1]))
+    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
+    pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
+    return pos 
 
 def euler_from_quaternion(quat):
         """
