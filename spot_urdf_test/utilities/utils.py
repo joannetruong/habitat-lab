@@ -56,7 +56,11 @@ def get_rpy(rotation, transform=True):
     if transform:
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
         obs_quat = obs_quat*inverse_base_transform
+        # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
+        # inverse_base_transform_yaw = scalar_vector_to_quat(np.pi/2,(1,0,0))
+        # obs_quat = obs_quat * inverse_base_transform_yaw * quat
     roll, yaw, pitch = obs_quat.to_euler()
+    # yaw -= np.deg2rad(90)
     return np.array([roll, pitch, yaw])
 
 def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:

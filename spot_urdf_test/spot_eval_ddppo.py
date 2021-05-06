@@ -38,7 +38,7 @@ class Workspace(object):
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
         self.pos_gain[2] = 0.7 # 0.7
         self.vel_gain[2] = 1.5 # 1.5
-        self.num_steps = 30
+        self.num_steps = 80
         self.ctrl_freq = 240
         self.time_per_step = 80
         self.prev_state=None
@@ -88,7 +88,8 @@ class Workspace(object):
             "depth_camera_1stperson": {
                 "sensor_type": habitat_sim.SensorType.DEPTH,
                 "resolution": camera_resolution_small,
-                "position": [0.0,0.1862,-0.1778],#0.0762+0.11
+                "position": [0.0,0.3,-0.1778],#0.0762+0.11
+                # "position": [0.0,0.1862,-0.1778],#0.0762+0.11
                 # "position": [0.0,0.1862,0.],#0.0762+0.11
                 "orientation": [0.0, 0.0, 0.0],
                 "sensor_subtype": habitat_sim.SensorSubType.PINHOLE,
@@ -122,14 +123,33 @@ class Workspace(object):
         agent_cfg = habitat_sim.agent.AgentConfiguration()
         agent_cfg.sensor_specifications = sensor_specs
 
-        return habitat_sim.Configuration(backend_cfg, [agent_cfg])
+        agent_cfg2 = habitat_sim.agent.AgentConfiguration()
+        ortho_spec = habitat_sim.CameraSensorSpec()
+        ortho_spec.uuid = "ortho"
+        ortho_spec.sensor_type    =  habitat_sim.SensorType.COLOR
+        ortho_spec.resolution     =  camera_resolution_large
+        ortho_spec.position       =  [-2.0,3.50,10.0]
+        ortho_spec.orientation    =  [np.deg2rad(-10),np.deg2rad(20.0),0.0]
+        ortho_spec.sensor_subtype =  habitat_sim.SensorSubType.ORTHOGRAPHIC
+        agent_cfg2.sensor_specifications = [ortho_spec]
+
+        return habitat_sim.Configuration(backend_cfg, [agent_cfg, agent_cfg2])
 
     def place_agent(self):
         # place our agent in the scene
         agent_state = habitat_sim.AgentState()
-        agent_state.position = [0.0, 0.7, 0.0]
+        # agent_state.position = [-0.15, 0.7, 1.0]
+        agent_state.position = [0.0, 0.0, 0.0]
         agent_state.rotation = np.quaternion(1, 0, 0, 0)
         self.agent = self.sim.initialize_agent(0, agent_state)
+
+        agent_state2 = habitat_sim.AgentState()
+        agent_state2.position = [-6.0,2.0,4.0]
+        agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-10.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
+        agent_state2.rotation = utils.quat_from_magnum(agent_rotation)
+        # agent_state.rotation = np.quaternion(1, 0, 0, 0)
+        agent2 = self. sim.initialize_agent(1, agent_state2)
+
         return self.agent.scene_node.transformation_matrix()
 
     def setup(self):
@@ -170,12 +190,8 @@ class Workspace(object):
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
-        obj_mgr = self.sim.get_object_template_manager()
-        self.cube_id = self.sim.add_object_by_handle(obj_mgr.get_template_handles("cube")[0])
-        self.sim.set_object_motion_type(habitat_sim.physics.MotionType.KINEMATIC, self.cube_id)
-        self.sim.set_object_is_collidable(False, self.cube_id)
-        # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
-        # local_base_pos = np.array([-3,0.0,4.5]) 
+
+        # local_base_pos = np.array([-5,0.0,0.0]) 
         # agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
         # base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
         # base_transform.translation = agent_transform.transform_point(local_base_pos)
@@ -242,31 +258,39 @@ class Workspace(object):
         action_limit[:, 1] = np.zeros(12) - np.pi / 2
         self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
         position, orientation = self.get_robot_pos()
-        print('position: ', position, 'orientation: ', orientation)
+        print('position: ', position, 'orientation: ', np.rad2deg(orientation[-1]))
     # [/setup]
     def reset_robot(self, start_pose):
-        link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        # new_state = link_rigid_state
-        # new_state.translatio  n.x = start_pose[0]
-        # new_state.translation.z = start_pose[1]
+        # local_base_pos = start_pose
+        # local_base_pos = start_pose - np.array([-0.15, 0.0, 1.0])
+        # local_base_pos = start_pose - np.array([-0.15, 0.7, 2.06]) # [-5.62700033 -0.49999601 -0.70499998]
+        local_base_pos = start_pose
+        # print('start pose: ', start_pose)
+        # local_base_pos = utils.rotate_pos_from_hab(start_pose)
+        agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
         base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
-        base_transform.translation = mn.Vector3(*start_pose)
-        print('base transform translation: ', base_transform.translation)
+        base_transform.translation = agent_transform.transform_point(local_base_pos)
         self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
 
+        # base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        # base_transform.translation = mn.Vector3(*start_pose)
+        # self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+
+        # self.sim.step_physics(1/240.0)
         # link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        # agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
         # self.start_rotation = utils.quat_from_magnum(link_rigid_state.rotation)
         # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
         # base_quat = utils.get_quat(-np.pi/2,(1,0,0))
         # new_quat = quat * base_quat
         # scalar, vector = utils.get_scalar_vector(new_quat)
         # base_transform = mn.Matrix4.rotation(mn.Rad(scalar), mn.Vector3(*vector))
-        # link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        # base_transform.translation = link_rigid_state.translation
+        # # base_transform.translation = agent_transform.transform_point(local_base_pos)
+        # base_transform.translation = np.array([-5.627, 0.705, -0.499996])
         # self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        # link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
 
-
-        # base_transform_yaw = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        # base_transform_yaw = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0))
         # base_transform_yaw.translation = base_transform.translation
         # print('base transform translation yaw: ', base_transform_yaw.translation)
         # self.sim.set_articulated_object_root_state(self.robot_id, base_transform_yaw)
@@ -276,7 +300,7 @@ class Workspace(object):
         time.sleep(1)
 
         pos, ori = self.get_robot_pos()
-        print('robot start pos: ', pos, ori)
+        print('robot start pos: ', pos, np.rad2deg(ori[-1]))
 
     def log_raibert_controller(self):
         self.raibert_infos[str(self.ep_id)] = {}
@@ -295,7 +319,7 @@ class Workspace(object):
         for n in range(self.num_steps):
             action = np.array([lin_x, lin_y, ang])
             self.step_robot(action) 
-            self.log_raibert_controller()
+            # self.log_raibert_controller()
             self.ep_id +=1
 
     def step_robot(self, action):
@@ -308,26 +332,27 @@ class Workspace(object):
             # Get actual joint actions 
             raibert_action = self.raibert_controller.get_action(state, i+1)
             # Simulate spot for 1/ctrl_freq seconds and return camera observation
-            observation = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=True)
-            self.observations += observation
+            agent_obs, ortho_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=True)
+            self.observations += agent_obs
             # Recalculate spot state for next action
             state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
             self.check_done(action, state)
             if self.done:
                 break
-        self.save_img(observation)
-        return observation[0]['depth_camera_1stperson'] 
+        self.save_img(agent_obs, ortho_obs)
+        return agent_obs[0]['depth_camera_1stperson'] 
 
-    def save_img(self, observations):
+    def save_img(self, agent_obs, ortho_obs):
         ds=1
         pov_ext="rgba_camera_3rdperson"
         pov_rgb="rgba_camera_1stperson"
         pov_depth="depth_camera_1stperson"
-        frame_ext =  cv2.cvtColor(np.uint8(observations[0][pov_ext]),cv2.COLOR_RGB2BGR)
-        frame_rgb =  cv2.cvtColor(np.uint8(observations[0][pov_rgb]),cv2.COLOR_RGB2BGR)
-        frame_depth =  cv2.cvtColor(np.uint8(observations[0][pov_depth]/ 10 * 255),cv2.COLOR_RGB2BGR)
+        frame_ext =  cv2.cvtColor(np.uint8(ortho_obs[0]["ortho"]),cv2.COLOR_RGB2BGR)
+        frame_rgb =  cv2.cvtColor(np.uint8(agent_obs[0][pov_rgb]),cv2.COLOR_RGB2BGR)
+        frame_depth =  cv2.cvtColor(np.uint8(agent_obs[0][pov_depth]/ 10 * 255),cv2.COLOR_RGB2BGR)
         if self.save_img_ty == 'rgb_3rd':
             cv2.imwrite(os.path.join(self.save_img_dir, 'img_' + str(self.ctr) + '.jpg'), frame_ext)
+            cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
         elif self.save_img_ty == 'rgb_1st':
             cv2.imwrite(os.path.join(self.save_img_dir, 'rgb_img_' + str(self.ctr) + '.jpg'), frame_rgb)
         elif self.save_img_ty =='depth_1st':
@@ -357,10 +382,15 @@ class Workspace(object):
         base_pos_hab = utils.rotate_pos_from_hab(robot_state.translation)
 
         robot_position = np.array([base_pos_hab[0], base_pos_hab[1], base_pos_hab[2]])
-        robot_ori = utils.get_rpy(robot_state.rotation)
+        robot_ori = utils.get_rpy(robot_state.rotation) 
+        # robot_ori[-1] -= np.deg2rad(90)
         return robot_position, robot_ori
 
     def _compute_pointgoal(self, source_position, source_rotation, goal_position):
+        print('source_position: ', source_position)
+        print('source_rotation: ', source_rotation)
+        source_position[1] = 0.0
+        goal_position[1] = 0.0
         direction_vector = goal_position - source_position
         direction_vector_agent = utils.quaternion_rotate_vector(
             source_rotation.inverse(), direction_vector
@@ -368,7 +398,7 @@ class Workspace(object):
         rho, phi = utils.cartesian_to_polar(
             -direction_vector_agent[2], direction_vector_agent[0]
         )
-        phi -= np.pi/2
+        # phi -= np.pi/2
         print('goal sensor: ', rho, np.rad2deg(-phi), goal_position)
         return np.array([rho, -phi], dtype=np.float32)
 
@@ -376,6 +406,9 @@ class Workspace(object):
         obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
         inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
         obs_quat = obs_quat*inverse_base_transform
+        # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
+        # inverse_base_transform_yaw = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
+        # obs_quat = obs_quat * inverse_base_transform_yaw * quat
         return obs_quat
 
     def get_goal_sensor(self, goal_position):
@@ -384,9 +417,15 @@ class Workspace(object):
         """
         agent_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         agent_position = agent_state.translation
-        agent_rotation = self.transform_angle(agent_state.rotation)
+        roll, pitch, yaw = utils.get_rpy(agent_state.rotation)
+        yaw = yaw-np.deg2rad(90)
+        agent_rotation = squaternion.Quaternion.from_euler(roll, pitch, yaw, degrees=False)
+        # source_rotation = utils.quat_from_magnum(agent_rotation)
+        # inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
+        # agent_rotation = agent_rotation*inverse_base_transform
+
         rotation_world_agent = utils.quat_from_magnum(agent_rotation)
-        print('robot state: ', agent_state.translation, np.rad2deg(utils.get_rpy(agent_state.rotation)[-1]))
+        print('robot state: ', agent_state.translation, np.rad2deg(roll), np.rad2deg(pitch), np.rad2deg(yaw))
         return self._compute_pointgoal(
             agent_position, rotation_world_agent, goal_position
         )
@@ -395,7 +434,7 @@ class Workspace(object):
         start_poses, goal_poses = self.get_episodes()
         num_episodes = len(start_poses)
         # for episode in range(num_episodes):
-        for episode in range(2):
+        for episode in range(1):
             self.evaluate_episode(start_poses[episode], goal_poses[episode])
 
     def check_done(self, action, state):
@@ -416,12 +455,6 @@ class Workspace(object):
     
     def evaluate_episode(self, start_pos, goal_pos):
         self.reset_robot(start_pos)
-        link_rigid_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        cube_1_translation = link_rigid_state.translation
-        cube_1_translation.x = goal_pos[0]
-        cube_1_translation.z = goal_pos[2]
-        self.sim.set_translation(cube_1_translation, self.cube_id)
-        self.sim.set_rotation(link_rigid_state.rotation, self.cube_id)
 
         self.done = False
         self.success = False
@@ -429,7 +462,7 @@ class Workspace(object):
         num_actions = 0
         num_processes=1
         test_recurrent_hidden_states = torch.zeros(
-                1, 
+                num_processes, 
                 self.model.net.num_recurrent_layers,
                 512,
                 device=self.device,
@@ -464,9 +497,9 @@ class Workspace(object):
                     not_done_masks,
                     deterministic=True,
                 )
-            actions = actions.reshape([1, self.dim_actions]).to(device="cpu")
-            print('[actions]: {}'.format(actions))
-            prev_actions.copy_(actions)
+                actions = actions.reshape([1, self.dim_actions]).to(device="cpu")
+                print('[actions]: {}'.format(actions))
+                prev_actions.copy_(actions)
             not_done_masks = torch.ones(num_processes, 1, dtype=torch.bool, device=self.device)
             if self.dim_actions == 2:
                 linear_velocity, angular_velocity = torch.clip(actions[0], min=-1, max=1)
@@ -494,7 +527,6 @@ class Workspace(object):
             self.depth_obs = self.step_robot(action) 
             num_actions +=1
         # self.make_video()
-
 
 if __name__ == "__main__":
     robot = sys.argv[1]

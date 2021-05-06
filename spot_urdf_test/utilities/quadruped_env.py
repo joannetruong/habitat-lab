@@ -151,7 +151,8 @@ class A1():
             # simulate dt seconds at 60Hz to the nearest fixed timestep
         if verbose:
             print("Simulating " + str(dt) + " world seconds.")
-        observations = []
+        depth_obs = []
+        ortho_obs = []
         start_time = self.sim.get_world_time()
         count = 0
         
@@ -161,9 +162,10 @@ class A1():
         # while self.sim.get_world_time() < start_time + dt:
         self.sim.step_physics(dt)
         if get_frames:
-            observations.append(self.sim.get_sensor_observations())
+            depth_obs.append(self.sim.get_sensor_observations(0))
+            ortho_obs.append(self.sim.get_sensor_observations(1))
                 
-        return observations
+        return depth_obs, ortho_obs
 
     def _follow_robot(self):
         robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
