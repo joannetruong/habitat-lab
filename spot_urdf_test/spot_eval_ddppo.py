@@ -32,7 +32,7 @@ class Workspace(object):
     def __init__(self, robot):
         self.raibert_infos = {}
         self.ep_id = 1
-        self.observations = []
+        self.depth_ortho_imgs = []
         self.text = []
         self.pos_gain = np.ones((3,)) * 0.2 # 0.2 
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
@@ -43,11 +43,14 @@ class Workspace(object):
         self.time_per_step = 80
         self.prev_state=None
         self.finite_diff=False
+        self.min_depth = 0.3
+        self.max_depth = 10.0
         self.robot_name = robot
         self.setup()
-        self.save_img_dir = 'ddppo_imgs_11/'
-        self.save_img_ty = 'rgb_3rd'
-        weights_dir = 'ddppo_policies/ckpt.11.pth'
+        self.save_video_dir = 'ddppo_vids/'
+        # weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_xyt_21.pth'
+        # weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_xyt_backwards_23.pth'
+        weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_visual_encoder_nccl_11.pth'
         self.episode_pth = 'spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
         self.allow_backwards = False
@@ -144,8 +147,10 @@ class Workspace(object):
         self.agent = self.sim.initialize_agent(0, agent_state)
 
         agent_state2 = habitat_sim.AgentState()
-        agent_state2.position = [-6.0,2.0,4.0]
-        agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-10.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
+        # agent_state2.position = [-6.0,2.0,4.0]
+        # agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-10.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
+        agent_state2.position = [-4.0,2.0,5.0]
+        agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-20.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
         agent_state2.rotation = utils.quat_from_magnum(agent_rotation)
         # agent_state.rotation = np.quaternion(1, 0, 0, 0)
         agent2 = self. sim.initialize_agent(1, agent_state2)
@@ -333,33 +338,38 @@ class Workspace(object):
             raibert_action = self.raibert_controller.get_action(state, i+1)
             # Simulate spot for 1/ctrl_freq seconds and return camera observation
             agent_obs, ortho_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=True)
-            self.observations += agent_obs
             # Recalculate spot state for next action
             state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
             self.check_done(action, state)
             if self.done:
                 break
-        self.save_img(agent_obs, ortho_obs)
+        self.stitch_show_img(agent_obs, ortho_obs)        
         return agent_obs[0]['depth_camera_1stperson'] 
 
-    def save_img(self, agent_obs, ortho_obs):
-        ds=1
-        pov_ext="rgba_camera_3rdperson"
-        pov_rgb="rgba_camera_1stperson"
-        pov_depth="depth_camera_1stperson"
-        frame_ext =  cv2.cvtColor(np.uint8(ortho_obs[0]["ortho"]),cv2.COLOR_RGB2BGR)
-        frame_rgb =  cv2.cvtColor(np.uint8(agent_obs[0][pov_rgb]),cv2.COLOR_RGB2BGR)
-        frame_depth =  cv2.cvtColor(np.uint8(agent_obs[0][pov_depth]/ 10 * 255),cv2.COLOR_RGB2BGR)
-        if self.save_img_ty == 'rgb_3rd':
-            cv2.imwrite(os.path.join(self.save_img_dir, 'img_' + str(self.ctr) + '.jpg'), frame_ext)
-            cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
-        elif self.save_img_ty == 'rgb_1st':
-            cv2.imwrite(os.path.join(self.save_img_dir, 'rgb_img_' + str(self.ctr) + '.jpg'), frame_rgb)
-        elif self.save_img_ty =='depth_1st':
-            cv2.imwrite(os.path.join(self.save_img_dir, 'depth_img_' + str(self.ctr) + '.jpg'), frame_depth)
-        print('saved img')
-        self.ctr +=1
+    def stitch_show_img(self, agent_obs, ortho_obs, show=True):
+        depth_img = cv2.cvtColor(np.uint8(agent_obs[0]['depth_camera_1stperson']/ 10 * 255),cv2.COLOR_RGB2BGR)
+        ortho_img = cv2.cvtColor(np.uint8(ortho_obs[0]['ortho']),cv2.COLOR_RGB2BGR)
 
+        height,width,layers=ortho_img.shape
+        resize_depth_img = cv2.resize(depth_img, (width, height))
+        frames = np.concatenate((resize_depth_img, ortho_img), axis=1)
+        self.depth_ortho_imgs.append(frames)
+
+        key = cv2.waitKey(100)
+        if key == ord('q'):
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+            self.check_make_dir(self.save_video_dir)
+            video=cv2.VideoWriter(os.path.join(self.save_video_dir, 'spot_coda_ddppo.mp4'),fourcc,10,(2*width,height))
+            for frame in self.depth_ortho_imgs:
+                video.write(frame)
+            exit()
+        cv2.imshow('depth_ortho_imgs',frames)
+
+    def check_make_dir(self, pth):
+        if not os.path.exists(pth):
+            os.makedirs(pth)
+        return
+        
     def get_episodes(self):
         start_poses = []
         goal_poses = []
@@ -474,7 +484,8 @@ class Workspace(object):
         while not self.done:
             observations = {}
 
-            # observations["depth"] = self.depth_obs
+            # normalize depth images
+            self.depth_obs = (self.depth_obs - self.min_depth) / (self.max_depth - self.min_depth)
             observations["depth"] = np.expand_dims(self.depth_obs, axis=2)
             observations["pointgoal_with_gps_compass"] = self.get_goal_sensor(goal_pos)
             observations = [observations]
@@ -526,6 +537,7 @@ class Workspace(object):
             print('NUM_ACTIONS: ', num_actions)
             self.depth_obs = self.step_robot(action) 
             num_actions +=1
+        self.save_video()
         # self.make_video()
 
 if __name__ == "__main__":
