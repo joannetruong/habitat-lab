@@ -32,7 +32,7 @@ class Workspace(object):
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
         self.pos_gain[2] = 0.7 # 0.7
         self.vel_gain[2] = 1.5 # 1.5
-        self.num_steps = 5
+        self.num_steps = 30
         self.ctrl_freq = 240
         self.time_per_step = 80
         self.prev_state=None
@@ -43,8 +43,8 @@ class Workspace(object):
     def make_configuration(self):
         # simulator configuration
         backend_cfg = habitat_sim.SimulatorConfiguration()
-        # backend_cfg.scene_id = "data/scene_datasets/habitat-test-scenes/empty_room.glb"
-        backend_cfg.scene_id = "data/scene_datasets/coda/coda_hard.glb"
+        backend_cfg.scene_id = "data/scene_datasets/coda/empty_room.glb"
+        # backend_cfg.scene_id = "data/scene_datasets/coda/coda_hard.glb"
         backend_cfg.enable_physics = True
 
         # sensor configurations
@@ -69,12 +69,8 @@ class Workspace(object):
             "rgba_camera_3rdperson": {
             "sensor_type": habitat_sim.SensorType.COLOR,
             "resolution": camera_resolution,
-            # "position": [-2.0,2.0,0.0],#[0.0, 1.0, 0.3],
-            # "orientation": [0.0,0.0,0.0],#[-45, 0.0, 0.0],
-            # "position": [0.0,3.0,1.0],#[0.0, 1.0, 0.3],
-            # "orientation": [0.0,np.deg2rad(90),np.deg2rad(20)],#[-45, 0.0, 0.0],
-            "position": [-2.0,3.50,10.0],#[0.0, 1.0, 0.3],
-            "orientation": [np.deg2rad(-10),np.deg2rad(20.0),0.0],#[-45, 0.0, 0.0],
+            "position": [-2.0,2.0,0.0],#[0.0, 1.0, 0.3],
+            "orientation": [0.0,0.0,0.0],#[-45, 0.0, 0.0],
             "sensor_subtype": habitat_sim.SensorSubType.ORTHOGRAPHIC,
             },
         }
@@ -93,16 +89,33 @@ class Workspace(object):
         agent_cfg = habitat_sim.agent.AgentConfiguration()
         agent_cfg.sensor_specifications = sensor_specs
 
-        return habitat_sim.Configuration(backend_cfg, [agent_cfg])
+        agent_cfg2 = habitat_sim.agent.AgentConfiguration()
+        ortho_spec = habitat_sim.CameraSensorSpec()
+        ortho_spec.uuid = "ortho"
+        ortho_spec.sensor_type    =  habitat_sim.SensorType.COLOR
+        ortho_spec.resolution     =  camera_resolution_large
+        ortho_spec.position       =  [-2.0,3.50,10.0]
+        ortho_spec.orientation    =  [np.deg2rad(-10),np.deg2rad(20.0),0.0]
+        ortho_spec.sensor_subtype =  habitat_sim.SensorSubType.ORTHOGRAPHIC
+        agent_cfg2.sensor_specifications = [ortho_spec]
+
+        return habitat_sim.Configuration(backend_cfg, [agent_cfg, agent_cfg2])
 
     def place_agent(self, sim):
         # place our agent in the scene
         agent_state = habitat_sim.AgentState()
-        agent_state.position = [-0.15, 0.7, 1.0]
-        # agent_state.position = [-0.15, -0.7, 1.0]
-        # agent_state.position = [-0.15, -1.0, 1.0]
+        agent_state.position = [-0.15, -0.7, 1.0]
         agent_state.rotation = np.quaternion(-0.83147, 0, 0.55557, 0)
         self.agent = sim.initialize_agent(0, agent_state)
+
+        agent_state2 = habitat_sim.AgentState()
+        # agent_state2.position = [-6.0,2.0,4.0]
+        # agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-10.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
+        agent_state2.position = [-4.0,2.0,5.0]
+        agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-20.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
+        agent_state2.rotation = utils.quat_from_magnum(agent_rotation)
+        # agent_state.rotation = np.quaternion(1, 0, 0, 0)
+        agent2 = self. sim.initialize_agent(1, agent_state2)
         return self.agent.scene_node.transformation_matrix()
 
     def setup(self):
@@ -143,14 +156,10 @@ class Workspace(object):
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
-        
+        print('###########ROBOT ID: ', robot_id)
+        print('###########ROBOT FILE: ', robot_file)
         # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
-        # local_base_pos = np.array([0,1.5,-3]) # forward pillar collision
-        # local_base_pos = np.array([-1,1.3,-4]) # right pillar collision
-        # local_base_pos = np.array([-3.0,1.3,4.5])
-        # local_base_pos = np.array([-2,1.3,-4]) # original 
-        # local_base_pos = np.array([-3,0.0,4.5]) # original 
-        local_base_pos = np.array([-3,0.0,0.5]) # original 
+        local_base_pos = np.array([-2,1.3,-4])
         agent_transform = sim.agents[0].scene_node.transformation_matrix()
         base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
         base_transform.translation = agent_transform.transform_point(local_base_pos)
@@ -305,7 +314,7 @@ class Workspace(object):
             raibert_action = self.raibert_controller.get_action(state, i+1)
             # Simulate spot for 1/ctrl_freq seconds and return camera observation
             raibert_actions_commanded.append(raibert_action)
-            cur_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=True)
+            cur_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=False)
             self.observations += cur_obs
             # print(cur_obs[0]['depth_camera_1stperson'], cur_obs[0]['depth_camera_1stperson'].shape)
 
@@ -338,7 +347,7 @@ class Workspace(object):
     def make_video(self):
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
         self.make_video_cv2(self.observations, ds=1, output_path=output_path +\
-             time_str +  'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff), pov='depth_camera_1stperson',fps=self.ctrl_freq)
+             time_str +  'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff), pov='rgba_camera_3rdperson',fps=self.ctrl_freq)
 
     # This is wrapped such that it can be added to a unit test
     def test_robot(self):
@@ -356,6 +365,8 @@ class Workspace(object):
         # self.cmd_vel_xyt(0.35, 0.0, -0.15)
         # print("MOVING FORWARD ARC LEFT")
         # self.cmd_vel_xyt(0.35, 0.0, 0.15)
+        # print('TURNING IN PLACE LEFT')
+        # self.cmd_vel_xyt(0.0, 0.0, 0.15)
 
         self.make_video()
         with open(os.path.join(output_path, 'controller_log.json'), 'w') as f:
