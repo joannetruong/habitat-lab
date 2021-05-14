@@ -156,8 +156,6 @@ class Workspace(object):
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         robot_id = sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
-        print('###########ROBOT ID: ', robot_id)
-        print('###########ROBOT FILE: ', robot_file)
         # Set root state for the URDF in the sim relative to the agent and find the inverse transform for finding velocities later
         local_base_pos = np.array([-2,1.3,-4])
         agent_transform = sim.agents[0].scene_node.transformation_matrix()
@@ -229,20 +227,20 @@ class Workspace(object):
     def make_video_cv2(self, observations, ds=1, output_path = None, fps=60, pov="rgba_camera_3rdperson"):
         if output_path is None:
             return False
-
-        shp = self.observations[0][pov].shape
+        observations = self.observations[0]
+        shp = observations[0][pov].shape
         
         videodims = (shp[1]//ds, shp[0]//ds)
         
         fourcc = cv2.VideoWriter_fourcc("m", "p", "4", "v")
         vid_name = output_path + ".mp4"
         rate = fps // 30
-        self.observations = self.observations[1::rate]
+        observations = observations[1::rate]
         if self.text is not None:
             self.text= self.text[1::rate]
         video = cv2.VideoWriter(vid_name, fourcc, 30, videodims)
         print('Formatting Video')
-        for count, ob in enumerate(self.observations):
+        for count, ob in enumerate(observations):
             if 'depth' in pov:
                 
                 ob[pov] = ob[pov][:,:,np.newaxis] / 10 * 255
