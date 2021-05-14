@@ -93,7 +93,7 @@ class Workspace(object):
         ortho_spec = habitat_sim.CameraSensorSpec()
         ortho_spec.uuid = "ortho"
         ortho_spec.sensor_type    =  habitat_sim.SensorType.COLOR
-        ortho_spec.resolution     =  camera_resolution_large
+        ortho_spec.resolution     =  camera_resolution
         ortho_spec.position       =  [-2.0,3.50,10.0]
         ortho_spec.orientation    =  [np.deg2rad(-10),np.deg2rad(20.0),0.0]
         ortho_spec.sensor_subtype =  habitat_sim.SensorSubType.ORTHOGRAPHIC
@@ -115,7 +115,7 @@ class Workspace(object):
         agent_rotation = squaternion.Quaternion.from_euler(np.deg2rad(-20.0),np.deg2rad(-80.0),np.deg2rad(0.0), degrees=False)
         agent_state2.rotation = utils.quat_from_magnum(agent_rotation)
         # agent_state.rotation = np.quaternion(1, 0, 0, 0)
-        agent2 = self. sim.initialize_agent(1, agent_state2)
+        agent2 = sim.initialize_agent(1, agent_state2)
         return self.agent.scene_node.transformation_matrix()
 
     def setup(self):
