@@ -32,7 +32,7 @@ class Workspace(object):
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
         self.pos_gain[2] = 0.7 # 0.7
         self.vel_gain[2] = 1.5 # 1.5
-        self.num_steps = 30
+        self.num_steps = 3
         self.ctrl_freq = 240
         self.time_per_step = 80
         self.prev_state=None
@@ -227,20 +227,19 @@ class Workspace(object):
     def make_video_cv2(self, observations, ds=1, output_path = None, fps=60, pov="rgba_camera_3rdperson"):
         if output_path is None:
             return False
-        observations = self.observations[0]
-        shp = observations[0][pov].shape
+        shp = self.observations[0][pov].shape
         
         videodims = (shp[1]//ds, shp[0]//ds)
         
         fourcc = cv2.VideoWriter_fourcc("m", "p", "4", "v")
         vid_name = output_path + ".mp4"
         rate = fps // 30
-        observations = observations[1::rate]
+        self.observations = self.observations[1::rate]
         if self.text is not None:
             self.text= self.text[1::rate]
         video = cv2.VideoWriter(vid_name, fourcc, 30, videodims)
         print('Formatting Video')
-        for count, ob in enumerate(observations):
+        for count, ob in enumerate(self.observations):
             if 'depth' in pov:
                 
                 ob[pov] = ob[pov][:,:,np.newaxis] / 10 * 255
@@ -312,8 +311,8 @@ class Workspace(object):
             raibert_action = self.raibert_controller.get_action(state, i+1)
             # Simulate spot for 1/ctrl_freq seconds and return camera observation
             raibert_actions_commanded.append(raibert_action)
-            cur_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=False)
-            self.observations += cur_obs
+            depth_obs, ortho_obs = self.robot.step(raibert_action, self.pos_gain, self.vel_gain, dt=1/self.ctrl_freq, follow_robot=False)
+            self.observations += depth_obs
             # print(cur_obs[0]['depth_camera_1stperson'], cur_obs[0]['depth_camera_1stperson'].shape)
 
             # Get text to add to video
