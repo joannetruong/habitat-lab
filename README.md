@@ -49,8 +49,30 @@ cd habitat-cont && \
 git checkout new_habitat && \ 
 cd habitat-lab && \
 pip install -r requirements.txt && \
-python setup.py develop --all
+python setup.py develop --all && \
 ```
+
+Move `habitat-lab` out one directory, and delete `habitat-cont`
+```
+cd ../.. && \
+mv habitat-cont/habitat-lab . && \
+rm -rf habitat-cont 
+```
+
+Fix importing errors in habitat_baselines:
+* `habitat-lab/habitat_baselines/__init__.py`
+
+```
+try:
+    from habitat_baselines.il.trainers.eqa_cnn_pretrain_trainer import (
+        EQACNNPretrainTrainer,
+    )
+    from habitat_baselines.il.trainers.pacman_trainer import PACMANTrainer
+    from habitat_baselines.il.trainers.vqa_trainer import VQATrainer
+except:
+    pass
+```
+
 
 ## Add data, change paths
 * URDF: `habitat-sim/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf`
