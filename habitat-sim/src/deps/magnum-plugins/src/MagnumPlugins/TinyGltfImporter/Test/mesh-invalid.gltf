@@ -1,0 +1,418 @@
+{
+    "asset": {
+        "version": "2.0"
+    },
+    "meshes": [
+        {
+            "name": "invalid primitive",
+            "primitives": [
+                {
+                    "mode": 666,
+                    "attributes": {}
+                }
+            ]
+        },
+        {
+            "name": "different vertex count for each accessor",
+            "primitives": [
+                {
+                    "attributes": {
+                        "POSITION": 0,
+                        "TEXCOORD_1": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected position type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "POSITION": 2
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported position component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "POSITION": 3
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected normal type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "NORMAL": 2
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported normal component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "NORMAL": 3
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected tangent type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "TANGENT": 0
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported tangent component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "TANGENT": 5
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected texcoord type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "TEXCOORD_0": 0
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported texcoord component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "TEXCOORD_0": 4
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected color type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "COLOR_0": 1
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported color component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "COLOR_0": 5
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected object id type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "_OBJECT_ID": 6
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unsupported object id component type",
+            "primitives": [
+                {
+                    "attributes": {
+                        "_OBJECT_ID": 7
+                    }
+                }
+            ]
+        },
+        {
+            "name": "unexpected index type",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 6
+                }
+            ]
+        },
+        {
+            "name": "unsupported index component type",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 7
+                }
+            ]
+        },
+        {
+            "name": "normalized index type",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 8
+                }
+            ]
+        },
+        {
+            "name": "strided index view",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 9
+                }
+            ]
+        },
+        {
+            "name": "accessor type size larger than buffer stride",
+            "primitives": [
+                {
+                    "attributes": {
+                        "COLOR_0": 10
+                    }
+                }
+            ]
+        },
+        {
+            "name": "accessor count larger than buffer size",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 11
+                }
+            ]
+        },
+        {
+            "name": "buffer view range out of bounds",
+            "primitives": [
+                {
+                    "attributes": {},
+                    "indices": 12
+                }
+            ]
+        },
+        {
+            "name": "buffer index out of bounds",
+            "primitives": [
+                {
+                    "attributes": {
+                        "POSITION": 13
+                    }
+                }
+            ]
+        },
+        {
+            "name": "buffer view index out of bounds",
+            "primitives": [
+                {
+                    "attributes": {
+                        "POSITION": 14
+                    }
+                }
+            ]
+        },
+        {
+            "name": "normalized float",
+            "primitives": [
+                {
+                    "attributes": {
+                        "_THING": 15
+                    }
+                }
+            ]
+        },
+        {
+            "name": "non-normalized byte matrix",
+            "primitives": [
+                {
+                    "attributes": {
+                        "_THING": 16
+                    }
+                }
+            ]
+        },
+        {
+            "name": "accessor index out of bounds",
+            "primitives": [
+                {
+                    "note": "for indices tinygltf handles this, for attributes not. HEH. Using TEXCOORD so the initial check for texture coordinate types is verified for bounds checks also.",
+                    "attributes": {
+                        "TEXCOORD_1": 17
+                    }
+                }
+            ]
+        }
+    ],
+    "accessors": [
+        {
+            "name": "0",
+            "bufferView": 0,
+            "componentType": 5126,
+            "count": 3,
+            "type": "VEC3"
+        },
+        {
+            "name": "1",
+            "bufferView": 1,
+            "componentType": 5126,
+            "count": 4,
+            "type": "VEC2"
+        },
+        {
+            "name": "2",
+            "bufferView": 0,
+            "componentType": 5126,
+            "count": 3,
+            "type": "VEC2"
+        },
+        {
+            "name": "3",
+            "bufferView": 1,
+            "componentType": 5130,
+            "count": 1,
+            "type": "VEC3"
+        },
+        {
+            "name": "4",
+            "bufferView": 0,
+            "componentType": 5125,
+            "normalized": true,
+            "count": 3,
+            "type": "VEC2"
+        },
+        {
+            "name": "5",
+            "bufferView": 0,
+            "componentType": 5120,
+            "count": 3,
+            "type": "VEC4"
+        },
+        {
+            "name": "6",
+            "bufferView": 1,
+            "componentType": 5125,
+            "count": 3,
+            "type": "VEC2"
+        },
+        {
+            "name": "7",
+            "bufferView": 1,
+            "componentType": 5124,
+            "count": 3,
+            "type": "SCALAR"
+        },
+        {
+            "name": "8",
+            "bufferView": 1,
+            "componentType": 5125,
+            "normalized": true,
+            "count": 3,
+            "type": "SCALAR"
+        },
+        {
+            "name": "9",
+            "bufferView": 0,
+            "componentType": 5125,
+            "count": 3,
+            "type": "SCALAR"
+        },
+        {
+            "name": "10",
+            "bufferView": 0,
+            "componentType": 5126,
+            "normalized": true,
+            "count": 3,
+            "type": "VEC4"
+        },
+        {
+            "name": "11",
+            "bufferView": 1,
+            "byteOffset": 1,
+            "componentType": 5125,
+            "count": 8,
+            "type": "SCALAR"
+        },
+        {
+            "name": "12",
+            "bufferView": 2,
+            "componentType": 5125,
+            "count": 3,
+            "type": "SCALAR"
+        },
+        {
+            "name": "13",
+            "bufferView": 3,
+            "componentType": 5125,
+            "count": 3,
+            "type": "SCALAR"
+        },
+        {
+            "name": "14",
+            "bufferView": 4,
+            "componentType": 5126,
+            "count": 9,
+            "type": "VEC3"
+        },
+        {
+            "name": "15",
+            "bufferView": 0,
+            "componentType": 5130,
+            "normalized": true,
+            "count": 1,
+            "type": "SCALAR"
+        },
+        {
+            "name": "16",
+            "bufferView": 1,
+            "componentType": 5120,
+            "normalized": false,
+            "count": 1,
+            "type": "MAT2"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 36,
+            "byteStride": 12
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 36,
+            "byteLength": 32
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 60,
+            "byteLength": 12
+        },
+        {
+            "buffer": 1,
+            "byteOffset": 0,
+            "byteLength": 12
+        }
+    ],
+    "buffers": [
+        {
+            "byteLength": 68,
+            "uri": "mesh-invalid.bin"
+        }
+    ]
+}

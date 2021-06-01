@@ -1,0 +1,50 @@
+#!/usr/bin/make -f
+
+# For some crappy reason Ubuntu includes this flag by default when building deb
+# packages. This breaks signal/slot connections across *.sos in
+# Corrade::Interconnect library (which may affect for example connecting the
+# signals to Application interfaces) and as said on the links below, it has
+# some noticeable unintended/dangerous effects as well, so I'm just disabling
+# it globally. See:
+#  http://stackoverflow.com/questions/7216973/is-there-a-downside-to-using-bsymbolic-functions
+#  https://software.intel.com/en-us/articles/performance-tools-for-software-developers-bsymbolic-can-cause-dangerous-side-effects
+export DEB_LDFLAGS_MAINT_STRIP = -Wl,-Bsymbolic-functions
+
+%:
+	dh $@ --parallel
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DWITH_AUDIO=ON \
+		-DWITH_GLXAPPLICATION=ON \
+		-DWITH_GLFWAPPLICATION=ON \
+		-DWITH_SDL2APPLICATION=ON \
+		-DWITH_WINDOWLESSGLXAPPLICATION=ON \
+		-DWITH_GLXCONTEXT=ON \
+		-DWITH_OPENGLTESTER=ON \
+		-DWITH_ANYAUDIOIMPORTER=ON \
+		-DWITH_ANYIMAGECONVERTER=ON \
+		-DWITH_ANYIMAGEIMPORTER=ON \
+		-DWITH_ANYSCENECONVERTER=ON \
+		-DWITH_ANYSCENEIMPORTER=ON \
+		-DWITH_ANYSHADERCONVERTER=ON \
+		-DWITH_MAGNUMFONT=ON \
+		-DWITH_MAGNUMFONTCONVERTER=ON \
+		-DWITH_OBJIMPORTER=ON \
+		-DWITH_TGAIMAGECONVERTER=ON \
+		-DWITH_TGAIMPORTER=ON \
+		-DWITH_WAVAUDIOIMPORTER=ON \
+		-DWITH_DISTANCEFIELDCONVERTER=ON \
+		-DWITH_IMAGECONVERTER=ON \
+		-DWITH_SCENECONVERTER=ON \
+		-DWITH_SHADERCONVERTER=ON \
+		-DWITH_FONTCONVERTER=ON \
+		-DWITH_GL_INFO=ON \
+		-DWITH_AL_INFO=ON
+
+# Extraordinarily coarse way to suppress error about libGL not being in
+# dependencies when the user has installed NVidia binary drivers which are not
+# in the repositories. Can't I just IGNORE A SIGNLE FILE DAMMIT?!
+override_dh_shlibdeps:
+		dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info

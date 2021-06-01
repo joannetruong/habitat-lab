@@ -1,0 +1,472 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+/** @page building-plugins Downloading and building plugins
+@brief Guide how to download and build plugins for the Magnum engine.
+
+@m_keyword{Building plugins,,}
+
+@tableofcontents
+@m_footernavigation
+
+Plugins provide additional capability for the Magnum engine in terms of
+importing and exporting various media file formats. They are not needed for
+essential usage, but you might want them sooner or later when you would want to
+use an image as a texture or render text on the screen.
+
+@section building-plugins-packages Prepared packages
+
+The easiest way to install Magnum Plugins is to use one of the ready-made
+packages for your platform of choice. See @ref building-plugins-manual if you
+want to have more control. Cross-compiling is very similar to
+@ref building-cross "cross-compiling of Magnum itself".
+
+-   @ref building-plugins-packages-vcpkg
+-   @ref building-plugins-packages-arch
+-   @ref building-plugins-packages-msys
+-   @ref building-plugins-packages-deb
+-   @ref building-plugins-packages-gentoo
+-   @ref building-plugins-packages-brew
+
+@subsection building-plugins-packages-vcpkg Vcpkg package
+
+Magnum Plugins are available as a [Vcpkg](https://github.com/Microsoft/vcpkg)
+package. See @ref building-packages-vcpkg "the Magnum Vcpkg documentation" for
+a more detailed introduction and a troubleshooting guide. Installing latest
+stable version of Magnum Plugins with all its dependencies is done like this:
+
+@code{.bat}
+vcpkg install magnum-plugins
+@endcode
+
+@m_class{m-block m-success}
+
+@par Installing latest master
+    The `master` is considered stable for production use and often you may want
+    to prefer it over a potentially outdated tagged release. To do so, use
+    the `--head` option on `magnum-plugins` as well as its dependencies:
+@par
+    @code{.bat}
+    vcpkg install --head corrade magnum magnum-plugins
+    @endcode
+@par
+    Note that `vcpkg upgrade` doesn't work well with `--head` packages (it will
+    go back to latest tagged version instead of updated master), you have to
+    remove `magnum-plugins` as well as their dependencies and install `--head`
+    again:
+@par
+    @code{.bat}
+    vcpkg remove magnum-plugins --recurse
+    vcpkg install --head corrade magnum magnum-plugins
+    @endcode
+
+Note that just a subset of plugins is installed by default. To opt-in or
+opt-out of additional features, you can use the following syntax; feature names
+are simply names of CMake `WITH_*` options from the @ref building-plugins-features
+section but lowercase, e.g.:
+
+@code{.bat}
+vcpkg install magnum-plugins[assimpimporter,ddsimporter]
+@endcode
+
+To install all features of a package, use `*`, e.g.:
+
+@code{.bat}
+vcpkg install magnum-plugins[*]
+@endcode
+
+There are also Vcpkg packages for
+@ref building-integration-packages-vcpkg "Magnum Integration" and
+@ref building-extras-packages-vcpkg "Magnum Extras".
+
+@subsection building-plugins-packages-arch ArchLinux packages
+
+Package for the latest stable release is maintained in the `community` repo.
+Installing is as simple as this:
+
+@code{.sh}
+sudo pacman -S magnum-plugins
+@endcode
+
+In `package/archlinux/magnum-plugins-git` there is a package for Git
+development build. The package is also in AUR as
+[magnum-plugins-git](https://aur.archlinux.org/packages/magnum-plugins-git/).
+It depends on @ref building-corrade-packages-arch "Corrade" and
+@ref building-packages-arch "Magnum" ArchLinux packages.
+
+There are also a few development packages for native builds, cross-compilation
+for Emscripten, Android and MinGW or various sanitizer/coverage builds. See the
+PKGBUILD files in the `package/archlinux` directory. They allow you to build
+and install the package directly from source tree. Example usage:
+
+@code{.sh}
+git clone git://github.com/mosra/magnum-plugins && cd magnum-plugins
+cd package/archlinux
+makepkg -fp PKGBUILD # or any other PKGBUILD file
+@endcode
+
+@note The PKGBUILDs reference a few external dependencies such as
+    `basis-universal-src` or (in case of Emscripten) `emscripten-faad2`, which
+    are not in AUR. You can find PKGBUILDs for these at
+    https://github.com/mosra/archlinux. You can also edit the package, disable
+    building of affected features and remove the dependency.
+
+In most cases the development PKGBUILDs also contain a @cb{.sh} check() @ce
+function which will run all unit tests before packaging. That might sometimes
+fail or take too long, pass `--nocheck` to `makepkg` to skip that.
+
+Once built, install the package using `pacman`:
+
+@code{.sh}
+sudo pacman -U magnum-plugins-*.pkg.tar.zst
+@endcode
+
+Edit the PKGBUILDs if you want to pass additional flags to CMake or
+@ref building-plugins-features "enable / disable additional features".
+
+There are also ArchLinux packages for
+@ref building-integration-packages-arch "Magnum Integration",
+@ref building-extras-packages-arch "Magnum Extras" and
+@ref building-examples-packages-arch "Magnum Examples".
+
+@subsection building-plugins-packages-msys MSYS2 packages
+
+[MSYS2](https://www.msys2.org/) package for the latest stable release is
+mantained in the official repos. Installing is as simple as this:
+
+@code{.sh}
+pacman -S mingw-w64-x86_64-magnum-plugins # or mingw-w64-i686-magnum-plugins
+@endcode
+
+Similarly to ArchLinux, there is one package in the
+`package/msys/magnum-plugins` directory, which will download and package latest
+stable release; and then a development `PKGBUILD` in `package/msys`, allowing
+you to package and install the currently checked out source tree. Both depend
+on corresponding @ref building-corrade-packages-msys "Corrade" and
+@ref building-packages-msys "Magnum" MSYS2 packages. Example usage:
+
+@code{.sh}
+git clone git://github.com/mosra/magnum-plugins && cd magnum-plugins
+cd package/msys
+makepkg -fp PKGBUILD
+@endcode
+
+The above works in a 32/64bit MinGW shell, from a MSYS shell the equivalent
+command is
+
+@code{.sh}
+makepkg-mingw -fp PKGBUILD
+@endcode
+
+@m_class{m-noindent}
+
+which will build both a 32bit and a 64bit version. See the
+[MSYS2 Wiki](https://github.com/msys2/msys2/wiki/Creating-Packages) for more
+information.
+
+There are also MSYS2 packages for
+@ref building-integration-packages-msys "Magnum Integration".
+
+@subsection building-plugins-packages-deb Packages for Debian, Ubuntu and derivatives
+
+The `package/debian/` directory contains all files needed for building Debian
+packages. You need the @ref building-corrade-packages-deb "Corrade" and
+@ref building-packages-deb "Magnum" Debian packages installed and in addition
+also the `dpkg-dev` and `debhelper` packages. Building is easy, just change
+directory to package root, link or copy the `package/debian` directory there
+and run `dpkg-buildpackage`:
+
+@code{.sh}
+git clone git://github.com/mosra/magnum-plugins && cd magnum-plugins
+ln -s package/debian .
+dpkg-buildpackage
+@endcode
+
+This will compile binary and development packages, which will then appear in a
+parent directory. Install them using `dpkg`:
+
+@code{.sh}
+sudo dpkg -i ../magnum-plugins*.deb
+@endcode
+
+If you want to pass additional flags to CMake or
+@ref building-plugins-features "enable / disable additional features", add them
+to `dh_auto_configure` at the bottom of `package/debian/rules`. Watch out, as
+indentation has to be done using tabs, not spaces.
+
+@m_class{m-block m-warning}
+
+@par Enabling Basis Universal and MeshOptimizer plugins
+@parblock
+Neither Basis Universal nor MeshOptimizer provide any packages for Debian and
+thus the Magnum Plugins package doesn't have it enabled by default. In order to
+enable them, do the following:
+
+-   For @ref Trade::BasisImporter "BasisImporter" or
+    @ref Trade::BasisImageConverter "BasisImageConverter", [download commit
+    `2f43afcc` of the Basis Universal repo](https://github.com/BinomialLLC/basis_universal/archive/2f43afcc97d0a5dafdb73b4e24e123cf9687a418.tar.gz),
+    extract it into `src/external/basis-universal` (note the dash instead of an
+    underscore) and set `WITH_BASISIMPORTER` / `WITH_BASISIMAGECONVERTER` to
+    `ON` in `package/debian/rules`
+-   For @ref Trade::MeshOptimizerSceneConverter "MeshOptimizerSceneConverter",
+    [clone the MeshOptimizer repo](https://github.com/zeux/meshoptimizer) to
+    `src/external/meshoptimizer` and set `WITH_MESHOPTIMIZERSCENECONVERTER` to
+    `ON` in `package/debian/rules`.
+
+With the above, when you run `dpkg-buildpackage`, CMake will automatically
+discover the sources and link them as static libraries to corresponding
+plugins.
+@endparblock
+
+@m_class{m-block m-success}
+
+@par Enabling Glslang and SPIRV-Tools plugins
+@parblock
+Glslang and SPIRV-Tools packages are available only since Ubuntu 20.04 and thus
+are not enabled in the Magnum Plugins package by default. In order to enable
+them, do the following:
+
+-   For @ref ShaderTools::GlslangConverter "GlslangShaderConverter", add
+    `glslang-dev` to the `Build-Depends:` line in `package/debian/control` and
+    set `WITH_GLSLANGSHADERCONVERTER` to `ON` in `package/debian/rules`.
+-   For @ref ShaderTools::SpirvToolsConverter "SpirvToolsShaderConverter",
+    add `spirv-tools` to the `Build-Depends:` line in `package/debian/control`
+    and set `WITH_SPIRVTOOLSSHADERCONVERTER` to `ON` in `package/debian/rules`.
+
+With the above, when you run `dpkg-buildpackage`, it should correctly find the
+dependencies (or ask for them to be installed) and build the corresponding
+plugins. The workflow is equivalent for vanilla Debian, as the packages are
+named the same.
+@endparblock
+
+There are also Debian packages for
+@ref building-integration-packages-deb "Magnum Integration",
+@ref building-extras-packages-deb "Magnum Extras" and
+@ref building-examples-packages-deb "Magnum Examples".
+
+@subsection building-plugins-packages-gentoo Gentoo Linux ebuilds
+
+Gentoo Git ebuild is available in the `package/gentoo` directory. Get the
+@ref building-corrade-packages-gentoo "Corrade" and
+@ref building-packages-gentoo "Magnum" Gentoo packages first and then build and
+install Magnum Plugins like this:
+
+@code{.sh}
+git clone git://github.com/mosra/magnum-plugins && cd magnum-plugins
+cd package/gentoo
+sudo ebuild dev-libs/magnum-plugins/magnum-plugins-9999.ebuild manifest clean merge
+@endcode
+
+If you want to pass additional flags to CMake or
+@ref building-plugins-features "enable / disable additional features", add them
+to `mycmakeargs` in the `*.ebuild` file.
+
+There are also Gentoo packages for
+@ref building-integration-packages-gentoo "Magnum Integration",
+@ref building-extras-packages-gentoo "Magnum Extras" and
+@ref building-examples-packages-gentoo "Magnum Examples".
+
+@subsection building-plugins-packages-brew Homebrew formulas for macOS
+
+macOS [Homebrew](https://brew.sh) formulas building the latest Git revision are
+in the `package/homebrew` directory. Either use the `*.rb` files directly or
+use the tap at https://github.com/mosra/homebrew-magnum. This will install the
+latest stable version of Magnum Plugins with all dependencies:
+
+@code{.sh}
+brew install mosra/magnum/magnum-plugins
+@endcode
+
+But often you may want to install the latest Git revision of all Magnum
+projects instead:
+
+@code{.sh}
+brew install --HEAD mosra/magnum/corrade
+brew install --HEAD mosra/magnum/magnum
+brew install --HEAD mosra/magnum/magnum-plugins
+@endcode
+
+When installing from the `*.rb` files you need to install the
+@ref building-corrade-packages-brew "Corrade"
+and @ref building-packages-brew "Magnum" Homebrew packages first. If you want
+to pass additional flags to CMake or
+@ref building-plugins-features "enable / disable additional features", edit the
+`*.rb` file.
+
+There are also Homebrew packages for
+@ref building-integration-packages-brew "Magnum Integration",
+@ref building-extras-packages-brew "Magnum Extras" and
+@ref building-examples-packages-brew "Magnum Examples".
+
+@section building-plugins-manual Manual build
+
+The source is available on GitHub: https://github.com/mosra/magnum-plugins.
+Building the plugins is very similar to building Magnum itself. See
+@ref building for additonal information about building and running tests,
+cross-compiling and platform-specific issues.
+
+@subsection building-plugins-features Enabling or disabling features
+
+By default no plugins are built and you need to select them manually:
+
+-   `WITH_ASSIMPIMPORTER` --- Build the @ref Trade::AssimpImporter "AssimpImporter"
+    plugin. Depends on [Assimp](http://assimp.org/).
+-   `WITH_BASISIMAGECONVERTER` --- Build the
+    @ref Trade::BasisImageConverter "BasisImageConverter" plugin. Depends on
+    [Basis Universal](https://github.com/binomialLLC/basis_universal).
+-   `WITH_BASISIMPORTER` --- Build the @ref Trade::BasisImporter "BasisImporter"
+    plugin. Depends on [Basis Universal](https://github.com/binomialLLC/basis_universal)
+    --- if you are on Vcpkg, it will "just work", otherwise you need to
+    download the sources and point `BASIS_UNIVERSAL_DIR` to their directory so
+    CMake can find them.
+-   `WITH_DDSIMPORTER` --- Build the @ref Trade::DdsImporter "DdsImporter"
+    plugin.
+-   `WITH_DEVILIMAGEIMPORTER` --- Build the
+    @ref Trade::DevIlImageImporter "DevIlImageImporter" plugin. Depends on
+    [DevIL](http://openil.sourceforge.net/).
+-   `WITH_DRFLACAUDIOIMPORTER` --- Build the
+    @ref Audio::DrFlacImporter "DrFlacAudioImporter" plugin.
+-   `WITH_DRMP3AUDIOIMPORTER` --- Build the
+    @ref Audio::DrMp3Importer "DrMp3AudioImporter" plugin.
+-   `WITH_DRWAVAUDIOIMPORTER` --- Build the
+    @ref Audio::DrWavImporter "DrWavAudioImporter" plugin.
+-   `WITH_FAAD2AUDIOIMPORTER` --- Build the
+    @ref Audio::Faad2Importer "Faad2AudioImporter" plugin. Depends on
+    [FAAD2](https://www.audiocoding.com/faad2.html).
+-   `WITH_FREETYPEFONT` --- Build the @ref Text::FreeTypeFont "FreeTypeFont"
+    plugin. Depends on [FreeType](http://www.freetype.org/).
+-   `WITH_GLSLANGSHADERCONVERTER` --- Build the @ref ShaderTools::GlslangConverter "GlslangShaderConverter"
+    plugin. Depends on [Glslang](https://github.com/KhronosGroup/glslang).
+-   `WITH_HARFBUZZFONT` --- Build the @ref Text::HarfBuzzFont "HarfBuzzFont"
+    plugin. Enables also building of the @ref Text::FreeTypeFont "FreeTypeFont"
+    plugin. Depends on [HarfBuzz](http://www.freedesktop.org/wiki/Software/HarfBuzz).
+-   `WITH_ICOIMPORTER` --- Build the @ref Trade::IcoImporter "IcoImporter"
+    plugin.
+-   `WITH_JPEGIMAGECONVERTER` --- Build the
+    @ref Trade::JpegImageConverter "JpegImageConverter" plugin.
+-   `WITH_JPEGIMPORTER` --- Build the @ref Trade::JpegImporter "JpegImporter"
+    plugin. Depends on [libJPEG](http://libjpeg.sourceforge.net/).
+-   `WITH_MESHOPTIMIZERSCENECONVERTER` --- Build the
+    @ref Trade::MeshOptimizerSceneConverter "MeshOptimizerSceneConverter"
+    plugin.
+-   `WITH_MINIEXRIMAGECONVERTER` --- Build the
+    @ref Trade::MiniExrImageConverter "MiniExrImageConverter" plugin.
+-   `WITH_OPENGEXIMPORTER` --- Build the @ref Trade::OpenGexImporter "OpenGexImporter"
+    plugin. Enables also building of the @ref OpenDdl library.
+-   `WITH_PNGIMAGECONVERTER` --- Build the
+    @ref Trade::PngImageConverter "PngImageConverter" plugin. Depends on
+    [libPNG](http://www.libpng.org/pub/png/libpng.html).
+-   `WITH_PNGIMPORTER` --- Build the @ref Trade::PngImporter "PngImporter"
+    plugin. Depends on [libPNG](http://www.libpng.org/pub/png/libpng.html).
+-   `WITH_PRIMITIVEIMPORTER` --- Build the @ref Trade::PrimitiveImporter
+    "PrimitiveImporter" plugin.
+-   `WITH_SPIRVTOOLSSHADERCONVERTER` --- Build the @ref ShaderTools::SpirvToolsConverter "SpirvToolsShaderConverter"
+    plugin. Depends on [SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools).
+-   `WITH_STANFORDIMPORTER` --- Build the
+    @ref Trade::StanfordImporter "StanfordImporter" plugin.
+-   `WITH_STANFORDSCENECONVERTER` --- Build the
+    @ref Trade::StanfordSceneConverter "StanfordSceneConverter" plugin.
+-   `WITH_STBIMAGECONVERTER` --- Build the
+    @ref Trade::StbImageConverter "StbImageConverter" plugin.
+-   `WITH_STBIMAGEIMPORTER` --- Build the
+    @ref Trade::StbImageImporter "StbImageImporter" plugin. Enabled
+    automatically if `WITH_TINYGLTFIMPORTER` is enabled.
+-   `WITH_STBTRUETYPEFONT` --- Build the
+    @ref Text::StbTrueTypeFont "StbTrueTypeFont" plugin.
+-   `WITH_STBVORBISAUDIOIMPORTER` --- Build the
+    @ref Audio::StbVorbisImporter "StbVorbisAudioImporter" plugin.
+-   `WITH_TINYGLTFIMPORTER` --- Build the
+    @ref Trade::TinyGltfImporter "TinyGltfImporter" plugin.
+
+Some plugins expose their internal state through separate libraries and you can
+control their build separately:
+
+-   `WITH_OPENDDL` --- Build the @ref OpenDdl library. Enabled automatically if
+    `WITH_OPENGEXIMPORTER` is enabled.
+
+Options controlling the build are a subset of
+@ref building-features "the options used by Magnum":
+
+-   `BUILD_STATIC` --- Build all libraries as static. Default is shared, except
+    on platforms such as @ref CORRADE_TARGET_ANDROID "Android" or
+    @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" that don't support dynamic
+    linking.
+-   `BUILD_STATIC_PIC` --- Build static libraries with position-independent
+    code. Enabled by default when building static libraries, disable if you
+    don't need this feature. On @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten"
+    this option is always off.
+-   `BUILD_PLUGINS_STATIC` --- Build plugins as static. By default, plugins are
+    built as dynamic. Independent of the `BUILD_STATIC` option to allow having
+    static libraries with dynamic plugins and vice versa. To some extent it's
+    also possible to have only a subset of plugins built as static --- set
+    `MAGNUM_<PLUGIN>_BUILD_STATIC` for particular plugins to `ON` or `OFF` to
+    override this option.
+-   Additional options are inherited from the
+    @ref CORRADE_BUILD_MULTITHREADED and
+    @ref MAGNUM_BUILD_STATIC_UNIQUE_GLOBALS options specified when building
+    Magnu,
+
+Note that each plugin class / library namespace documentation contains more
+detailed information about its dependencies, availability on particular
+platforms and also a guide how to enable given plugin for building and how to
+use it with CMake.
+
+Libraries and static plugins built in the `Debug` configuration (e.g. with
+`CMAKE_BUILD_TYPE` set to `Debug`) have a `-d` suffix, *dynamic* plugins in
+`Debug` configuration are installed to the `magnum-d` subdirectory, similarly
+to what is done when @ref building "building Magnum itself".
+
+@section building-plugins-doc Building documentation
+
+The documentation for plugins is built as part of of the main Magnum
+documentation. Clone the projects next to each other and continue as described
+in @ref building-doc.
+
+@section building-plugins-ci Continuous Integration
+
+@subsection building-plugins-ci-circleci CircleCI
+
+In `package/ci/` there is a `circle.yml` file with Linux GCC 4.8, macOS,
+Emscripten, AddressSanitizer and ThreadSanitizer configuration. Online
+at https://circleci.com/gh/mosra/magnum-plugins.
+
+@subsection building-plugins-ci-travis Travis
+
+In `package/ci/` there is a `travis.yml` file with iOS and Android
+configuration. Online at https://travis-ci.com/mosra/magnum-plugins.
+
+@subsection building-plugins-ci-appveyor AppVeyor
+
+In `package/ci/` there is an `appveyor.yml` file with Windows desktop MSVC,
+MinGW and Windows RT configuration. Online at
+https://ci.appveyor.com/project/mosra/magnum-plugins.
+
+@subsection building-plugins-ci-coverage Codecov.io
+
+Linux, Linux GLES, macOS and Windows MinGW builds contribute to a combined code
+coverage report, available online at https://codecov.io/gh/mosra/magnum-plugins.
+*/
+}

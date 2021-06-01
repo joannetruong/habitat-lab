@@ -1,0 +1,102 @@
+clone_depth: 1
+
+environment:
+  matrix:
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-msvc2015
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-msvc2017
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019
+  - TARGET: desktop
+    COMPILER: mingw
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-mingw
+  - TARGET: desktop-gles
+    COMPILER: msvc
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-gles2-msvc2017
+  - TARGET: desktop-gles
+    COMPILER: msvc
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-gles2-msvc2019
+  - TARGET: desktop-gles
+    COMPILER: msvc
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-gles3-msvc2017
+  - TARGET: desktop-gles
+    COMPILER: msvc
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-gles3-msvc2019
+  - TARGET: rt
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-gles2-msvc2017
+  - TARGET: rt
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-gles3-msvc2017
+
+notifications:
+- provider: Webhook
+  url: https://webhooks.gitter.im/e/415ae90928ba0dbd3df4
+  on_build_success: false
+  on_build_failure: true
+  on_build_status_changed: true
+
+install:
+# Ninja. `cinst ninja` started 503ing in late November 2019 and wasn't really
+# reliable before either. So install by hand, as that's reliable always.
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\ninja-win.zip appveyor DownloadFile https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip
+- 7z x ninja-win.zip -oC:/tools/ninja
+
+- set PATH=C:/Sys/bin;C:/tools/ninja;%PATH%
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" pip install codecov
+- IF "%TARGET_GLES2%" == "ON" set TARGET_GLES3=OFF
+- IF "%TARGET_GLES2%" == "OFF" set TARGET_GLES3=ON
+
+# Eigen
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\eigen-3.3.7.tar.gz appveyor DownloadFile https://gitlab.com/libeigen/eigen/-/archive/3.3.7/eigen-3.3.7.tar.gz
+- 7z x eigen-3.3.7.tar.gz -o%APPVEYOR_BUILD_FOLDER%\deps && 7z x %APPVEYOR_BUILD_FOLDER%\deps\eigen-3.3.7.tar -o%APPVEYOR_BUILD_FOLDER%\deps && ren %APPVEYOR_BUILD_FOLDER%\deps\eigen-3.3.7 eigen
+
+# GLM
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\0.9.9.0.zip appveyor DownloadFile https://github.com/g-truc/glm/archive/0.9.9.0.zip
+- 7z x 0.9.9.0.zip -o%APPVEYOR_BUILD_FOLDER%\deps && ren %APPVEYOR_BUILD_FOLDER%\deps\glm-0.9.9.0 glm
+
+# SDL2
+- IF NOT "%TARGET%" == "rt" IF "%COMPILER%" == "msvc" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\SDL2-devel-2.0.9-VC.zip appveyor DownloadFile http://www.libsdl.org/release/SDL2-devel-2.0.9-VC.zip
+- IF NOT "%TARGET%" == "rt" IF "%COMPILER%" == "msvc" 7z x SDL2-devel-2.0.9-VC.zip && ren SDL2-2.0.9 SDL
+- IF NOT "%TARGET%" == "rt" IF "%COMPILER%" == "mingw" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\SDL2-devel-2.0.9-mingw.tar.gz appveyor DownloadFile http://libsdl.org/release/SDL2-devel-2.0.9-mingw.tar.gz
+- IF NOT "%TARGET%" == "rt" IF "%COMPILER%" == "mingw" 7z x SDL2-devel-2.0.9-mingw.tar.gz & 7z x SDL2-devel-2.0.9-mingw.tar & ren SDL2-2.0.9 SDL
+
+# ImGui
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\imgui-1.72.zip appveyor DownloadFile https://github.com/ocornut/imgui/archive/v1.72.zip -FileName imgui-1.72.zip
+- 7z x imgui-1.72.zip -o%APPVEYOR_BUILD_FOLDER%\deps && ren %APPVEYOR_BUILD_FOLDER%\deps\imgui-1.72 imgui
+
+# OVR SDK
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "msvc" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\ovr_sdk_win_1.26.0_public_minimal.zip appveyor DownloadFile https://ci.magnum.graphics/ovr_sdk_win_1.26.0_public_minimal.zip
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "msvc" 7z x ovr_sdk_win_1.26.0_public_minimal.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+build_script:
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "msvc" call package\ci\appveyor-desktop.bat
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" call package\ci\appveyor-desktop-mingw.bat
+- IF "%TARGET%" == "desktop-gles" call package\ci\appveyor-desktop-gles.bat
+- IF "%TARGET%" == "rt" call package\ci\appveyor-rt.bat
+
+cache:
+- ninja-win.zip -> package/ci/appveyor-cache-reset.txt
+- ovr_sdk_win_1.26.0_public_minimal.zip -> package/ci/appveyor-cache-reset.txt
+- 2.86.1.zip -> package/ci/appveyor-cache-reset.txt
+- 0.9.9.0.zip -> package/ci/appveyor-cache-reset.txt
+- 3.3.7.tar.bz2 -> package/ci/appveyor-cache-reset.txt
+- imgui-1.72.zip -> package/ci/appveyor-cache-reset.txt

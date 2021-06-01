@@ -1,0 +1,329 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+/** @page coding-style Coding style
+@brief Coding style and best practices to preserve maintainability and
+consistent style across whole project.
+
+@tableofcontents
+
+Please note that if you have a good excuse to either break the rules or modify
+them, feel free to do it (and update this guide accordingly, if appropriate).
+Nothing is worse than rule that hurts productivity instead of improving it.
+
+This guide builds upon @ref corrade-coding-style "Corrade's coding style guide"
+and extends it where needed. You are encouraged to read it first.
+
+@section coding-style-cpp C++ code
+
+@subsection coding-style-cpp-headers Headers
+
+Headers shouldn't have @cpp using @ce declarations inside them (unless there is
+good excuse, see @ref Magnum.h).
+
+Headers have `*.h` extension, @ref compilation-speedup-hpp "template implementation headers"
+have `*.hpp` extension (hinting that they are something between `*.h` and
+`*.cpp` files).
+
+@subsection coding-style-cpp-format Code format
+
+@subsubsection coding-style-cpp-types Builtin types
+
+Use Magnum's own type aliases for public API (e.g. @ref UnsignedInt, see
+@ref types for more information), but use specific types when interacting with
+third party libraries and OpenGL (e.g. @cpp GLuint @ce) and rely only on
+implicit conversions when converting between them. This helps avoiding sign,
+truncation and other issues, e.g. @cpp Math::Vector2<GLsizei> @ce will
+implicitly convert to @ref Vector2i if and only if @ref Int is the same type as
+@cpp GLsizei @ce.
+
+@subsubsection coding-style-cpp-naming Naming
+
+When writing wrappers for OpenGL functions and defines, try to match the
+original name as closely as possible, although expanding abbrevations (and
+removing redundant prefixes) is encouraged.
+
+@subsubsection coding-style-cpp-forward-declarations Forward declarations and forward declaration headers
+
+When a namespace has classes which are commonly forward-declared, consider
+making a forward declaration header --- it should have the same name as the
+namespace itself and contain foward declarations for all classes, enums and
+copies of all meaningful typedefs. See @ref compilation-forward-declarations
+for more information.
+
+@section coding-style-compatibility Compatibility with various OpenGL editions
+
+If any class, function or part of code depends on particular OpenGL edition
+(e.g. only for desktop), use conditional compilation to avoid erors on other
+platforms (see @ref portability-target for more information). Put related
+documentation also into the conditional compilation block and don't forget to
+appropriately mark the class/function
+(@ref coding-style-documentation-commands-requires "see below"). Example:
+
+@snippet coding-style.h glcompatibility
+
+@section coding-style-documentation Doxygen documentation
+
+@subsection coding-style-documentation-commands Special documentation commands
+
+Additionally to @c \@todoc, @c \@debugoperator, @c \@debugoperatorenum,
+@c \@debugoperatorclassenum, @c \@configurationvalue, @c \@configurationvalueref,
+@c \@tweakableliteral, @c \@partialsupport, @c \@thirdparty, @c \@cb, @c \@ce,
+@c \@cpp, @c \@cmake defined @ref corrade-coding-style-documentation-commands "the same as in Corrade"
+and all @c \@m_* commands from the [m.css theme](https://mcss.mosra.cz/doxygen/#theme-specific-commands),
+these are defined:
+
+@subsubsection coding-style-documentation-commands-code Code
+
+The @c \@glsl command expands to <tt>\@cb{.glsl}</tt>, making it possible to
+have inline highlighted GLSL code snippets, similarly to @c \@cpp and @c \@cmake.
+
+@subsubsection coding-style-documentation-commands-extension Links to OpenGL, Vulkan and OpenAL extensions
+
+If an OpenGL extension is referenced in the documentation, it should be done
+with @c \@gl_extension command:
+
+@snippet coding-style.h extension
+
+It produces a link to the specification of the extension in OpenGL registry:
+
+<blockquote>
+@gl_extension{ARB,timer_query}
+</blockquote>
+
+With command @c \@gl_extension2 you can specify extension filename, if the
+previous command gives 404 error. For example
+
+@snippet coding-style.h extension2
+
+produces this link:
+
+<blockquote>
+@gl_extension2{NV,read_buffer_front,GL_NV_read_buffer}
+</blockquote>
+
+WebGL extensions can be specified using @c \@webgl_extension. For example
+
+@snippet coding-style.h webgl_extension
+
+produces this:
+
+<blockquote>
+@webgl_extension{EXT,color_buffer_float}
+</blockquote>
+
+Vulkan extensions can be referenced using @c \@vk_extension. For example
+
+@snippet coding-style.h vk_extension
+
+produces this link:
+
+<blockquote>
+@vk_extension{EXT,debug_report}
+</blockquote>
+
+OpenAL extensions can be referenced using @c \@al_extension, OpenAL context
+extension using @c \@alc_extension. For example
+
+@snippet coding-style.h al_extension
+
+produces the following:
+
+<blockquote>
+@al_extension{EXT,float32}, @alc_extension{SOFT,HRTF}
+</blockquote>
+
+@subsubsection coding-style-documentation-commands-ref Links to related OpenGL, Vulkan, OpenAL functions and definitions
+
+If an function touches OpenGL, related OpenGL functions should be documented
+in @c \@see block with @c \@fn_gl command. If only specific definition is used
+in the function, document it with @c \@def_gl command. Example usage:
+
+@snippet coding-style.h fn_gl
+
+It produces a link to the online manual:
+
+<blockquote>
+@fn_gl{Enable}/@fn_gl{Disable} with @def_gl{TEXTURE_CUBE_MAP_SEAMLESS}
+</blockquote>
+
+Some functions are documented together in a single page. For this case
+there's the @c \@fn_gl2 command that takes the actual page name as second
+parameter:
+
+@snippet coding-style.h fn_gl2
+
+<blockquote>
+@fn_gl2_keyword{CopyTextureSubImage2D,CopyTexSubImage2D}
+</blockquote>
+
+For functions which are not part of OpenGL core specification, but only as
+extensions, use @c \@fn_gl_extension command, e.g.
+
+@snippet coding-style.h fn_gl_extension
+
+First parameter is function name without the suffix, the second two parameters
+are the same as in @c \@gl_extension command. It produced link to extension
+specification, with function name as link text:
+
+<blockquote>
+@fn_gl_extension{LabelObject,EXT,debug_label}
+</blockquote>
+
+For Vulkan, the commands are @c \@fn_vk, @c \@type_vk, @c \@val_vk and
+@c \@def_vk. Example:
+
+@snippet coding-style.h fn_vk
+
+Produces:
+
+<blockquote>
+-   @fn_vk{CreateInstance}
+-   @type_vk{InstanceCreateInfo}
+-   @val_vk{STRUCTURE_TYPE_INSTANCE_CREATE_INFO,StructureType}
+-   @def_vk{VERSION_MINOR}
+</blockquote>
+
+For OpenAL, the commands are @c \@fn_al, @c \@fn_alc, @c \@def_al and
+@c \@def_alc. Example:
+
+@snippet coding-style.h fn_al
+
+Produces:
+
+<blockquote>
+@fn_al{Listenerfv} with @def_al{VELOCITY}
+</blockquote>
+
+There are additional commands that combine @c \@fn_* / @c \@def_* and
+@c \@m_keywords together (i.e., provide a link to given GL/AL API and also add
+that name as an search keyword for current documented symbol). In particular,
+it's @c \@fn_gl_keyword, @c \@fn_gl2_keyword, @c \@def_gl_keyword,
+@c \@fn_al_keyword, @c \@fn_alc_keyword, @c \@def_al_keyword and
+@c \@def_alc_keyword. Their usage is equivalent to usage of commands without
+the `_keyword` suffix.
+
+@subsubsection coding-style-documentation-commands-requires Classes and functions requiring specific OpenGL, Vulkan, OpenAL version or extensions
+
+If any class or function requires specific OpenGL version above 2.1, it should
+be marked with appropriate command @c \@requires_glXX, where `XX` is version
+number (e.g. `42` for OpenGL 4.2) or @c \@requires_extension for specific
+extension which is not in any core OpenGL version. It should be used in
+conjunction with @c \@gl_extension command, if there is an extension providing
+the same functionality. For example:
+
+@snippet coding-style.h requires_gl
+
+If class is marked with the command, member and related functions shouldn't be
+marked. On the other hand, if the version/extension is needed only by one
+function, only the function should be marked. If the extension is needed only
+for some functionality (not related to any member function), it should be
+noted in the description.
+
+Similarly for OpenGL ES there is command @c \@requires_gl for functionality
+not available in OpenGL ES at all, @c \@requires_glesXX for functionality
+requiring OpenGL ES X.X, @c \@requires_gles for functionality requiring OpenGL
+ES and not available in WebGL, @c \@requires_webgl20 for functionality
+requiring WebGL 2.0 (i.e., not part of WebGL 1.0), @c \@requires_es_extension
+for specific extensions not part of the core OpenGL ES specification and
+@c \@requires_webgl_extension for specific extensions not part of the core
+WebGL specification. When there is more than just a single platform, first come
+desktop requirements, then ES requirements and WebGL requirements last.
+
+For Vulkan, the command is @c \@requires_vkXX, @c \@requires_vk_extension, and
+because Vulkan contain feature bits, also @c \@requires_vk_feature.
+
+@snippet coding-style.h requires_vk_extension
+
+For OpenAL, the command is @c \@requires_al_extension:
+
+@snippet coding-style.h requires_al_extension
+
+All classes and functions using those commands are cross-referenced from
+@ref opengl, @ref vulkan and @ref openal pages.
+
+@subsection coding-style-documentation-ordering Section ordering
+
+In detailed documentation the text should be always first, the blocks are then
+ordered by their importance. Various @c \@note, @c \@attention and @c \@warning
+blocks to highlight some information are always first, then @c \@see block with
+links to related stuff, where related Magnum functions are first and links to
+related GL API last, then various support information such as
+@c \@requires_glXX, @c \@requires_es_extension etc. (first desktop GL, then ES,
+then WebGL), after that @c \@deprecated_gl and @c \@deprecated information and
+@c \@todo, @c \@todoc and @c \@bug always last, as they are the least important
+and in most cases only for internal use.
+
+@section coding-style-unit-tests Unit tests
+
+All unit tests use Corrade's @ref Corrade::TestSuite "TestSuite".
+
+Don't forget to test all @cpp constexpr @ce methods --- many compilers don't
+implicitly check whether the @cpp constexpr @ce keyword can be used but then
+complain when you force the expression to be constant. It's better not to have
+given method marked as @cpp constexpr @ce than have it marked it errorneously.
+It's usually not desirable to have special test case for @cpp constexpr @ce
+behaviors, add @cpp constexpr @ce keywords to existing test cases to avoid
+duplicated testing of the same thing. Example (testing a copy constructor):
+
+@code{.cpp}
+constexpr Vector3 a(1.5f, 2.0f, 0.4f);
+constexpr Vector3 b(a);
+CORRADE_COMPARE(b, Vector3(1.5f, 2.0f, 0.4f));
+@endcode
+
+Don't forget to test implicit/explicit constructors and conversion operators
+where it matters (i.e. all low-level and frequently used types like vectors,
+matrices etc.). If the constructor/operator is implicit, test it in the context
+where explicit one would fail to compile, if it is explicit, test its
+explicitness with @ref std::is_convertible (it should return @cpp false @ce).
+These tests might catch various ambiguous call errors which would otherwise be
+unnoticed:
+
+@code{.cpp}
+Vector2 a = {1.5f, 0.5f}; // Explicit constructor would fail to compile here
+CORRADE_COMPARE(a, Vector2(1.5f, 0.5f));
+
+Vector2i b(a); // Implicit conversion operator would return true in 2nd check
+CORRADE_COMPARE(b, Vector2(1, 0));
+CORRADE_VERIFY(!(std::is_convertible<Vector2, Vector2i>::value));
+@endcode
+
+If some type should be constructible also from base type (additionaly to copy
+constructor), don't forget to test that too. The test is also usually needed
+only for low-level frequently used types (vectors, matrices) where such error
+would do largest harm. Depending on how copy constructor is implemented, you
+probably don't need to test classic copy construction, as it would be handled
+by the already tested one. Example (copy construction from base type):
+
+@code{.cpp}
+Vector<3, Float> a(1.5f, 2.0f, 0.4f);
+Vector3 b(a);
+CORRADE_COMPARE(b, Vector3(1.5f, 2.0f, 0.4f));
+@endcode
+
+*/
+}

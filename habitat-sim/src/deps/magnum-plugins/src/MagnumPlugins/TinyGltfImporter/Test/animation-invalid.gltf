@@ -1,0 +1,237 @@
+{
+    "asset": {
+        "version": "2.0"
+    },
+    "nodes": [
+        {}, {}
+    ],
+    "animations": [
+        {
+            "name": "unexpected time type",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "rotation"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 0,
+                    "interpolation": "LINEAR",
+                    "output": 0
+                }
+            ]
+        },
+        {
+            "name": "unsupported interpolation type",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "rotation"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "QUADRATIC",
+                    "output": 0
+                }
+            ]
+        },
+        {
+            "name": "unexpected translation type",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "translation"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 0
+                }
+            ]
+        },
+        {
+            "name": "unexpected rotation type",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "rotation"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 1
+                }
+            ]
+        },
+        {
+            "name": "unexpected scaling type",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "scale"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 0
+                }
+            ]
+        },
+        {
+            "name": "unsupported path",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1337,
+                        "path": "color"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "STEP",
+                    "output": 0
+                }
+            ]
+        },
+        {
+            "name": "sampler index out of bounds",
+            "channels": [
+                {
+                    "sampler": 1,
+                    "target": {
+                        "node": 1337,
+                        "path": "scale"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 2
+                }
+            ]
+        },
+        {
+            "name": "node index out of bounds",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 2,
+                        "path": "scale"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 2
+                }
+            ]
+        },
+        {
+            "name": "sampler input accessor index out of bounds",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1,
+                        "path": "scale"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 3,
+                    "interpolation": "LINEAR",
+                    "output": 2
+                }
+            ]
+        },
+        {
+            "name": "sampler output accessor index out of bounds",
+            "channels": [
+                {
+                    "sampler": 0,
+                    "target": {
+                        "node": 1,
+                        "path": "scale"
+                    }
+                }
+            ],
+            "samplers": [
+                {
+                    "input": 1,
+                    "interpolation": "LINEAR",
+                    "output": 3
+                }
+            ]
+        }
+    ],
+    "note": "additional accessor bounds checks are tested inside mesh-invalid.gltf",
+    "accessors": [
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 0,
+            "type": "VEC4"
+        },
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 0,
+            "type": "SCALAR"
+        },
+        {
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 0,
+            "type": "VEC3"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 0
+        }
+    ],
+    "buffers": [
+        {
+            "byteLength": 664,
+            "uri": "animation.bin"
+        }
+    ]
+}

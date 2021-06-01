@@ -1,0 +1,79 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+
+/** @page credits-contributors Contributors
+
+@section credits-contributors-integration Magnum Integration
+
+-   **Allie** ([\@bowling-allie](https://github.com/bowling-allie)) ---
+    making @ref BulletIntegration work with Bullet from Emscripten Ports,
+    improvements to @ref ImGuiIntegration
+-   **Andrew Huang** ([\@andyroiiid](https://github.com/andyroiiid)) ---
+    @ref ImGuiIntegration fixes
+-   **[\@denesik](https://github.com/denesik)** --- base of the
+    @ref ImGuiIntegration library
+-   **Guillaume Jacquemin** ([\@williamjcm](https://github.com/williamjcm)) ---
+    improvements of the @ref ImGuiIntegration library, MSYS2 packages
+-   **Jackson Campolattaro** ([\@JacksonCampolattaro](https://github.com/JacksonCampolattaro))
+    --- documentation improvements
+-   **[\@Janos95](https://github.com/Janos95)** --- Conversion of dynamic
+    array views in @ref EigenIntegration
+-   **Jan Dupal** ([\@JanDupal](https://github.com/JanDupal)) --- the
+    @ref BulletIntegration library
+-   **John Laxson** ([\@jlaxson](https://github.com/jlaxson)) --- Homebrew
+    package improvements
+-   **Jonathan Hale** ([\@Squareys](https://github.com/Squareys)) --- the
+    @ref OvrIntegration library, improvements to Bullet integration
+    and the migration of magnum-imgui to @ref ImGuiIntegration library
+-   **Jordan Peck** ([\@Auburns](https://github.com/Auburns)) --- improvements
+    to the @ref ImGuiIntegration library
+-   **Konstantinos Chatzilygeroudis** ([\@costashatz](https://github.com/costashatz))
+    --- the @ref DartIntegration library, Debian package
+-   **Marco Melorio** ([\@Melix19](https://github.com/Melix19)) ---
+    cursor support and other improvements to the @ref ImGuiIntegration library
+-   **Max Schwarz** ([\@xqms](https://github.com/xqms)) --- fixes and
+    clarifications in the @ref BulletIntegration library
+-   **Natesh Narain** ([\@nnarain](https://github.com/nnarain)) --- base
+    of the @ref ImGuiIntegration library
+-   **Nathan Ollerenshaw** ([\@matjam](https://github.com/matjam)) --- Ubuntu
+    package updates, a PPA repository for stable versions
+-   **Olga Turanksaya** ([\@olga-python](https://github.com/olga-python)) ---
+    Gentoo ebuild
+-   **[\@pezcode](https://github.com/pezcode)** --- improvements to the
+    @ref ImGuiIntegration library
+-   **[\@ShaddyDC](https://github.com/ShaddyDC)** --- base of the
+    @ref ImGuiIntegration library
+-   **[\@sigman78](https://github.com/sigman78)** --- initial implementation of
+    the @ref GlmIntegration library
+-   **Tomáš Skřivan** ([\@lecopivo](https://github.com/lecopivo)) --- base of
+    the @ref ImGuiIntegration library
+-   **Tracy Ma** ([\@linuxaged](https://github.com/linuxaged)) ---
+    `FindImGui.cmake` updates
+
+*/
+
+}

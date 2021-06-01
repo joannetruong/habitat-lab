@@ -1,0 +1,21 @@
+Source: magnum-integration
+Priority: optional
+Maintainer: Vladimír Vondruš <mosra@centrum.cz>
+Build-Depends: debhelper (>= 9), cmake (>= 3.4), magnum-dev, libbullet-dev, libeigen3-dev, libglm-dev
+Standards-Version: 3.9.2
+Section: libs
+Homepage: https://magnum.graphics
+Vcs-Git: git://github.com/mosra/magnum-integration.git
+Vcs-Browser: https://github.com/mosra/magnum-integration
+
+Package: magnum-integration-dev
+Section: libdevel
+Architecture: any
+Depends: magnum-integration (= ${binary:Version}), magnum-dev, libbullet-dev, libeigen3-dev, libglm-dev
+Description: Integration libraries for the Magnum C++11/C++14 graphics engine
+
+Package: magnum-integration
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, magnum, libbulletcollision2.83.6|libbullet2.87|libbullet2.88
+Description: Integration libraries for the Magnum C++11/C++14 graphics engine

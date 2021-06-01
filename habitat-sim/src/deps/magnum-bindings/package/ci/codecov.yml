@@ -1,0 +1,12 @@
+fixes:
+# The src/python/magnum/__init__.py is copied to cmake's build dir together
+# with setup.py next to the C++ binaries and the test is done from here.
+# Python's coverage.py reports an absolute path to it, which means a simple
+# "build/src/python/::src/python/" won't suffice. This is hardcoded to Travis,
+# CircleCI Linux / macOS and AppVeyor build paths so let's hope these won't
+# change.
+- "/home/travis/build/mosra/magnum-bindings/build/src/python/::src/python/"
+- "/Users/travis/build/mosra/magnum-bindings/build/src/python/::src/python/"
+- "/root/project/build/src/python/::src/python/"
+- "/Users/distiller/project/build/src/python/::src/python/"
+- "C:/projects/magnum-bindings/build/src/python/::src/python/"

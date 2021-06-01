@@ -1,0 +1,213 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+/** @page vulkan-wrapping Vulkan wrapping layer
+@brief Overview of the base Vulkan wrapper API
+@m_since_latest
+
+@tableofcontents
+@m_footernavigation
+
+The @ref Magnum::Vk library is a thin but high-level abstraction of the
+[Vulkan](https://www.khronos.org/vulkan/) GPU API, providing sane defaults with
+ability to opt-in for greater control and performance.
+
+@section vulkan-wrapping-create-info CreateInfo structure wrappers
+
+The `*CreateInfo` / `*AllocateInfo` structures tend to be rather complex
+compared to the created object and because they're only needed once when
+constructing the object, their definition is put in a separate header. This
+should help compile times in larger codebases where Vulkan objects are
+constructed in one place and then passed around to functions, without needing
+to know anything about the `CreateInfo`-related definitions anymore. Then, for
+convenience, each `ThingCreateInfo.h` header is guaranteed to include the
+`Thing.h` as well, so if you want both you can do for example just
+
+@snippet MagnumVk.cpp wrapping-include-createinfo
+
+<b></b>
+
+@m_class{m-noindent}
+
+instead of having to verbosely include both:
+
+@snippet MagnumVk.cpp wrapping-include-both
+
+Unless said otherwise in the particular constructor docs, a `Vk::*CreateInfo`
+instance has all required fields set to valid values upon construction, with
+everything else optional. One exception is for example
+@ref Vk::DeviceCreateInfo, where the user is expected to call
+@ref Vk::DeviceCreateInfo::addQueues() "addQueues()" as well.
+
+To completely mitigate the overhead from instantiating wrapper `*CreateInfo`
+classes, each of them can also be constructed using the @ref NoInit tag, which
+will skip all initialization and leave the contents unspecified to be filled
+later. In case the structure contains some heap-allocated state, the
+@ref NoInit constructor is guaranteed to not allocate. Note that with
+@ref NoInit constructors you have the full responsibility to correctly set up
+all members.
+
+@section vulkan-wrapping-instance-device Instance and device wrappers
+
+Compared to OpenGL, which has a concept of "current context", Vulkan doesn't
+have any implicit globals. The @ref Vk library follows that, with each object
+carrying a reference to a corresponding instance or device along. This was
+chosen as a reasonable tradeoff between requiring an explicit instance/device
+parameter in each API (which would be too error-prone and annoying to use) and
+having an implicit thread-local instance/device (which would repeat the
+well-known pain points of OpenGL).
+
+Vulkan API entrypoints aren't global either because each instance and device
+can have a different set of enabled layers and extensions, and thus different
+instance- and device-local function pointers. While the Vulkan specification
+allows device-level functions to be queried on an instance and thus use the
+same function pointers on a variety of devices, such workflow implies
+additional dispatch overhead, and thus isn't recommended. Magnum instead
+stores instance- and device-level function pointers locally in each
+@ref Vk::Instance and @ref Vk::Device to avoid this overhead --- these are then
+accessible through @ref Vk::Instance::operator->() "operator->()" on both:
+
+@snippet MagnumVk.cpp Instance-function-pointers
+
+For convenience and for easier interaction with 3rd party code, such pointers
+can be made global by calling @ref Vk::Instance::populateGlobalFunctionPointers()
+and @ref Vk::Device::populateGlobalFunctionPointers(), after which you can use
+the `vk*` functions as usual. However, all implications coming from these being
+tied to a particular instance/device still apply:
+
+@snippet MagnumVk.cpp Instance-global-function-pointers
+
+@section vulkan-wrapping-host-allocation Host memory allocation
+
+As opposed to device memory allocation, which is exposed through
+@ref Vk::Memory and related APIs, overriding host memory allocation via
+@type_vk{AllocationCallbacks} is not possible as use cases for overriding host
+memory allocators are quite rare. This pointer is thus always set to
+@cpp nullptr @ce in any `vkCreate*()` calls. If you want to supply your own
+callbacks, you have to call these functions directly --- ideally through the
+instance- and device-level function pointers available through
+@ref Vk::Instance::operator->() and @ref Vk::Device::operator->().
+
+@section vulkan-wrapping-raw Common interfaces for interaction with raw Vulkan code
+
+Each wrapped Vulkan object has a @ref Vk::Instance::handle() "handle()" getter,
+giving back the underlying Vulkan handle such as @type_vk{Instance}. In
+addition it's also implicitly convertible to that handle type, which means you
+can pass it as-is to raw Vulkan APIs. You can also use
+@ref Vk::Instance::release() "release()" to release its ownership and continue
+to use it as a regular handle. Conversely, any Vulkan handle can be wrapped
+into a first-class Magnum object using a corresponding
+@ref Vk::Instance::wrap() "wrap()" function.
+
+Similarly, all @ref Vk::InstanceCreateInfo "Vk::*CreateInfo" wrapper classes
+are convertible to a `Vk*CreateInfo` pointer in order to be easily passable
+directly to Vulkan APIs. You can create them from an existing
+`Vk*CreateInfo` instances as well, and use
+@ref Vk::InstanceCreateInfo::operator->() "operator->()" to access the wrapped
+structure to supply additional parameters not exposed by Magnum. However take
+care to not clash with values and pointers already set:
+
+@snippet MagnumVk.cpp wrapping-extending-create-info
+
+Similarly to the @ref NoInit constructors, constructing a `Vk::*CreateInfo`
+from the underlying Vulkan structure is guaranteed to not allocate as well ---
+only a shallow copy of the top-level structure is made and internal pointers,
+if any, keep pointing to the originating data. That approach has some
+implications:
+
+-   The user is responsible for ensuring those stay in scope for as long as
+    the structure is needed
+-   When calling Magnum's own APIs on the instance that was constructed from a
+    raw Vulkan structure, the pointed-to-data aren't touched in any way (which
+    means they can be @cpp const @ce), however they might get abandoned and the
+    top-level structure pointed elsewhere.
+-   Existing `pNext` chains are preserved. Calling Magnum's own APIs may result
+    in new entries added to the chain, but always at the front (again in order
+    to allow the pointed-to-data be @cpp const @ce). It's a responsibility of
+    the user to ensure no conflicting or duplicate entries are present
+    in the original chain when mixing it with Magnum's APIs.
+
+It's also possible to add new structures to the `pNext` chain of an existing
+instance. However, to prevent conflicts with Magnum which inserts at the front,
+new raw structures should be always appended at the end of the chain.
+
+@section vulkan-wrapping-optimizing-properties Optimizing instance and device property retrieval
+
+Retrieving layer and extension info as well as device properties involves
+allocations, string operations, sorting and other potentially expensive work
+both on the application side and in the driver. While the
+@ref Vk::LayerProperties, @ref Vk::InstanceExtensionProperties /
+@ref Vk::ExtensionProperties and @ref Vk::DeviceProperties APIs are made in a
+way to optimize subsequent queries as much as possible, care should be taken to
+avoid constructing and  initializing them more times than necessary.
+
+For @ref Vk::Instance creation, the @ref Vk::InstanceCreateInfo constructor is
+able to take pointers to existing @ref Vk::LayerProperties and
+@ref Vk::InstanceExtensionProperties instances and reuse them to query
+availability of implicitly enabled layers and extensions. If they're not
+passed, the class may (but also might not) create its own instances internally:
+
+@snippet MagnumVk.cpp wrapping-optimizing-properties-instance
+
+For @ref Vk::Device creation, the @ref Vk::DeviceProperties should ideally be
+* *moved* all the way to the @ref Vk::Device constructor, at which point it's
+made available through @ref Vk::Device::properties() to any code that needs it.
+If you have @ref Vk::pickDevice(), @ref Vk::DeviceCreateInfo and
+@ref Vk::Device constructor all in a single expression, the optimal operation
+is done implicitly:
+
+@snippet MagnumVk.cpp wrapping-optimizing-properties-device-single-expression
+
+However, if you instantiate @ref Vk::DeviceProperties and/or
+@ref Vk::DeviceCreateInfo separately, you have to @cpp std::move() @ce them to
+achieve the desired effect. An existing @ref Vk::ExtensionProperties instance
+can be also passed to @ref Vk::DeviceCreateInfo to allow reuse:
+
+@snippet MagnumVk.cpp wrapping-optimizing-properties-device-move
+
+@section vulkan-wrapping-naming-differences Important differences in naming
+
+-   To emphasise the distinction between rasterization and raytracing
+    pipelines and prevent confusion, @ref Vk::RasterizationPipelineCreateInfo
+    is used for @type_vk{GraphicsPipelineCreateInfo}, and similarly for
+    related APIs, such as @ref Vk::DynamicRasterizationState containing a
+    rasterization-related subset of @type_vk{DynamicState} or
+    @ref Vk::PipelineStage::AllRasterization for @val_vk{PIPELINE_STAGE_ALL_GRAPHICS_BIT,PipelineStageFlagBits}.
+-   Because not all @type_vk{Format} values can be used as both pixel and
+    vertex formats (for example there can be double-precision vertices, but not
+    pixels, or it makes no sense to use ASTC for vertices), the enum is split
+    into @ref Vk::PixelFormat and @ref Vk::VertexFormat. For pixel formats the
+    naming is simplified for easier typing (@ref Vk::PixelFormat::RGBA8Srgb
+    instead of @val_vk{FORMAT_R8G8B8A8_SRGB,Format}, for example); for vertex
+    formats the RGBA notion is omitted and replaced with just component count,
+    in most cases matching Magnum scalar and vector type names
+    (@ref Vk::VertexFormat::Vector3 instead of @val_vk{FORMAT_R32G32B32_SFLOAT,Format})
+-   As Magnum has several mesh-related abstraction (and Vulkan none),
+    @ref Vk::MeshPrimitive is used instead of @type_vk{PrimitiveTopology} for a
+    better visual grouping of related concepts
+
+*/
+}

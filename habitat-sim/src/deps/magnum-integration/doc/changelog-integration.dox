@@ -1,0 +1,343 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+
+/** @page changelog-integration Integration
+
+@tableofcontents
+@m_footernavigation
+
+@section changelog-integration-latest Changes since 2020.06
+
+@subsection changelog-integration-latest-new New features
+
+-   Conversion between dynamic Eigen types and
+    @ref Corrade::Containers::StridedArrayView "Containers::StridedArrayView"
+    using @ref EigenIntegration::arrayCast() (see [mosra/magnum-integration#74](https://github.com/mosra/magnum-integration/pull/74))
+
+@subsection changelog-integration-latest-changes Changes and improvements
+
+-   @ref BulletIntegration now supports Bullet compiled for double precision as
+    well
+-   Made it possible to override and call
+    @ref BulletIntegration::MotionState::getWorldTransform() /
+    @ref BulletIntegration::MotionState::setWorldTransform() from user code
+
+@subsection changelog-integration-latest-buildsystem Build system
+
+-   Updated `FindImGui.cmake` to optionally include the new `imgui_tables.cpp`
+    source present in latest versions (see [mosra/magnum-integration#78](https://github.com/mosra/magnum-integration/pull/78))
+-   Linux, Emscripten and macOS builds were migrated from Travis to Circle CI
+-   `FindBullet.cmake` now attemps to discover presence of the
+    `BT_USE_DOUBLE_PRECISION` preprocessor macro on both system-wide and
+    subproject workflow and adds it to the imported target to prevent linker
+    errors
+-   The Homebrew package now uses `std_cmake_args` instead of hardcoded build
+    type and install prefix, which resolves certain build issues (see
+    [mosra/homebrew-magnum#6](https://github.com/mosra/homebrew-magnum/pull/6))
+-   On CMake 3.16 and newer, `FindMagnumIntegration.cmake` can provide
+    additional details if some component is not found
+
+@subsection changelog-integration-latest-compatibility Potential compatibility breakages, removed APIs
+
+-   Removed `BulletIntegration::DebugDraw::DebugMode`, `DebugModes`, `mode()`
+    and `setDebugMode()` deprecated in 2018.10, use
+    @ref BulletIntegration::DebugDraw::Mode,
+    @ref BulletIntegration::DebugDraw::Modes "Modes",
+    @ref BulletIntegration::DebugDraw::mode() "mode()" and
+    @ref BulletIntegration::DebugDraw::setMode() "setMode()" instead
+
+@subsection changelog-integration-latest-documentation Documentation
+
+-   Various improvements and clarifications (see
+    [mosra/magnum-integration#75](https://github.com/mosra/magnum-integration/issues/75))
+-   Documented how to enable ImGui in Debian packages (see
+    [mosra/magnum-integration#73](https://github.com/mosra/magnum-integration/issues/73))
+
+@section changelog-integration-2020-06 2020.06
+
+Released 2020-06-27, tagged as
+[v2020.06](https://github.com/mosra/magnum-integration/releases/tag/v2020.06).
+
+@subsection changelog-integration-2020-06-new New features
+
+-   New @ref ImGuiIntegration::Context::updateApplicationCursor() allowing
+    ImGui to update application cursor using the new
+    @ref Platform::Sdl2Application::setCursor() "*Application::setCursor()"
+    APIs (see [mosra/magnum-integration#56](https://github.com/mosra/magnum-integration/pull/56),
+    [mosra/magnum-integration#71](https://github.com/mosra/magnum-integration/pull/71)
+    and [mosra/magnum-integration#72](https://github.com/mosra/magnum-integration/pull/72))
+
+@subsection changelog-integration-2020-06-changes Changes and improvements
+
+-   Simplified @ref DartIntegration internals using @ref EigenIntegration,
+    ignoring NaN values sometimes coming from DART (see
+    [mosra/magnum-integration#58](https://github.com/mosra/magnum-integration/pull/58))
+-   @ref ImGuiIntegration::Context::drawFrame() now resets scissor rectangle
+    back to the full framebuffer to avoid nasty surprises when scissor test is
+    not disabled again right after (see [mosra/magnum-examples#68](https://github.com/mosra/magnum-examples/issues/68))
+-   @ref ImGuiIntegration::Context::handleKeyPressEvent() now treats
+    @ref Platform::Sdl2Application::KeyEvent::Key::NumEnter "Platform::*Application::KeyEvent::Key::NumEnter"
+    the same way as @ref Platform::Sdl2Application::KeyEvent::Key::Enter "Key::Enter"
+-   Exposing font atlas texture via @ref ImGuiIntegration::Context::atlasTexture()
+    (see [mosra/magnum-integration#60](https://github.com/mosra/magnum-integration/issues/60),
+    [mosra/magnum-integration#61](https://github.com/mosra/magnum-integration/pull/61),
+    [mosra/magnum-integration#62](https://github.com/mosra/magnum-integration/pull/62)
+    and [mosra/magnum-integration#63](https://github.com/mosra/magnum-integration/pull/63))
+-   Avoid using obsolete ImGui APIs in tests (see
+    [mosra/magnum-integration#65](https://github.com/mosra/magnum-integration/pull/65))
+-   Library version is now exposed through `MAGNUMINTEGRATION_VERSION_YEAR`,
+    `MAGNUMINTEGRATION_VERSION_MONTH`, `MAGNUMINTEGRATION_VERSION_COMMIT`,
+    `MAGNUMINTEGRATION_VERSION_HASH` and `MAGNUMINTEGRATION_VERSION_STRING`
+    preprocessor defines in a new `Magnum/versionIntegration.h` header. This
+    header is not included by any other header to avoid trigerring a full
+    rebuild when Git commit changes. If Git is not found, only the first two
+    defines are present.
+-   @ref ImGuiIntegration now uses Magnum's own @ref Shaders::Flat2D instead of
+    a custom shader, which finally makes it work on GLES2 and WebGL 1
+
+@subsection changelog-integration-2020-06-buildsystem Build system
+
+-   Various minor fixes (see [mosra/magnum-integration#68](https://github.com/mosra/magnum-integration/pull/68))
+-   The library again compiles and tests cleanly with @ref CORRADE_NO_ASSERT
+    enabled, and this setup is verified on the CI to avoid further regressions
+
+@subsection changelog-integration-2020-06-bugfixes Bug fixes
+
+-   Due to a SDL2 bug on Windows that halts all event processing when dragging
+    a window across the screen, ImGui v1.68 and newer would receive zero delta
+    time and assert. @ref ImGuiIntegration::Context now detects that and passes
+    a non-zero delta time in that case. See also [mosra/magnum-integration#57](https://github.com/mosra/magnum-integration/issues/57).
+
+@subsection changelog-integration-2020-06-documentation Documentation
+
+-   Various fixes and clarifications (see
+    [mosra/magnum-integration#66](https://github.com/mosra/magnum-integration/pull/66))
+
+@section changelog-integration-2019-10 2019.10
+
+Released 2019-10-24, tagged as
+[v2019.10](https://github.com/mosra/magnum-integration/releases/tag/v2019.10).
+
+@subsection changelog-integration-2019-10-dependencies Dependency changes
+
+-   Minimal supported CMake version is now 3.4. Older versions are not
+    supported anymore and all workarounds for them were removed. Download a
+    prebuilt release of a newer version if you need to use Corrade on older
+    systems (such as Ubuntu 14.04 or Debian 8). This is a conservative change
+    that shouldn't affect any additional distribution compared to the CMake 3.1
+    requirement in 2019.01.
+
+@subsection changelog-integration-2019-10-new New features
+
+-   MSVC 2019 compatibility, following other Magnum projects
+-   When using Magnum as a CMake subproject, it now puts all binaries into a
+    common directory to simplify `PATH` handling and dynamic plugin loading.
+    For more information see @ref cmake-integration-subproject,
+    [mosra/magnum#357](https://github.com/mosra/magnum/issues/357) and
+    [mosra/magnum-plugins#63](https://github.com/mosra/magnum-plugins/issues/63).
+-   New @ref EigenIntegration library, providing conversion of math types from
+    and to [Eigen](http://eigen.tuxfamily.org/) APIs (see
+    [mosra/magnum-integration#40](https://github.com/mosra/magnum-integration/pull/40))
+-   New @ref ImGuiIntegration::imageButton() widget for drawing an image button
+    out of @ref GL::Texture2D (see [mosra/magnum-integration#38](https://github.com/mosra/magnum-integration/pull/38))
+
+@subsection changelog-integration-2019-10-changes Changes and improvements
+
+-   @ref ImGuiIntegration::Context::handleKeyPressEvent() "ImGuiIntegration::Context::handleKey*Event()"
+    now handles the @m_class{m-label m-default} **Space** key as well (see
+    [mosra/magnum-integration#44](https://github.com/mosra/magnum-integration/pull/44))
+-   @ref ImGuiIntegration::Context::handleMousePressEvent() and
+    @ref ImGuiIntegration::Context::handleMouseReleaseEvent() are fixed to
+    avoid ignoring mouse clicks if both press and release happens in the same
+    frame
+-   Assorted @ref DartIntegration updates (see
+    [mosra/magnum-integration#47](https://github.com/mosra/magnum-integration/pull/47)):
+    -   @ref DartIntegration::convertShapeNode() can now handle cones as well
+    -   Converted shapes now look less like a plastic, soft bodies having
+        smooth normals and no specular highlights
+    -   @ref DartIntegration::World::step() takes an optional parameter to
+        reset commands
+-   @ref DartIntegration::World can now work with an external plugin manager
+    instance
+-   @ref ImGuiIntegration::Context::relayout() now rebuilds the glyph cache
+    also when fonts change, not just on pixel density change (see
+    [mosra/magnum-integration#51](https://github.com/mosra/magnum-integration/issues/51))
+-   Added Super key (Windows/⌘) handling to
+    @ref ImGuiIntegration::Context::handleKeyPressEvent() "ImGuiIntegration::Context::handleKey*Event()"
+
+@subsection changelog-integration-2019-10-buildsystem Build system
+
+-   The `package/msys` directory now contains `PKGBUILD`s for
+    [MSYS2](https://www.msys2.org/). See @ref building-integration-packages-msys
+    for more information. See also [mosra/magnum-integration#39](https://github.com/mosra/magnum-integration/pull/39)
+    and [mosra/magnum#317](https://github.com/mosra/magnum/pull/317).
+-   If both a CMake-based ImGui installation is found and `IMGUI_DIR` is set
+    when building, `FindImGui.cmake` prefers the location given by `IMGUI_DIR`
+-   ES 2.0 and ES 3.0 subset of tests requiring GL context is now run on Travis
+    CI using SwiftShader for better code coverage (see
+    [mosra/magnum#207](https://github.com/mosra/magnum/issues/207))
+-   Updated Homebrew package to build also the @ref DartIntegration, since
+    the `dartsim` dependency is usable now (see [mosra/magnum-integration#46](https://github.com/mosra/magnum-integration/issues/46))
+-   Emscripten builds now have the `-fPIC` option disabled by default as it
+    causes linker errors related to `__memory_base` on 1.38.36 (see also
+    [emscripten-core/emscripten#8761](https://github.com/emscripten-core/emscripten/issues/8761))
+-   Explicitly mention that @ref ImGuiIntegration is not available in
+    @ref building-integration-packages-brew "Homebrew packages" due to a
+    missing dependency (see [mosra/magnum-integration#49](https://github.com/mosra/magnum-integration/issues/49))
+-   Updated `FindImGui.cmake` to explicitly link to the `ApplicationServices`
+    framework on macOS, since that's needed for ImGui 1.71 clipboard handling
+    (see [mosra/magnum-integration#48](https://github.com/mosra/magnum-integration/issues/48))
+-   @ref BulletIntegration can now use Bullet from Emscripten Ports instead of
+    looking for a prebuilt version elsewhere when the
+    `USE_EMSCRIPTEN_PORTS_BULLET` CMake option is enabled. See
+    @ref building-integration-features-emscripten-ports and
+    [mosra/magnum-integration#53](https://github.com/mosra/magnum-integration/pull/53).
+
+@subsection changelog-integration-2019-10-bugfixes Bug fixes
+
+-   The @ref ImGuiIntegration::image() widget was flipping the texture
+    vertically (see [mosra/magnum-integration#38](https://github.com/mosra/magnum-integration/pull/38))
+-   @ref DartIntegration::convertShapeNode() was orienting cylinders and
+    capsules improperly (see [mosra/magnum-integration#47](https://github.com/mosra/magnum-integration/pull/47))
+-   Headers in the @ref ImGuiIntegration library had messed up include guards
+    (see [mosra/magnum-integration#50](https://github.com/mosra/magnum-integration/issues/50))
+
+@subsection changelog-integration-2019-10-compatibility Potential compatibility breakages, removed APIs
+
+-   Removed `BulletIntegration::convertShape()` as it was depending on the
+    now-removed `Shapes` library, deprecated since 2018.10
+
+@subsection changelog-integration-2019-10-documentation Documentation
+
+-   @ref ImGuiIntegration::Context now mentions possible pitfalls when
+    supplying in-memory fonts to ImGui (see
+    [mosra/magnum-integration#42](https://github.com/mosra/magnum-integration/issues/42))
+-   Better documenting the need for extra CMake modules when using
+    @ref ImGuiIntegration (see [mosra/magnum-examples#64](https://github.com/mosra/magnum-examples/issues/64))
+
+@section changelog-integration-2019-01 2019.01
+
+Released 2019-02-04, tagged as
+[v2019.01](https://github.com/mosra/magnum-integration/releases/tag/v2019.01).
+
+@subsection changelog-integration-2019-01-dependencies Dependency changes
+
+-   Minimal supported GCC version is now 4.8.1, GCC 4.7 is not supported
+    anymore. Minimal Clang version is now 3.3, since that's the first version
+    with a complete C++11 support. See also
+    [mosra/magnum#274](https://github.com/mosra/magnum/issues/274).
+-   Minimal supported CMake version is now 3.1. Older versions are not
+    supported anymore and all workarounds for them were removed. Download a
+    prebuilt release of a newer version if you need to use Corrade on older
+    systems (such as Ubuntu 14.04 or Debian 8). See also
+    [mosra/magnum#274](https://github.com/mosra/magnum/issues/274).
+
+@subsection changelog-integration-2019-01-new New features
+
+-   New @ref ImGuiIntegration library to render
+    [Dear ImGui](https://github.com/ocornut/imgui) user interfaces (see
+    [mosra/magnum-integration#33](https://github.com/mosra/magnum-integration/pull/33)
+    and [mosra/magnum#36](https://github.com/mosra/magnum-integration/issues/36))
+
+@subsection changelog-integration-2019-01-bugfixes Bug fixes
+
+-   Conversion of 3x3 matrices in the @ref BulletIntegration was transposing
+    them by mistake. This was only discoverable if the transformation of
+    objects attached to @ref BulletIntegration::MotionState included rotation.
+    See also [mosra/magnum-integration#34](https://github.com/mosra/magnum-integration/pull/34).
+
+@subsection changelog-integration-2019-01-deprecated Deprecated APIs
+
+-   The `Magnum/OvrIntegration/Conversion.h` header name was not consistent
+    with other libraries and thus is deprecated, use
+    @ref Magnum/OvrIntegration/Integration.h instead
+
+@subsection changelog-integration-2019-01-compatibility Potential compatibility breakages, removed APIs
+
+-   Removed `MAGNUM_*INTEGRATION_LIBRARIES` and `MAGNUM_*INTEGRATION_INCLUDE_DIRS`
+    CMake variables, which were deprecated in favor of `MagnumIntegration::*`
+    imported targets in February 2016.
+
+@subsection changelog-integration-2019-01-documentation Documentation
+
+-   The @ref BulletIntegration::MotionState docs gave a false impression that
+    the transformation update is two-way, while it is only from bullet to
+    @ref SceneGraph. The docs are now clarified and suggest possible solutions.
+    See also [mosra/magnum-integration#35](https://github.com/mosra/magnum-integration/pull/35).
+
+@section changelog-integration-2018-10 2018.10
+
+Released 2018-10-23, tagged as
+[v2018.10](https://github.com/mosra/magnum-integration/releases/tag/v2018.10).
+
+@subsection changelog-integration-2018-10-new New features
+
+-   New @ref GlmIntegration library that provides conversion and debug output
+    for [GLM](https://glm.g-truc.net/) math types.
+
+@subsection changelog-integration-2018-10-changes Changes and improvements
+
+-   Updated the @ref OvrIntegration library to work with OVR SDK 1.17 and newer
+    and adapted it to work with latest changes in the @ref GL library
+    (see [mosra/magnum-integration#26](https://github.com/mosra/magnum-integration/pull/26)
+    and [mosra/magnum-integration#32](https://github.com/mosra/magnum-integration/pull/32))
+-   It's now possible to construct @ref BulletIntegration::DebugDraw without an
+    active GL context using the @ref NoCreate tag
+
+@subsection changelog-integration-2018-10-buildsystem Build system
+
+-   There's now a PPA for Ubuntu packages. See @ref building-integration-packages-deb
+    for more information. See also
+    [mosra/magnum-integration#31](https://github.com/mosra/magnum-integration/pull/31).
+
+@subsection changelog-integration-2018-10-bugfixes Bug fixes
+
+-   Sometimes Bullet reports object transformation full of NaNs. Unsure what
+    the real cause is but NaNs trigger an axis normalization assert in
+    @ref Math::Matrix4::rotation(), so the @ref BulletIntegration::MotionState
+    class is ignoring this case with a warning.
+
+@subsection changelog-integration-2018-10-deprecated Deprecated APIs
+
+-   `BulletIntegration::DebugDraw::DebugMode`, `DebugModes`, `mode()` and
+    `setDebugMode()` are deprecated, use @ref BulletIntegration::DebugDraw::Mode,
+    @ref BulletIntegration::DebugDraw::Modes "Modes",
+    @ref BulletIntegration::DebugDraw::mode() "mode()" and
+    @ref BulletIntegration::DebugDraw::setMode() "setMode()" instead. The
+    @ref BulletIntegration::DebugDraw::Mode "Mode" and
+    @ref BulletIntegration::DebugDraw::Modes "Modes" enums were deprecated by
+    mistake in 2018.02, now they are reverted back to non-deprecated state.
+-   `BulletIntegration::DebugDraw::Mode::FastWirefram` has a typo and is
+    deprecated, use @ref BulletIntegration::DebugDraw::Mode::FastWireframe
+    instead
+
+Changelogs for previous versions are available in
+@ref changelog-integration-old "Archived integration changelogs".
+
+*/
+
+}

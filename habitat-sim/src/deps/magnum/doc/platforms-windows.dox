@@ -1,0 +1,383 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+
+/** @page platforms-windows Windows
+@brief Tips and tricks for Windows platforms
+
+@tableofcontents
+@m_keyword{ANGLE OpenGL compatibility layer,,}
+@m_keywords{clang-cl MSYS2 MinGW}
+@m_footernavigation
+
+@section platforms-windows-hidpi HiDPI support
+
+Windows supports two approaches to advertising HiDPI support. The recommended
+way is via a so-called manifest file added to an executable, but it's also
+possible to it programatically through the [SetProcessDpiAwareness()](https://docs.microsoft.com/en-us/windows/win32/api/shellscalingapi/nf-shellscalingapi-setprocessdpiawareness)
+family of APIs. Note there's three different levels of DPI awareness setup for
+Windows Vista and newer, Windows 8.1 and newer and Windows 10, and for best
+support may want to support all three.
+
+When using MSVC, the manifest file can be added directly via CMake. Advertising application-wide per-monitor support can look like in the following snippet,
+together with fallbacks for older systems:
+
+@code{.xml}
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"
+          xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+<asmv3:application>
+  <asmv3:windowsSettings>
+    <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
+      true/pm
+    </dpiAware> <!-- legacy -->
+    <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+      permonitorv2,permonitor
+    </dpiAwareness> <!-- falls back to pm if pmv2 is not available -->
+  </asmv3:windowsSettings>
+</asmv3:application>
+</assembly>
+@endcode
+
+Then, the manifest file can be supplied directly in the sources list for
+@cmake add_executable() @ce, via a variable, or you can add it conditionally
+later using @cmake target_sources() @ce. For example:
+
+@code{.cmake}
+add_executable(my-application MyApplication.cpp)
+if(CORRADE_TARGET_WINDOWS)
+    target_sources(my-application PRIVATE WindowsHiDPI.manifest)
+endif()
+@endcode
+
+If you're not using CMake, [here's how to do it directly with mt.exe](https://docs.microsoft.com/en-us/cpp/build/how-to-embed-a-manifest-inside-a-c-cpp-application). Some toolkits (such as GLFW in @ref Platform-GlfwApplication-dpi "Platform::GlfwApplication")
+are advertising HiDPI support implicitly programatically. In that case the
+manifest file doesn't need to be supplied, but there may be some disadvantages
+compared to supplying the manifest. See the
+[MSDN documentation about DPI awareness](https://msdn.microsoft.com/en-us/library/windows/desktop/mt846517(v=vs.85).aspx)
+for more information.
+
+@m_class{m-block m-info}
+
+@par Supplying manifests with MinGW
+    With MinGW the operation is slightly more involved, as you need to pass it
+    through a `*.rc` file. A downside is that MinGW is not able to merge
+    information from multiple manifests like the MSVC toolchain can.
+@par
+    @code{.txt}
+    1 RT_MANIFEST "WindowsHiDPI.manifest"
+    @endcode
+@par
+    Then you add the `*.rc` file using @cb{.cmake} target_sources @ce like
+    above. Here's a CMake snippet that will work for both:
+@par
+    @code{.cmake}
+    add_executable(my-application MyApplication.cpp)
+    if(CORRADE_TARGET_WINDOWS)
+        if(MSVC)
+            target_sources(my-application PRIVATE WindowsHiDPI.manifest)
+        elif(MINGW)
+            target_sources(my-application PRIVATE WindowsHiDPI.rc)
+        endif()
+    endif()
+    @endcode
+
+@section platforms-windows-unicode Unicode support
+
+Windows is the only major platform that forces developers into UTF-16. This
+presents several challenges, however Magnum tries to shield users from this as
+much as possible:
+
+-   All Magnum APIs work with strings encoded as UTF-8, converting to UTF-16
+    behind the scenes if necessary
+-   If you use @ref Corrade::Utility::Directory instead of C file APIs or
+    @ref std::fstream, all filesystem operations are Unicode-aware, working
+    with paths encoded in UTF-8
+-   All Magnum APIs operating with files (@ref Trade::AbstractImporter::openFile(),
+    @ref GL::Shader::addFile(), ...) use @ref Corrade::Utility::Directory
+    underneath, meaning you're implicitly Unicode-aware as long as you use
+    Magnum APIs
+-   @ref Corrade::Utility::Arguments expose environment variables as UTF-8,
+    decoding them from UTF-16 input on Windows
+-   And finally, for Unicode-aware console I/O and command-line arguments,
+    simply link to the @ref main "Corrade::Main" library, which will do needed
+    conversion implicitly for you
+
+@section platform-windows-icon Executable icon
+
+In order to supply an icon for the executable, make an `*.ico` file
+(preferrably out of multiple different sizes) and create a `*.rc` file
+referencing it. The first argument can be anything (it can be used for
+retrieving the icon later at runtime via Windows APIs), Windows always pick the
+first icon in the `*.rc` file for the executable.
+
+@code{.txt}
+MYICON ICON "my-icon.ico"
+@endcode
+
+Then add the `*.rc` file to your application sources and CMake will take care
+of the rest:
+
+@code{.cmake}
+if(CORRADE_TARGET_WINDOWS)
+    target_sources(my-application PRIVATE icon.rc)
+endif()
+@endcode
+
+Note that this doesn't have any effect on the *window* icon --- there it has to
+be specified at runtime, for example via
+@ref Platform::Sdl2Application::setWindowIcon(). See also the
+@ref Trade::IcoImporter "IcoImporter" plugin for importing icon files.
+
+@section platform-windows-terminal-colors Colored terminal output
+
+There's two options for colored terminal output --- either using the classic
+Windows API (which is the default), or making use of the ANSI color escape
+codes compatible with all Unix systems. The former has a restriction that it
+works only when printing directly to the terminal (so your colors will get lost
+if you redirect to a file). The latter is available only in Windows 10, has to
+be explicitly enabled using @ref CORRADE_UTILITY_USE_ANSI_COLORS when building
+Corrade and additionally requires an explicit setup during application startup.
+This setup is done when you link to the @ref main "Corrade::Main" library, see
+its documentation for more information.
+
+@section platform-windows-hiding-console Hiding console window
+
+By default, CMake compiles GUI applications with a potentially unwanted
+console window lurking in the background. This can be fixed by creating your
+executable with @cmake add_executable(... WIN32 ...) @ce and linking to the
+@ref main "Corrade::Main" library. See its documentation for more information.
+
+@section platforms-windows-clang-cl Using Clang-CL
+
+As an alternative to MSVC it's possible to use [Clang-CL](https://clang.llvm.org/docs/UsersManual.html#clang-cl).
+Compared to MinGW it is fully ABI-compatible with MSVC, sharing the same STL
+implementation, and thus you can freely mix and match libraries built by either
+of them.
+
+If you already have MSVC 2019, clang-cl is available as an optional install
+component. Configuring your project to be used with e.g. Ninja could then look
+similarly to the following. Custom clang-cl installations work as well of
+course, adapt the paths as necessary:
+
+@code{.bat}
+C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Auxiliary/Build/vcvarsall.bat" x64
+
+cmake .. ^
+    -DCMAKE_C_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/Llvm/bin/clang-cl.exe" ^
+    -DCMAKE_CXX_COMPILER="C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/Llvm/bin/clang-cl.exe" ^
+    -DCMAKE_LINKER="C:/Program Files (x86)/Microsoft Visual Studio/2019/Community/VC/Tools/Llvm/bin/lld-link.exe" ^
+    -DCMAKE_CXX_FLAGS="-m64" ^
+    -G Ninja
+@endcode
+
+CMake is currently [having issues propagating correct bitness to clang-cl](https://gitlab.kitware.com/cmake/cmake/issues/16259)
+when using Ninja, which means you may need to explicitly pass either `-m64` or
+`-m32` to Clang. In the above case, `vcvarsall.bat` was called with the `x64`
+parameter but the Clang bundled with Visual Studio is 32-bit and thus defaults
+to 32-bit builds. Additionally, if your code needs to use exceptions (Magnum
+itself doesn't, but @ref Corrade::TestSuite relies on them to report failures
+in tests), you may need to explicitly pass `/EHs` via `CMAKE_CXX_FLAGS` as
+exceptions are currently [disabled by default](https://github.com/catchorg/Catch2/issues/1113).
+
+While Magnum itself is tested to work with this compiler, be prepared that you
+might run into exciting new issues that aren't present with MSVC, MinGW or
+Clang alone. In dire situations, you can use @ref CORRADE_TARGET_CLANG_CL to
+add compiler-specific workarounds.
+
+More information on [the Microsoft C++ Team Blog](https://devblogs.microsoft.com/cppblog/clang-llvm-support-in-visual-studio/).
+
+@section platforms-windows-rt Windows RT
+
+Windows RT is a restricted subset of Windows API, used for UWP / "Metro" /
+Windows Store apps. The major difference is lack of access to APIs that are
+common in Win32 world, such as memory-mapped files, DLLs or environment
+variables.
+
+In particular, Windows RT doesn't provide a direct access to OpenGL, the only
+possibility to use it is through ANGLE. See @ref building-windows-angle and
+@ref platforms-gl-es-angle for more information.
+
+For Windows RT you need to provide logo images and splash screen, all
+referenced from the `*.appxmanifest` file. The file is slightly different for
+different targets, template for Windows Store and MSVC 2013 is below, others
+are in the @ref Platform-Sdl2Application-bootstrap-winrt "SDL2 bootstrap application".
+
+@code{.xml}
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/2010/manifest"
+         xmlns:m2="http://schemas.microsoft.com/appx/2013/manifest">
+  <Identity Name="MyApplication" Publisher="CN=A Publisher" Version="1.1.0.0" />
+  <Properties>
+    <DisplayName>My Application</DisplayName>
+    <PublisherDisplayName>A Publisher</PublisherDisplayName>
+    <Logo>assets/logo-store.png</Logo>
+  </Properties>
+  <Resources>
+    <Resource Language="x-generate" />
+  </Resources>
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe"
+                 EntryPoint="MyApplication.App">
+      <m2:VisualElements
+        DisplayName="Magnum Windows Store Application"
+        Description="My Application"
+        BackgroundColor="#202020"
+        ForegroundText="light"
+        Square150x150Logo="assets/logo.png"
+        Square30x30Logo="assets/logo-small.png">
+        <m2:SplashScreen Image="assets/splash.png" />
+      </m2:VisualElements>
+    </Application>
+  </Applications>
+</Package>
+@endcode
+
+The assets are referenced also from the main `CMakeLists.txt` file. You have to
+mark all non-source files (except for the `*.pfx` key) with `VS_DEPLOYMENT_CONTENT`
+property and optionally set their location with `VS_DEPLOYMENT_LOCATION`. If
+you are using `*.resw` files, these need to have the `VS_TOOL_OVERRIDE`
+property set to `PRIResource`.
+
+@section platforms-windows-msvc-version-mapping MSVC version mapping
+
+MSVC and Visual Studio use three, er, four different versioning schemes. CMake
+exposes compiler version equivalent to the `_MSC_VER` macro, see this
+[handy Wikipedia table](https://en.wikipedia.org/wiki/Microsoft_Visual_C%2B%2B#Internal_version_numbering)
+for mapping to Visual Studio versions. For example, a check for MSVC 2017
+would look like this:
+
+@code{.cmake}
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT
+   CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.10")
+    # Code requiring MSVC 2017
+endif()
+@endcode
+
+@note CMake supports `VERSION_GREATER_EQUAL` in the @cb{.cmake} if() @ce
+    statement only [since version 3.7](https://cmake.org/cmake/help/latest/release/3.7.html#commands),
+    use a negated `VERSION_LESS` like above in older versions.
+
+@see @ref platforms-macos-clang-version-mapping
+
+@section platforms-windows-troubleshooting Troubleshooting
+
+@subsection platforms-windows-troubleshooting-ninja-includes Ninja spams the output with tons of include file notices
+
+This happens when you have a non-English locale of Visual Studio installed and
+apart from the spammy output it will probably cause incremental builds to not
+correctly rebuild files after a header change. A workaround is to uninstall the
+current locale and install the English one instead, additionally you have to
+recreate your build directory. See [ninja-build/ninja#613](https://github.com/ninja-build/ninja/issues/613)
+for more information.
+
+@subsection platforms-windows-troubleshooting-file-encoding Code page warnings with MSVC
+
+On some Windows systems with non-English locales, a warning similar to the
+following might come up, emitted for practically any Magnum header:
+
+@m_class{m-console-wrap}
+
+@code{.shell-session}
+src\Corrade/Utility/Debug.h : warning C4819: The file contains a character that cannot be represented in the current code page (949). Save the file in Unicode format to prevent data loss
+@endcode
+
+This is due to Visual Studio expecting header files in your system locale. All
+Magnum headers are *deliberately* containing UTF-8 characters (usually at least
+the `©` character in the license block) in order to prevent encoding errors in
+3rd party contributions. Solution is to convert your source files to UTF-8 as
+well, and, if the warning doesn't go away, add `/utf-8` to `CMAKE_CXX_FLAGS`
+--- either on the command line / via CMake GUI, or by directly adding the flag
+to your project's CMakeLists (useful if your whole team suffers from this
+problem). See https://stackoverflow.com/a/37872393 for more information.
+
+@code{.cmake}
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
+@endcode
+
+@subsection platform-windows-troubleshooting-default-project The ALL_BUILD project can't be executed
+
+When CMake generates Visual Studio projects, it will set `ALL_BUILD` as a
+default project. This can be annoying since the `ALL_BUILD` can be only built
+but not executed, and thus pressing *Build & Run* will fail with an error. A
+workaround is to right-click the actual executable target (such as
+`MyApplication`) and select *Set as Startup Project*. With CMake 3.6 and newer,
+this can be also changed by setting the [VS_STARTUP_PROJECT](https://cmake.org/cmake/help/latest/prop_dir/VS_STARTUP_PROJECT.html)
+property for the project directory:
+
+@code{.cmake}
+add_executable(MyApplication ...)
+set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT MyApplication)
+@endcode
+
+The Magnum bootstrap projects set this automatically.
+
+@subsection platform-windows-troubleshooting-bom-in-shaders UTF-8 BOM in shader code
+
+If your GLSL shaders fail to compile with the following error, it means you
+have your file saved as UTF-8 with a BOM:
+
+@code{.shell-session}
+GL::Shader::compile(): compilation of vertex shader 1 failed with the following message:
+ERROR:2:1: `` : syntax error: illegal extended ASCII character (0xef)
+ERROR:2:1: `` : syntax error: illegal extended ASCII character (0xbb)
+ERROR:2:1: `` : syntax error: illegal extended ASCII character (0xbf)
+@endcode
+
+While the C++ compilers can usually ignore the BOM marker, it's not so common
+with GLSL compilers in the drivers. Save your file as UTF-8 without BOM.
+
+@subsection platform-windows-troubleshooting-duplicate-section-has-different-size "Duplicate section has different size" warnings/errors on MinGW
+
+If you use MinGW Clang, you might be running into warnings like
+
+@m_class{m-console-wrap}
+
+@code{.shell-session}
+C:/msys64/mingw64/lib/libMagnumGlfwApplication-d.a(GlfwApplication.cpp.obj): duplicate section ".rdata$_ZTSN6Magnum8Platform15GlfwApplicationE[_ZTSN6Magnum8Platform15GlfwApplicationE]" has different size.
+@endcode
+
+or, with `-fuse-ld=lld`, even an error:
+
+@m_class{m-console-wrap}
+
+@code{.shell-session}
+lld-link: error: duplicate symbol: typeinfo name for Magnum::Platform::GlfwApplication
+>>> defined at CMakeFiles/appExec.dir/src/main.cpp.obj
+>>> defined at libMagnumGlfwApplication-d.a(GlfwApplication.cpp.obj)
+@endcode
+
+This happens when combining libraries built with MinGW GCC and MinGW Clang, as
+those two are unfortunately not fully ABI-compatible. Instead please rebuild
+alll your dependencies using the same compiler. See
+[mosra/magnum#439](https://github.com/mosra/magnum/issues/439) for details.
+
+@todoc DLL paths (wait, what is this TODO about, even)
+@todoc vcpkg
+@todoc desktop ES
+@todoc lcov on mingw (ugh)
+*/
+
+}

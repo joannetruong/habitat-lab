@@ -1,0 +1,76 @@
+# Author: mosra <mosra@centrum.cz>
+pkgname=emscripten-magnum-plugins
+pkgver=dev.wasm
+pkgrel=1
+pkgdesc="Plugins for the Magnum C++11/C++14 graphics engine (Emscripten, wasm)"
+arch=('any')
+url="https://magnum.graphics"
+license=('MIT')
+depends=('emscripten-magnum=dev.wasm' 'emscripten-faad2')
+makedepends=('cmake' 'emscripten' 'corrade' 'ninja' 'basis-universal-src')
+options=(!strip !buildflags)
+
+_rootdir=$startdir/../../
+
+build() {
+    if [ ! -d "$_rootdir/build-emscripten-wasm" ] ; then
+        mkdir "$_rootdir/build-emscripten-wasm"
+        cd "$_rootdir/build-emscripten-wasm"
+
+        cmake .. \
+            -DCMAKE_TOOLCHAIN_FILE="$_rootdir/toolchains/generic/Emscripten-wasm.cmake" \
+            -G Ninja
+    fi
+
+    cd "$_rootdir/build-emscripten-wasm"
+
+    # For Basis disabling everything we don't support in Magnum + BC7 as its
+    # tables are YUUUGE (see the Basis README for details)
+    # WITH_BASISIMAGECONVERTER is disabled as it requires pthreads.
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/lib/emscripten/system \
+        -DCMAKE_CXX_FLAGS="-DBASISD_SUPPORT_BC7=0 -DBASISD_SUPPORT_ATC=0 -DBASISD_SUPPORT_FXT1=0 -DBASISD_SUPPORT_PVRTC2=0" \
+        -DBASIS_UNIVERSAL_DIR=/opt/basis-universal \
+        -DWITH_BASISIMPORTER=ON \
+        -DWITH_BASISIMAGECONVERTER=OFF \
+        -DWITH_DDSIMPORTER=ON \
+        -DWITH_DEVILIMAGEIMPORTER=OFF \
+        -DWITH_DRFLACAUDIOIMPORTER=ON \
+        -DWITH_DRMP3AUDIOIMPORTER=ON \
+        -DWITH_DRWAVAUDIOIMPORTER=ON \
+        -DWITH_FAAD2AUDIOIMPORTER=ON \
+        -DWITH_ICOIMPORTER=ON \
+        -DWITH_MESHOPTIMIZERSCENECONVERTER=OFF \
+        -DWITH_MINIEXRIMAGECONVERTER=ON \
+        -DWITH_OPENGEXIMPORTER=ON \
+        -DWITH_PRIMITIVEIMPORTER=ON \
+        -DWITH_SPIRVTOOLSSHADERCONVERTER=OFF \
+        -DWITH_STANFORDIMPORTER=ON \
+        -DWITH_STANFORDSCENECONVERTER=ON \
+        -DWITH_STBIMAGECONVERTER=ON \
+        -DWITH_STBIMAGEIMPORTER=ON \
+        -DWITH_STBTRUETYPEFONT=ON \
+        -DWITH_STBVORBISAUDIOIMPORTER=ON \
+        -DWITH_STLIMPORTER=ON \
+        -DWITH_TINYGLTFIMPORTER=ON \
+        -DBUILD_TESTS=OFF
+    ninja
+}
+
+check() {
+    cd "$_rootdir/build-emscripten-wasm"
+
+    # So tests are not even built (takes AGES) when the user doesn't want to
+    cmake . -DBUILD_TESTS=ON
+    ninja
+
+    CORRADE_TEST_COLOR=ON ctest --output-on-failure
+}
+
+package() {
+    cd "$_rootdir/build-emscripten-wasm"
+    DESTDIR="$pkgdir/" ninja install
+}
+
+# kate: hl bash

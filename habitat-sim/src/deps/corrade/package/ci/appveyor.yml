@@ -1,0 +1,88 @@
+clone_depth: 1
+
+environment:
+  matrix:
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-msvc2015
+    CONFIGURATION: Debug
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-msvc2017
+    CONFIGURATION: Debug
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019
+    CONFIGURATION: Debug
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-static-msvc2019
+    CONFIGURATION: Debug
+    BUILD_STATIC: ON
+  - TARGET: desktop
+    COMPILER: msvc-clang
+    ANSI_COLORS: ON
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019-clang
+    CONFIGURATION: Debug
+  # Build the 32bit and non-ANSI as Release, one on 2015 and one on 2017, so we
+  # catch things that are not a problem on either with 64bit and Debug.
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM:
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-32b-msvc2015
+    CONFIGURATION: Release
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: OFF
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-noansi-msvc2017
+    CONFIGURATION: Release
+  - TARGET: desktop
+    COMPILER: mingw
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-mingw
+  - TARGET: rt
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-msvc2017
+
+notifications:
+- provider: Webhook
+  url: https://webhooks.gitter.im/e/415ae90928ba0dbd3df4
+  on_build_success: false
+  on_build_failure: true
+  on_build_status_changed: true
+
+install:
+# Ninja. `cinst ninja` started 503ing in late November 2019 and wasn't really
+# reliable before either. So install by hand, as that's reliable always.
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\ninja-win.zip appveyor DownloadFile https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip
+- 7z x ninja-win.zip -oC:/tools/ninja
+
+- set PATH=C:/tools/ninja;%PATH%
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" pip install codecov
+
+build_script:
+- IF NOT "%BUILD_STATIC%" == "ON" set BUILD_STATIC=OFF
+- IF "%TARGET%" == "desktop" IF "%COMPILER:~0,4%" == "msvc" call package\ci\appveyor-desktop.bat
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" call package\ci\appveyor-desktop-mingw.bat
+- IF "%TARGET%" == "rt" call package\ci\appveyor-rt.bat
+
+cache:
+- ninja-win.zip -> package/ci/appveyor-cache-reset.txt

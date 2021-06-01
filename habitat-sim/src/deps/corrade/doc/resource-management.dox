@@ -1,0 +1,111 @@
+/*
+    This file is part of Corrade.
+
+    Copyright © 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016,
+                2017, 2018, 2019, 2020, 2021
+              Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Corrade {
+/** @page resource-management Resource management
+@brief Compiling external files into application binary.
+
+@m_footernavigation
+
+The @ref Utility::Resource class provides management of resources compiled
+directly into the executable, such as icons, data files etc. This tutorial will
+give you a brief introduction into how resources are compiled into the
+executable and later retrieved in the application.
+
+@section resource-management-compilation Resource compilation
+
+Imagine that you have e.g. a long license text with all these yelling words
+in all caps:
+
+@include resource/licenses/en.txt
+
+And for obvious reasons you don't want to put directly into the code, have it
+in a separate file, but in the end you want it compiled directly into the
+executable, so your product is one compact file.
+
+Corrade's CMake support provides the @ref corrade-cmake-add-resource "corrade_add_resource()",
+macro which takes resource configuration file and produces C++ source file. The
+source file can be then passed among other source files to an executable or
+a library. First argument is name of resulting C++ source file, second argument
+is a configuration file name.
+
+@dontinclude resource/CMakeLists.txt
+@skip find_package
+@until corrade_add_resource
+
+The configuration file contains group name (explained below) and list of all
+the files. The files can also have aliases for e.g. simplifying filenames.
+
+@include resource/resources.conf
+
+@section resource-management-management Resource management
+
+Now it's time to make an application which will have these resources compiled
+in. The resources should be initialized automatically, if not (for example if
+they are compiled into static library), call @ref CORRADE_RESOURCE_INITIALIZE()
+with resource name as argument before they are used, for example at the
+beginning of @cpp main() @ce function.
+
+This example application will just print the license text and exit:
+
+@dontinclude resource/main.cpp
+@skip #include
+@until }
+@until }
+@until }
+
+Compile the application with simple CMake @cmake add_executable() @ce command
+and don't forget to compile in the resource file created above:
+
+@dontinclude resource/CMakeLists.txt
+@skip add_executable
+@until target_link_libraries
+
+After successful compilation the application will print out the license text:
+
+@code{.shell-session}
+$ ./ResourceTest
+This application is copyright © John Doe et al. and the author IS NOT
+RESPONSIBLE AT ALL FOR ANY PHYSICAL OR OTHER DAMAGES AND INJURIES WHICH
+MAY LEAD TO DEATH OR EVEN APOCALYPSE AND CAN BE CAUSED BY THIS APPLICATION
+...
+@endcode
+
+The full file content is linked below. Full source code is also available in
+the [GitHub repository](https://github.com/mosra/corrade/tree/master/src/examples/resource).
+
+-   @ref resource/CMakeLists.txt "CMakeLists.txt"
+-   @ref resource/licenses/en.txt "licenses/en.txt"
+-   @ref resource/main.cpp "main.cpp"
+-   @ref resource/resources.conf "resources.conf"
+
+@example resource/licenses/en.txt @m_examplenavigation{resource-management,resource/} @m_footernavigation
+@example resource/resources.conf @m_examplenavigation{resource-management,resource/} @m_footernavigation
+@example resource/main.cpp @m_examplenavigation{resource-management,resource/} @m_footernavigation
+@example resource/CMakeLists.txt @m_examplenavigation{resource-management,resource/} @m_footernavigation
+
+*/
+}

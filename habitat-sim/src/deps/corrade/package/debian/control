@@ -1,0 +1,21 @@
+Source: corrade
+Priority: optional
+Maintainer: Vladimír Vondruš <mosra@centrum.cz>
+Build-Depends: debhelper (>= 9), cmake (>= 3.4)
+Standards-Version: 3.9.2
+Section: libs
+Homepage: https://magnum.graphics/corrade/
+Vcs-Git: git://github.com/mosra/corrade.git
+Vcs-Browser: https://github.com/mosra/corrade
+
+Package: corrade-dev
+Section: libdevel
+Architecture: any
+Depends: corrade (= ${binary:Version})
+Description: C++11/C++14 multiplatform utility library
+
+Package: corrade
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: C++11/C++14 multiplatform utility library

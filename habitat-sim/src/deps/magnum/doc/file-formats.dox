@@ -1,0 +1,607 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+namespace Magnum {
+/** @page file-formats File format support
+@brief Support tables for widely used image, scene, audio and font formats
+
+@tableofcontents
+
+The @ref Trade::AnyImageImporter "AnyImageImporter",
+@ref Trade::AnySceneImporter "AnySceneImporter",
+@ref Trade::AnyImageConverter "AnyImageConverter",
+@ref Trade::AnySceneConverter "AnySceneConverter" and other `Any*` plugins can
+be used for generic handling of any of the recognized formats, they'll proxy
+the operation to a concrete plugin implementation. The following tables list
+the most widely used formats with alternative plugin implementations and known
+caveats for each. When one format is supported by more than one plugin, you
+can use @ref Corrade::PluginManager::AbstractManager::setPreferredPlugins() to
+prioritize a particular plugin implementation.
+
+See the @ref file-formats-legend section at the bottom of the page for a
+detailed explanation of the color-coded columns.
+
+@section file-formats-image-importers Image importers
+
+Together with @ref file-formats-scene-importers "scene importers" derived from
+@ref Trade::AbstractImporter.
+
+@m_class{m-row m-container-inflate}
+
+@parblock
+
+@m_class{m-fullwidth m-flat}
+
+<table>
+<tr>
+<th>Format</th>
+<th>Generic plugin alias</th>
+<th>Plugin name</th>
+<th class="m-text-center">Caveats</th>
+<th class="m-text-center">Dependencies</th>
+<th class="m-text-center">License</th>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Basis Universal (`*.basis`)</th>
+<td>`BasisImporter`</td>
+<td>@ref Trade::BasisImporter "BasisImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-success">bundleable, tiny</td>
+<td class="m-text-center m-success">Apache-2.0</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">BMP<br/>(`*.bmp`)</th>
+<td rowspan="2">`BmpImporter`</td>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center m-success">@ref Trade-StbImageImporter-behavior-bmp "minor"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">DirectDraw Surface<br/>(`*.dds`)</th>
+<td rowspan="2">`DdsImporter`</td>
+<td>@ref Trade::DdsImporter "DdsImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-DdsImporter-behavior "some"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-DevIlImageImporter-behavior-dds "severe"</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">GIF<br/>(`*.gif`)</th>
+<td rowspan="2">`GifImporter`</td>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center m-success">@ref Trade-StbImageImporter-behavior-animated-gifs "minor"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-DevIlImageImporter-behavior-animated-gifs "severe"</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">Radiance HDR<br/>(`*.hdr`)</th>
+<td rowspan="2">`HdrImporter`</td>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">ICO<br/>(`*.ico`, `*.cur`)</th>
+<td rowspan="2">`IcoImporter`</td>
+<td>@ref Trade::IcoImporter "IcoImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-IcoImporter-behavior "some"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-DevIlImageImporter-behavior-ico "severe"</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="3">JPEG<br/>(`*.jpg`, `*.jpe`, `*.jpeg`)</th>
+<td rowspan="3">`JpegImporter`</td>
+<td>@ref Trade::JpegImporter "JpegImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-warning">external, tiny</td>
+<td class="m-text-center m-success">Libjpeg</td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-StbImageImporter-behavior-arithmetic-jpeg "some"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="3">PNG<br/>(`*.png`)</th>
+<td rowspan="3">`PngImporter`</td>
+<td>@ref Trade::PngImporter "PngImporter"</td>
+<td class="m-text-center m-success">@ref Trade-PngImporter-behavior "minor"</td>
+<td class="m-text-center m-warning">external, tiny</td>
+<td class="m-text-center m-success">libPNG</td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-DevIlImageImporter-behavior-cgbi "some"</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">PSD<br/>(`*.psd`)</th>
+<td rowspan="2">`PsdImporter`</td>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-StbImageImporter-behavior-psd "severe"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-DevIlImageImporter-behavior-psd "severe"</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="3">Truevision TGA<br/>(`*.tga`, `*.vda`, `*.icb`, `*.vst`)</th>
+<td rowspan="3">`TgaImporter`</td>
+<td>@ref Trade::TgaImporter "TgaImporter"</td>
+<td class="m-text-center m-success">@ref Trade-TgaImporter-behavior "minor"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageImporter "StbImageImporter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr>
+<td>@ref Trade::DevIlImageImporter "DevIlImageImporter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-danger">external</td>
+<td class="m-text-center m-warning">LGPLv2.1</td>
+</tr>
+</table>
+
+@endparblock
+
+In addition to the above, @ref Trade::DevIlImageImporter "DevIlImageImporter"
+and @ref Trade::StbImageImporter "StbImageImporter" support many more formats.
+
+@section file-formats-image-converters Image converters
+
+Derived from @ref Trade::AbstractImageConverter.
+
+@m_class{m-row m-container-inflate}
+
+@parblock
+
+@m_class{m-fullwidth m-flat}
+
+<table>
+<tr>
+<th>Format</th>
+<th>Generic plugin alias</th>
+<th>Plugin name</th>
+<th class="m-text-center">Caveats</th>
+<th class="m-text-center">Dependencies</th>
+<th class="m-text-center">License</th>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Basis Universal (`*.basis`)</th>
+<td>`BasisImageConverter`</td>
+<td>@ref Trade::BasisImageConverter "BasisImageConverter"</td>
+<td class="m-text-center m-warning">@ref Trade-BasisImageConverter-behavior "some"</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">Apache-2.0</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Windows Bitmap (`*.bmp`)</th>
+<td>`BmpImageConverter`</td>
+<td>@ref Trade::StbImageConverter "StbImageConverter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>OpenEXR (`*.exr`)</th>
+<td>`OpenExrImageConverter`</td>
+<td>@ref Trade::MiniExrImageConverter "MiniExrImageConverter"</td>
+<td class="m-text-center m-success">@ref Trade-MiniExrImageConverter-behavior "minor"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Radiance HDR (`*.hdr`)</th>
+<td>`HdrImageConverter`</td>
+<td>@ref Trade::StbImageConverter "StbImageConverter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">JPEG<br/>(`*.jpg`, `*.jpe`, `*.jpeg`)</th>
+<td rowspan="2">`JpegImageConverter`</td>
+<td>@ref Trade::JpegImageConverter "JpegImageConverter"</td>
+<td class="m-text-center m-success">@ref Trade-JpegImageConverter-behavior "minor"</td>
+<td class="m-text-center m-warning">external, tiny</td>
+<td class="m-text-center m-success">Libjpeg</td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageConverter "StbImageConverter"</td>
+<td class="m-text-center m-success">@ref Trade-StbImageConverter-behavior-arithmetic-jpeg "minor"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">PNG<br/>(`*.png`)</th>
+<td rowspan="2">`PngImageConverter`</td>
+<td>@ref Trade::PngImageConverter "PngImageConverter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-warning">external, tiny</td>
+<td class="m-text-center m-success">libPNG</td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageConverter "StbImageConverter"</td>
+<td class="m-text-center m-warning">@ref Trade-StbImageConverter-behavior-16bit-png "some"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">Truevision TGA<br/>(`*.tga`, `*.vda`, `*.icb`, `*.vst`)</th>
+<td rowspan="2">`TgaImageConverter`</td>
+<td>@ref Trade::TgaImageConverter "TgaImageConverter"</td>
+<td class="m-text-center m-success">@ref Trade-TgaImageConverter-behavior "minor"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::StbImageConverter "StbImageConverter"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-primary">public domain</td>
+</tr>
+</table>
+
+@endparblock
+
+@section file-formats-scene-importers Scene importers
+
+Together with @ref file-formats-image-importers "image-importers" derived from
+@ref Trade::AbstractImporter.
+
+@m_class{m-row m-container-inflate}
+
+@parblock
+
+@m_class{m-fullwidth m-flat}
+
+<table>
+<tr>
+<th>Format</th>
+<th>Generic plugin alias</th>
+<th>Plugin name</th>
+<th class="m-text-center">Caveats</th>
+<th class="m-text-center">Dependencies</th>
+<th class="m-text-center">License</th>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>COLLADA (`*.dae`)</th>
+<td>`ColladaImporter`</td>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-AssimpImporter-behavior "severe"</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Autodesk FBX (`*.fbx`)</th>
+<td>`FbxImporter`</td>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">OBJ<br/>(`*.obj`)</th>
+<td rowspan="2">`ObjImporter`</td>
+<td>@ref Trade::ObjImporter "ObjImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-ObjImporter-behavior "severe"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-AssimpImporter-behavior "some"</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">Open Game Engine Exchange<br/>(`*.ogex`)</th>
+<td rowspan="2">`OpenGexImporter`</td>
+<td>@ref Trade::OpenGexImporter "OpenGexImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-OpenGexImporter-behavior "some"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">glTF<br/>(`*.gltf`, `*.glb`)</th>
+<td rowspan="2">`GltfImporter`</td>
+<td>@ref Trade::TinyGltfImporter "TinyGltfImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-TinyGltfImporter-behavior "some"</td>
+<td class="m-text-center m-primary">bundled</td>
+<td class="m-text-center m-success">MIT</td>
+</tr>
+<tr>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-AssimpImporter-behavior "severe"</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">Stanford PLY<br/>(`*.ply`)</th>
+<td rowspan="2">`StanfordImporter`</td>
+<td>@ref Trade::StanfordImporter "StanfordImporter"</td>
+<td class="m-text-center m-warning">@ref Trade-StanfordImporter-behavior "some"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-danger">@ref Trade-AssimpImporter-behavior "severe"</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th rowspan="2">STL<br/>(`*.stl`)</th>
+<td rowspan="2">`StlImporter`</td>
+<td>@ref Trade::StlImporter "StlImporter"</td>
+<td class="m-text-center m-success">@ref Trade-StlImporter-behavior "minor"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+<tr>
+<td>@ref Trade::AssimpImporter "AssimpImporter"</td>
+<td class="m-text-center m-dim">unknown</td>
+<td class="m-text-center m-warning">bundleable</td>
+<td class="m-text-center m-success">BSD 3-clause</td>
+</tr>
+</table>
+
+@endparblock
+
+In addition to the above, @ref Trade::AssimpImporter "AssimpImporter" supports
+many more formats.
+
+@section file-formats-scene-converters Scene converters
+
+Derived from @ref Trade::AbstractImageConverter.
+
+@m_class{m-row m-container-inflate}
+
+@parblock
+
+@m_class{m-fullwidth m-flat}
+
+<table>
+<tr>
+<th>Format</th>
+<th>Generic plugin alias</th>
+<th>Plugin name</th>
+<th class="m-text-center">Caveats</th>
+<th class="m-text-center">Dependencies</th>
+<th class="m-text-center">License</th>
+</tr>
+<tr><td colspan="6"></td></tr>
+
+<tr>
+<th>Stanford PLY (`*.ply`)</th>
+<td>`StanfordSceneConverter`</td>
+<td>@ref Trade::StanfordSceneConverter "StanfordSceneConverter"</td>
+<td class="m-text-center m-success">@ref Trade-StanfordSceneConverter-behavior "minor"</td>
+<td class="m-text-center">@m_span{m-text m-dim} none @m_endspan </td>
+<td class="m-text-center"></td>
+</tr>
+</table>
+
+@endparblock
+
+@section file-formats-audio-importers Audio importers
+
+To be written.
+
+@section file-formats-fonts Fonts
+
+To be written.
+
+@section file-formats-font-converters Font converters
+
+To be written.
+
+@section file-formats-shader-converters Shader converters
+
+To be written.
+
+@section file-formats-legend Legend
+
+The *Caveats* column lists known issues and limitations of each plugin, and is
+color-coded for easier understanding. Note the caveats might get updated over
+time as features get implemented, bugs fixed or new issues discovered.
+
+-   @m_class{m-label m-default} **none** means there are no known issues or
+    limitations.
+-   @m_class{m-label m-success} **minor** means the known issues only affect
+    rare corner cases and shouldn't be a problem in practice.
+-   @m_class{m-label m-warning} **some** means it has limitations affecting
+    certain use cases. You're encouraged to check the documentation to be
+    sure these don't affect you.
+-   @m_class{m-label m-danger} **severe** means it has known bugs and
+    limitations and isn't guaranteed to be usable for generic file import. It
+    might work for your concrete use case, but you're encouraged to pick an
+    alternative, if possible.
+-   @m_class{m-label m-dim} **unknown** means there were no documented issues
+    for given file format and there isn't enough practical experience to say
+    how well it works.
+
+The *Dependencies* column shows what kind of dependencies the plugin relies on,
+highlighting potential portability issues:
+
+-   @m_class{m-label m-default} **none** means it's dependency-free, with all
+    its internals following Magnum standards of high test coverage, stability,
+    portability and documentation.
+-   @m_class{m-label m-primary} **bundled** means the dependency is usually a
+    single-file 3rd party library that's bundled in the repo, and thus with no
+    extra work needed to get it running. It's also tested on all platforms as
+    Magnum itself, which should mean no portability issues either.
+-   @m_class{m-label m-success} **bundleable, tiny** means the
+    dependency is external to the repository, but it's relatively small and
+    thus has no considerable impact on build times or deployment size. It can
+    be either found externally or embedded as a CMake subproject, which may
+    simplify the building procedure. While no guarantees on its portability are
+    given, small libraries are generally rather portable.
+-   @m_class{m-label m-warning} **bundleable** means the dependency is external
+    to the repository and has a significant size that may have impact on build
+    times and deployment size. However it's still possible to embed it as a
+    CMake subproject, which *could* simplify the building a bit.
+-   @m_class{m-label m-warning} **external, tiny** means the dependency is
+    external to the repository, it's relatively small but cannot be (or isn't
+    tested to be) embedded as a CMake subproject, which makes it slightly
+    harder to get running.
+-   @m_class{m-label m-danger} **external** means the dependency is external
+    to the repository, has a significant size that may have impact on
+    deployment size, and cannot be (or isn't tested to be) embedded as a CMake
+    subproject. No guarantees on portability whatsoever.
+
+The *License* column shows the license of the plugin dependency, if there's
+any. Like with all other @ref credits-third-party "3rd party components", each
+plugin has a color-coded block showing the license, linking to its text and
+mentioning requirements coming from the license:
+
+-   @m_class{m-label m-primary} **light blue** marks public domain
+    dependencies, which don't require anything from you in order to use them
+    and put no restrictions on use
+-   @m_class{m-label m-success} **green** marks licenses that make the
+    dependency safe to use in a commerical setting without having to release
+    your source code, usually requiring you to give attribution.
+-   @m_class{m-label m-warning} **yellow** marks licenses that require you to
+    either dynamically link to the software to be able to use it in a
+    commercial setting or release your source code as well. Such plugins are
+    safe to use in internal development tools and asset pipelines, but you
+    might want to consider alternatives before bundling them in a deployed
+    commercial product. In some cases there is an alternative commercial
+    licensing option without this requirement.
+-   @m_class{m-label m-danger} **red** label marks licenses that
+    unconditionally require you to publish your software together with its
+    source code. Such plugins are only safe to use in internal development
+    tools and asset pipelines, consider alternatives for use in a deployed
+    commercial product. In some cases there is an alternative commercial
+    licensing option without this requirement.
+*/
+}

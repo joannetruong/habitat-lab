@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>My Python Project</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,400i,600,600i%7CSource+Code+Pro:400,400i,600" />
+  <link rel="stylesheet" href="m-dark+documentation.compiled.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+<header><nav id="navigation">
+  <div class="m-container">
+    <div class="m-row">
+      <a href="index.html" id="m-navbar-brand" class="m-col-t-8 m-col-m-none m-left-m">My Python Project</a>
+    </div>
+  </div>
+</nav></header>
+<main><article>
+  <div class="m-container m-container-inflatable">
+    <div class="m-row">
+      <div class="m-col-l-10 m-push-l-1">
+        <h1>Classes</h1>
+        <ul class="m-doc">
+          <li class="m-doc-collapsible">
+            <a href="#" onclick="return toggle(this)">module</a> <a href="content.html" class="m-doc">content</a> <span class="m-doc">This overwrites the docstring for <a class="m-doc" href="content.html">content</a>.</span>
+            <ul class="m-doc">
+              <li>module <a href="content.docstring_summary.html" class="m-doc">docstring_summary</a> <span class="m-doc">This module retains summary from the docstring</span></li>
+              <li>module <a href="content.submodule.html" class="m-doc">submodule</a> <span class="m-doc">This submodule has an external summary.</span></li>
+              <li>class <a href="content.Class.html" class="m-doc">Class</a> <span class="m-doc">This overwrites the docstring for <a class="m-doc" href="content.Class.html">Class</a>.</span></li>
+              <li>class <a href="content.ClassDocumentingItsMembers.html" class="m-doc">ClassDocumentingItsMembers</a> <span class="m-doc">This class documents its members directly in its own directive</span></li>
+              <li>class <a href="content.ClassWithSlots.html" class="m-doc">ClassWithSlots</a> <span class="m-doc">This class has slots and those have to be documented externally</span></li>
+              <li>class <a href="content.ClassWithSummary.html" class="m-doc">ClassWithSummary</a> <span class="m-doc">This class has summary from the docstring</span></li>
+            </ul>
+          </li>
+        </ul>
+        <script>
+        function toggle(e) {
+            e.parentElement.className = e.parentElement.className == 'm-doc-collapsible' ?
+                'm-doc-expansible' : 'm-doc-collapsible';
+            return false;
+        }
+        /* Collapse all nodes marked as such. Doing it via JS instead of
+           directly in markup so disabling it doesn't harm usability. The list
+           is somehow regenerated on every iteration and shrinks as I change
+           the classes. It's not documented anywhere and I'm not sure if this
+           is the same across browsers, so I am going backwards in that list to
+           be sure. */
+        var collapsed = document.getElementsByClassName("collapsed");
+        for(var i = collapsed.length - 1; i >= 0; --i)
+            collapsed[i].className = 'm-doc-expansible';
+        </script>
+      </div>
+    </div>
+  </div>
+</article></main>
+</body>
+</html>

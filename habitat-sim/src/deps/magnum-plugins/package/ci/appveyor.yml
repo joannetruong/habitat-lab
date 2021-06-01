@@ -1,0 +1,111 @@
+clone_depth: 1
+
+environment:
+  matrix:
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-msvc2015
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-msvc2017
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019
+  - TARGET: desktop
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-static-msvc2019
+    BUILD_STATIC: ON
+  - TARGET: desktop
+    COMPILER: msvc-clang
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019-clang
+  - TARGET: desktop
+    COMPILER: mingw
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-mingw
+  - TARGET: rt
+    # This actually isn't needed anywhere, but without this the %COMPILE:~0,4%
+    # expressions cause a "The syntax of the command is incorrect." sometimes
+    # but not in all cases. What the fuck, cmd.exe.
+    COMPILER: msvc
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-msvc2017
+
+notifications:
+- provider: Webhook
+  url: https://webhooks.gitter.im/e/415ae90928ba0dbd3df4
+  on_build_success: false
+  on_build_failure: true
+  on_build_status_changed: true
+
+install:
+# Ninja. `cinst ninja` started 503ing in late November 2019 and wasn't really
+# reliable before either. So install by hand, as that's reliable always.
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\ninja-win.zip appveyor DownloadFile https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip
+- 7z x ninja-win.zip -oC:/tools/ninja
+
+- set PATH=C:/Sys/bin;C:/tools/ninja;%PATH%
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" pip install codecov
+
+# assimp, for MSVC 2019, 2017, clang-cl and MinGW
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/assimp-5.0.1-windows-2019-debug.zip && 7z x assimp-5.0.1-windows-2019-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/assimp-5.0.1-windows-2016-debug.zip && 7z x assimp-5.0.1-windows-2016-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" appveyor DownloadFile https://ci.magnum.graphics/assimp-5.0.1-windows-mingw.zip && 7z x assimp-5.0.1-windows-mingw.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+# libjpeg-turbo, for MSVC 2019, 2017 and clang-cl only; MinGW builds it because
+# FFS
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/libjpeg-turbo-2.0.6-windows-2019.zip && 7z x libjpeg-turbo-2.0.6-windows-2019.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/libjpeg-turbo-2.0.6-windows-2016.zip && 7z x libjpeg-turbo-2.0.6-windows-2016.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+# OpenAL
+- IF NOT "%TARGET%" == "rt" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\openal-soft-1.19.1-bin.zip appveyor DownloadFile https://openal-soft.org/openal-binaries/openal-soft-1.19.1-bin.zip
+- IF NOT "%TARGET%" == "rt" 7z x openal-soft-1.19.1-bin.zip && ren openal-soft-1.19.1-bin openal && echo [General] > %APPDATA%/alsoft.ini & echo drivers=null >> %APPDATA%/alsoft.ini
+# Unlike with Magnum itself which copies OpenAL DLL to its output directory,
+# here we need to do that ourselves as we don't have Magnum's build dir in PATH
+- IF "%TARGET%" == "desktop" ren openal\bin\Win64\soft_oal.dll OpenAL32.dll
+
+# DevIL
+- IF NOT "%TARGET%" == "rt" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\DevIL-SDK-x64-1.7.8.zip appveyor DownloadFile http://downloads.sourceforge.net/openil/DevIL-SDK-x64-1.7.8.zip
+- IF NOT "%TARGET%" == "rt" mkdir devil && cd devil && 7z x ..\DevIL-SDK-x64-1.7.8.zip && mkdir lib && move unicode\*.lib lib\ && cd ..
+
+# FreeType, for MSVC 2019, 2017 and clang-cl only
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/freetype-2.10.4-windows-2019.zip && 7z x freetype-2.10.4-windows-2019.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/freetype-2.10.4-windows-2016.zip && 7z x freetype-2.10.4-windows-2016.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+# Basis Universal
+- set BASIS_VERSION=8565af680d1bd2ad56ab227ca7d96c56dfbe93ed
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\basis_universal-%BASIS_VERSION%.zip appveyor DownloadFile https://github.com/BinomialLLC/basis_universal/archive/%BASIS_VERSION%.zip
+- 7z x %BASIS_VERSION%.zip && ren basis_universal-%BASIS_VERSION% basis_universal
+# https://github.com/BinomialLLC/basis_universal/pull/106
+# TODO: remove once we update to UASTC-enabled Basis
+- bash -c "cd basis_universal && patch -p1 < ../package/ci/basisu-msvc2019-16.6.patch"
+
+# SPIRV-Tools, for MSVC 2019, 2017 and clang-cl only
+# This line REQUIRES the COMPILER variable to be set on rt builds, otherwise it
+# complains that "The syntax of the command is incorrect.". The same done in
+# build_script below works without problems. What the hell.
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/spirv-tools-2020.4-windows-2019-debug.zip && 7z x spirv-tools-2020.4-windows-2019-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/spirv-tools-2020.4-windows-2016-debug.zip && 7z x spirv-tools-2020.4-windows-2016-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+# Glslang, for MSVC 2019, 2017 and clang-cl only
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2019" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/glslang-8.13.3743-windows-2019-debug.zip && 7z x glslang-8.13.3743-windows-2019-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%TARGET%" == "desktop" IF "%APPVEYOR_BUILD_WORKER_IMAGE%" == "Visual Studio 2017" IF "%COMPILER:~0,4%" == "msvc" appveyor DownloadFile https://ci.magnum.graphics/glslang-8.13.3743-windows-2016-debug.zip && 7z x glslang-8.13.3743-windows-2016-debug.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+build_script:
+- IF NOT "%BUILD_STATIC%" == "ON" set BUILD_STATIC=OFF
+- IF "%TARGET%" == "desktop" IF "%COMPILER:~0,4%" == "msvc" call package\ci\appveyor-desktop.bat
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" call package\ci\appveyor-desktop-mingw.bat
+- IF "%TARGET%" == "rt" call package\ci\appveyor-rt.bat
+
+cache:
+- ninja-win.zip -> package/ci/appveyor-cache-reset.txt
+- openal-soft-1.19.1-bin.zip -> package/ci/appveyor-cache-reset.txt
+- libjpeg-turbo-1.5.0.tar.gz -> package/ci/appveyor-cache-reset.txt
+- DevIL-SDK-x64-1.7.8.zip -> package/ci/appveyor-cache-reset.txt
+- basis_universal-%BASIS_VERSION%.zip -> package/ci/appveyor-cache-reset.txt
+# meshoptimizer
+- v0.14.zip -> package/ci/appveyor-cache-reset.txt

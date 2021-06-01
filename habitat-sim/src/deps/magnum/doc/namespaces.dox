@@ -1,0 +1,689 @@
+/*
+    This file is part of Magnum.
+
+    Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
+                2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+/** @dir magnum/src/Magnum
+ * @brief Namespace @ref Magnum (part of @ref building "Magnum library")
+ */
+/** @namespace Magnum
+@brief Root namespace
+
+Base classes and typedefs.
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+Parts of this library are additionally available in a form of
+@ref singles "single-header libraries". See @ref building and @ref cmake for
+more information.
+*/
+
+/** @dir Magnum/Platform
+ * @brief Namespace @ref Magnum::Platform
+ */
+/** @namespace Magnum::Platform
+@brief Platform-specific application and context creation
+
+Base classes for creating applications with various toolkits.
+
+Parts of this namespace are built if `WITH_*APPLICATION` is enabled when
+building Magnum, with each library having specific toolkit dependencies and
+platform requirements. To use a particular application library with CMake,
+request given `*Application` component of the `Magnum` package and link
+to the `Magnum::Application` target, for example:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Sdl2Application)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Application)
+@endcode
+
+Please see documentation of a particular `*Application` classs, the
+@ref magnum-gl-info "magnum-gl-info" utility documentation, @ref building,
+@ref cmake and @ref platform for more information about usage requirements.
+*/
+
+/** @dir Magnum/Math
+ * @brief Namespace @ref Magnum::Math, @ref Magnum::Math::Literals
+ */
+/** @namespace Magnum::Math
+@brief Math library
+
+Template classes for matrix and vector calculations.
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building, @ref cmake, @ref matrix-vector and @ref transformations for
+more information.
+
+@m_class{m-block m-success}
+
+@par Single-header version
+    This library is also available as a single-header, dependency-less
+    [MagnumMath.hpp](https://github.com/mosra/magnum-singles/tree/master/MagnumMath.hpp)
+    library in the Magnum Singles repository for easier integration into your
+    projects. See @ref singles for more information. Everything except contents
+    of the @ref Magnum/Math/FunctionsBatch.h and @ref Magnum/Math/Algorithms/Svd.h
+    headers is included. The library has a separate non-inline implementation
+    part, enable it *just once* like this:
+@par
+    @code{.cpp}
+    #define MAGNUM_MATH_IMPLEMENTATION
+    #include <MagnumMath.hpp>
+    @endcode
+@par
+    In addition, contents of the @ref GlmIntegration and @ref EigenIntegration
+    libraries are included as well --- opt-in by specifying either
+    @cpp #define MAGNUM_MATH_GLM_INTEGRATION @ce or
+    @cpp #define MAGNUM_MATH_EIGEN_INTEGRATION @ce before including the file.
+    Including it multiple times with different macros defined works as well.
+
+*/
+/** @namespace Magnum::Math::Literals
+@brief Math literals
+
+Literals for easy construction of angle and color values.
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building, @ref cmake and @ref types for more information.
+
+@m_class{m-block m-success}
+
+@par Single-header version
+    This library is available as a part of the single-header, dependency-less
+    [MagnumMath.hpp](https://github.com/mosra/magnum-singles/tree/master/MagnumMath.hpp)
+    library in the Magnum Singles repository for easier integration into your
+    projects. See @ref singles and @ref Math for more information.
+*/
+
+/** @dir Magnum/Math/Algorithms
+ * @brief Namespace @ref Magnum::Math::Algorithms
+ */
+/** @namespace Magnum::Math::Algorithms
+@brief Algorithms
+
+Various matrix and vector algorithms.
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building and @ref cmake for more information.
+
+@m_class{m-block m-success}
+
+@par Single-header version
+    This library is available as a part of the single-header, dependency-less
+    [MagnumMath.hpp](https://github.com/mosra/magnum-singles/tree/master/MagnumMath.hpp)
+    library in the Magnum Singles repository for easier integration into your
+    projects. See @ref singles and @ref Math for more information.
+*/
+
+/** @namespace Magnum::Math::Distance
+@brief Functions for calculating distances
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building and @ref cmake for more information.
+
+@m_class{m-block m-success}
+
+@par Single-header version
+    This library is available as a part of the single-header, dependency-less
+    [MagnumMath.h](https://github.com/mosra/magnum-singles/tree/master/MagnumMath.h)
+    library in the Magnum Singles repository for easier integration into your
+    projects. See @ref singles and @ref Math for more information.
+*/
+
+/** @namespace Magnum::Math::Intersection
+@brief Functions for calculating intersections
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building and @ref cmake for more information.
+
+@m_class{m-block m-success}
+
+@par Single-header version
+    This library is available as a part of the single-header, dependency-less
+    [MagnumMath.h](https://github.com/mosra/magnum-singles/tree/master/MagnumMath.h)
+    library in the Magnum Singles repository for easier integration into your
+    projects. See @ref singles and @ref Math for more information.
+*/
+
+/** @dir Magnum/Animation
+ * @brief Namespace @ref Magnum::Animation
+ */
+/** @namespace Magnum::Animation
+@brief Keyframe-based animation
+
+This library is built as part of Magnum by default. To use this library with
+CMake, find the `Magnum` package and link to the `Magnum::Magnum` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Magnum)
+@endcode
+
+See @ref building, @ref cmake and @ref animation for more information.
+@experimental
+*/
+
+/** @dir Magnum/Audio
+ * @brief Namespace @ref Magnum::Audio, @ref Magnum::Audio::Extensions
+ */
+/** @namespace Magnum::Audio
+@brief Audio playback
+
+Audio import, playback and integration with @ref SceneGraph.
+
+This library depends on the [OpenAL](https://www.openal.org/) library and is
+built if `WITH_AUDIO` is enabled when building Magnum. To use this library with
+CMake, put [FindOpenAL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenAL.cmake)
+into your `modules/` directory, request the `Audio` component of the `Magnum`
+package and link to the `Magnum::Audio` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Audio)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Audio)
+@endcode
+
+Additionally, if you're using Magnum as a CMake subproject, bundle the
+[openal-soft repository](https://github.com/kcat/openal-soft) and do the
+following *before* calling @cmake find_package() @ce to ensure it's enabled, as
+the library is not built by default. If you want to use system-installed
+OpenAL, omit the first part and point `CMAKE_PREFIX_PATH` to its installation
+dir if necessary.
+
+@code{.cmake}
+set(CMAKE_POSITION_INDEPENDENT_CODE ON) # needed if building dynamic libraries
+set(LIBTYPE STATIC) # omit or set to SHARED if you want a shared OpenAL library
+add_subdirectory(openal-soft EXCLUDE_FROM_ALL)
+
+set(WITH_AUDIO ON CACHE BOOL "" FORCE)
+add_subdirectory(magnum EXCLUDE_FROM_ALL)
+@endcode
+
+Additional plugins and utilities are built separately. See particular
+`Audio::*Importer` class documentation, the @ref magnum-al-info "magnum-al-info"
+utility documentation, @ref building, @ref building-plugins, @ref cmake,
+@ref cmake-plugins and @ref plugins for more information.
+
+@m_class{m-block m-default}
+
+@thirdparty This library makes use of the [OpenAL](https://www.openal.org/)
+    API.
+*/
+
+/** @dir Magnum/DebugTools
+ * @brief Namespace @ref Magnum::DebugTools
+ */
+/** @namespace Magnum::DebugTools
+@brief Debug tools
+
+Debugging helpers, renderers and profilers.
+
+This library is built if `WITH_DEBUGTOOLS` is enabled when building Magnum. To
+use this library with CMake, request the `DebugTools` component of the `Magnum`
+package and link to the `Magnum::DebugTools` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED DebugTools)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::DebugTools)
+@endcode
+
+See @ref building, @ref cmake and @ref debug-tools for more information.
+*/
+
+/** @dir Magnum/GL
+ * @brief Namespace @ref Magnum::GL
+ */
+/** @namespace Magnum::GL
+@brief OpenGL wrapping layer
+
+C++11 wrappers around OpenGL objects with state tracking and transparent
+extension support.
+
+All of this library except @ref GL::OpenGLTester is built if `WITH_GL` is
+enabled when building Magnum. To use this library with CMake, request the `GL`
+component of the `Magnum` package and link to the `Magnum::GL` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED GL)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::GL)
+@endcode
+
+In case you're building for EGL or OpenGL ES platforms, you also need to put
+[FindEGL.cmake](https://github.com/mosra/magnum/blob/master/modules/FindEGL.cmake),
+[FindOpenGLES2.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES2.cmake)
+or [FindOpenGLES3.cmake](https://github.com/mosra/magnum/blob/master/modules/FindOpenGLES3.cmake)
+into your `modules/` directory.
+
+See @ref building, @ref cmake and @ref opengl for more information.
+
+@m_class{m-block m-success}
+
+@thirdparty This library makes use of the
+    [OpenGL](https://www.opengl.org/) and [WebGL](https://www.khronos.org/webgl/)
+    APIs. In addition, the library uses code generated using
+    [flextGL](https://github.com/mosra/flextgl), copyright © 2011--2018 Thomas
+    Weber, licensed under @m_class{m-label m-success} **MIT**
+    ([license text](https://github.com/mosra/flextgl/blog/master/LICENSE),
+    [choosealicense.com](https://choosealicense.com/licenses/mit/)). It
+    requires attribution for public use.
+*/
+
+/** @dir Magnum/MeshTools
+ * @brief Namespace @ref Magnum::MeshTools
+ */
+/** @namespace Magnum::MeshTools
+@brief Mesh tools
+
+Tools for generating, optimizing and cleaning meshes.
+
+This library is built if `WITH_MESHTOOLS` is enabled when building Magnum. To
+use this library with CMake, request the `MeshTools` component of the `Magnum`
+package and link to the `Magnum::MeshTools` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED MeshTools)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::MeshTools)
+@endcode
+
+Note that functionality depending on @ref GL APIs is available only if Magnum
+is built with both `WITH_GL` and `TARGET_GL` enabled (which is done by
+default).
+
+See @ref building and @ref cmake for more information.
+*/
+
+/** @dir Magnum/Primitives
+ * @brief Namespace @ref Magnum::Primitives
+ */
+/** @namespace Magnum::Primitives
+@brief Primitive library
+
+Basic primitives for testing purposes.
+
+This library is built if `WITH_PRIMITIVES` is enabled when building Magnum. To
+use this library with CMake, request the `Primitives` component of the `Magnum`
+package and link to the `Magnum::Primitives` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Primitives)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Primitives)
+@endcode
+
+See @ref building and @ref cmake for more information.
+*/
+
+/** @dir Magnum/SceneGraph
+ * @brief Namespace @ref Magnum::SceneGraph
+ */
+/** @namespace Magnum::SceneGraph
+@brief Scene graph library
+
+Managing object hierarchy, transformations and interactions.
+
+This library is built if `WITH_SCENEGRAPH` is enabled when building Magnum. To
+use this library with CMake, request the `SceneGraph` component of the `Magnum`
+package and link to the `Magnum::SceneGraph` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED SceneGraph)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::SceneGraph)
+@endcode
+
+See @ref building, @ref cmake and @ref scenegraph for more information.
+*/
+
+/** @dir Magnum/Shaders
+ * @brief Namespace @ref Magnum::Shaders
+ */
+/** @namespace Magnum::Shaders
+@brief Builtin shaders
+
+Collection of shaders for easy prototyping and basic usage.
+
+This library is built if `WITH_SHADERS` is enabled when building Magnum. To
+use this library with CMake, request the `Shaders` component of the `Magnum`
+package and link to the `Magnum::Shaders` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Shaders)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Shaders)
+@endcode
+
+See @ref building, @ref cmake and @ref shaders for more information.
+
+@m_class{m-row}
+
+@parblock
+
+@m_div{m-col-m-4 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-flat.png width=256px
+@ref Flat @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-4 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-phong.png width=256px
+@ref Phong @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-clearfix-t} @m_enddiv
+
+@m_div{m-col-m-4 m-push-t-3 m-push-m-0 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-vertexcolor.png width=256px
+@ref VertexColor @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@endparblock
+
+@m_class{m-row}
+
+@parblock
+
+@m_div{m-clearfix-m} @m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-meshvisualizer2d.png width=256px
+@ref MeshVisualizer2D "MeshVisualizer2D" @m_class{m-label m-success} **2D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-meshvisualizer3d.png width=256px
+@ref MeshVisualizer3D "MeshVisualizer3D" @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-vector.png width=256px
+@ref Vector @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@m_div{m-col-m-3 m-col-t-6 m-text-center m-nopadt m-nopadx}
+@image html shaders-distancefieldvector.png width=256px
+@ref DistanceFieldVector @m_class{m-label m-success} **2D** @m_class{m-label m-primary} **3D**
+@m_enddiv
+
+@endparblock
+
+*/
+
+/** @dir Magnum/ShaderTools
+ * @brief Namespace @ref Magnum::ShaderTools
+ * @m_since_latest
+ */
+/** @namespace Magnum::ShaderTools
+@brief Shader tools
+@m_since_latest
+
+Shader validation, conversion, compilation and reflection.
+
+This library is built if `WITH_SHADERTOOLS` is enabled when building Magnum. To
+use this library with CMake, request the `ShaderTools` component of the
+`Magnum` package and link to the `Magnum::ShaderTools` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED ShaderTools)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::ShaderTools)
+@endcode
+
+Additional plugins and utilities are built separately. See particular
+`*Converter` class documentation, the
+@ref magnum-shaderconverter "magnum-shaderconverter" utility documentation,
+@ref building, @ref building-plugins, @ref cmake, @ref cmake-plugins and
+@ref plugins for more information.
+*/
+
+/** @dir Magnum/Text
+ * @brief Namespace @ref Magnum::Text
+ */
+/** @namespace Magnum::Text
+@brief Text rendering
+
+Font texture creation and text layout.
+
+This library is built if `WITH_TEXT` is enabled when building Magnum. To use
+this library with CMake, request the `Text` component of the `Magnum` package
+and link to the `Magnum::Text` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Text)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Text)
+@endcode
+
+Additional plugins and utilities are built separately. See particular `*Font`
+and `*FontConverter` class documentation, the
+@ref magnum-fontconverter "magnum-fontconverter" utility documentation,
+@ref building, @ref building-plugins, @ref cmake, @ref cmake-plugins and
+@ref plugins for more information.
+*/
+
+/** @dir Magnum/TextureTools
+ * @brief Namespace @ref Magnum::TextureTools
+ */
+/** @namespace Magnum::TextureTools
+@brief Texture tools
+
+Tools for generating, compressing and optimizing textures.
+
+This library is built if `WITH_TEXTURETOOLS` is enabled when building Magnum.
+To use this library with CMake, request the `TextureTools` component of the
+`Magnum` package in CMake and link to the `Magnum::TextureTools` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED TextureTools)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::TextureTools)
+@endcode
+
+Note that functionality depending on @ref GL APIs is available only if Magnum
+is built with both `WITH_GL` and `TARGET_GL` enabled (which is done by
+default).
+
+Additional utilities are built separately. See the
+@ref magnum-distancefieldconverter "magnum-distancefieldconverter" utility
+documentation, @ref building and @ref cmake for more information.
+*/
+
+/** @dir Magnum/Trade
+ * @brief Namespace @ref Magnum::Trade
+ */
+/** @namespace Magnum::Trade
+@brief Data format exchange
+
+Contains plugin interfaces for importing data of various formats and classes
+for direct access to the data.
+
+This library is built if `WITH_TRADE` is enabled when building Magnum. To use
+this library with CMake, request the `Trade` component of the `Magnum` package
+and link to the `Magnum::Trade` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Trade)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Trade)
+@endcode
+
+Additional plugins and utilities are built separately. See particular
+`Trade::*Importer` and `*ImageConverter` class documentation, the
+@ref magnum-imageconverter "magnum-imageconverter" and
+@ref magnum-sceneconverter "magnum-sceneconverter" utility documentation,
+@ref building, @ref building-plugins, @ref cmake, @ref cmake-plugins and
+@ref plugins for more information.
+*/
+
+/** @dir Magnum/Vk
+ * @brief Namespace @ref Magnum::Vk
+ */
+/** @namespace Magnum::Vk
+@brief Vulkan wrapping layer
+
+C++14 wrappers and helpers for Vulkan development.
+
+This library is depends on [Vulkan](https://www.khronos.org/vulkan/) and is
+built if `WITH_VK` is enabled when building Magnum. To use this library with
+CMake, put [FindVulkan.cmake](https://github.com/mosra/magnum/blob/master/modules/FindVulkan.cmake)
+into your `modules/` directory, request the `Vk` component of the `Magnum`
+package and link to the `Magnum::Vk` target:
+
+@code{.cmake}
+find_package(Magnum REQUIRED Vk)
+
+# ...
+target_link_libraries(your-app PRIVATE Magnum::Vk)
+@endcode
+
+Additionally, if you're using Magnum as a CMake subproject, do the following
+* *before* calling @cmake find_package() @ce to ensure it's enabled, as the
+library is not built by default:
+
+@code{.cmake}
+set(WITH_VK ON CACHE BOOL "" FORCE)
+add_subdirectory(magnum EXCLUDE_FROM_ALL)
+@endcode
+
+See @ref building, @ref cmake and @ref vulkan for more information.
+
+@m_class{m-block m-success}
+
+@thirdparty This library makes use of the
+    [Vulkan](https://www.khronos.org/vulkan/) API. In addition, the library
+    uses code generated using
+    [flextGL](https://github.com/mosra/flextgl), copyright © 2011--2018 Thomas
+    Weber, licensed under @m_class{m-label m-success} **MIT**
+    ([license text](https://github.com/mosra/flextgl/blog/master/LICENSE),
+    [choosealicense.com](https://choosealicense.com/licenses/mit/)). It
+    requires attribution for public use.
+*/
+
+/** @dir magnum/src/MagnumPlugins
+ * @brief Magnum plugins (part of @ref building "Magnum library")
+ */
+
+ /** @dir MagnumPlugins/AnyAudioImporter
+ * @brief Plugin @ref Magnum::Audio::AnyImporter
+ */
+/** @dir MagnumPlugins/AnyImageConverter
+ * @brief Plugin @ref Magnum::Trade::AnyImageConverter
+ */
+/** @dir MagnumPlugins/AnyImageImporter
+ * @brief Plugin @ref Magnum::Trade::AnyImageImporter
+ */
+/** @dir MagnumPlugins/AnySceneConverter
+ * @brief Plugin @ref Magnum::Trade::AnySceneConverter
+ */
+/** @dir MagnumPlugins/AnySceneImporter
+ * @brief Plugin @ref Magnum::Trade::AnySceneImporter
+ */
+/** @dir MagnumPlugins/AnyShaderConverter
+ * @brief Plugin @ref Magnum::ShaderTools::AnyConverter
+ */
+/** @dir MagnumPlugins/MagnumFont
+ * @brief Plugin @ref Magnum::Text::MagnumFont
+ */
+/** @dir MagnumPlugins/MagnumFontConverter
+ * @brief Plugin @ref Magnum::Text::MagnumFontConverter
+ */
+/** @dir MagnumPlugins/ObjImporter
+ * @brief Plugin @ref Magnum::Trade::ObjImporter
+ */
+/** @dir MagnumPlugins/TgaImageConverter
+ * @brief Plugin @ref Magnum::Trade::TgaImageConverter
+ */
+/** @dir MagnumPlugins/TgaImporter
+ * @brief Plugin @ref Magnum::Trade::TgaImporter
+ */
+/** @dir MagnumPlugins/WavAudioImporter
+ * @brief Plugin @ref Magnum::Audio::WavImporter
+ */

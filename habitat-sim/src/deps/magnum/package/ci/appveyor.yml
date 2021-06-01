@@ -1,0 +1,148 @@
+clone_depth: 1
+
+environment:
+  matrix:
+  - TARGET: desktop
+    COMPILER: msvc
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-msvc2015
+    CONFIGURATION: Debug
+    ENABLE_VULKAN: OFF
+  - TARGET: desktop
+    COMPILER: msvc
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-msvc2017
+    CONFIGURATION: Debug
+    ENABLE_VULKAN: OFF
+  - TARGET: desktop
+    COMPILER: msvc
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019
+    CONFIGURATION: Debug
+    ENABLE_VULKAN: ON
+  - TARGET: desktop
+    COMPILER: msvc
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-static-msvc2019
+    CONFIGURATION: Debug
+    BUILD_STATIC: ON
+    ENABLE_VULKAN: ON
+  - TARGET: desktop
+    COMPILER: msvc-clang
+    PLATFORM: x64
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-msvc2019-clang
+    CONFIGURATION: Debug
+    ENABLE_VULKAN: ON
+  # Build at least one 32bit Release build, so we catch things that are not a
+  # problem on either 64bit or Debug.
+  - TARGET: desktop
+    COMPILER: msvc
+    ANSI_COLORS: ON
+    PLATFORM:
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    APPVEYOR_JOB_NAME: windows-32b-msvc2015
+    CONFIGURATION: Release
+  - TARGET: desktop
+    COMPILER: mingw
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-mingw
+    ENABLE_VULKAN: ON
+  - TARGET: desktop-gles
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-gles2-msvc2017
+  - TARGET: desktop-gles
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-gles2-msvc2019
+  - TARGET: desktop-gles
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-gles3-msvc2017
+  - TARGET: desktop-gles
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+    APPVEYOR_JOB_NAME: windows-gles3-msvc2019
+  - TARGET: rt
+    TARGET_GLES2: ON
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-gles2-msvc2017
+  - TARGET: rt
+    TARGET_GLES2: OFF
+    APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    APPVEYOR_JOB_NAME: windows-rt-gles3-msvc2017
+
+notifications:
+- provider: Webhook
+  url: https://webhooks.gitter.im/e/415ae90928ba0dbd3df4
+  on_build_success: false
+  on_build_failure: true
+  on_build_status_changed: true
+
+install:
+# Ninja. `cinst ninja` started 503ing in late November 2019 and wasn't really
+# reliable before either. So install by hand, as that's reliable always.
+- IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\ninja-win.zip appveyor DownloadFile https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip
+- 7z x ninja-win.zip -oC:/tools/ninja
+
+- set PATH=C:/tools/ninja;%PATH%
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" pip install codecov
+
+- IF NOT "%BUILD_STATIC%" == "ON" set BUILD_STATIC=OFF
+# For ES builds, otherwise the "%COMPILER:~0,4%" below doesn't work, sigh
+- IF "%COMPILER%" == "" set COMPILER=msvc
+
+# OpenAL. The DLL is copied & renamed by the buildsystem, no need to do that
+# here anymore.
+- IF NOT "%TARGET%" == "rt" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\openal-soft-1.19.1-bin.zip appveyor DownloadFile https://openal-soft.org/openal-binaries/openal-soft-1.19.1-bin.zip
+- IF NOT "%TARGET%" == "rt" 7z x openal-soft-1.19.1-bin.zip && ren openal-soft-1.19.1-bin openal && echo [General] > %APPDATA%/alsoft.ini & echo drivers=null >> %APPDATA%/alsoft.ini
+
+# Build apps on both GL and Vulkan to verify these can build w/o GL as well.
+# Not on GLES, as there's not much GLES-dependent.
+- IF "%TARGET%" == "desktop" set BUILD_APPLICATIONS=YES
+- IF "%TARGET%" == "desktop-gles" set BUILD_APPLICATIONS=NO
+
+# SDL2
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER:~0,4%" == "msvc" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\SDL2-devel-2.0.9-VC.zip appveyor DownloadFile http://www.libsdl.org/release/SDL2-devel-2.0.9-VC.zip
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER:~0,4%" == "msvc" 7z x SDL2-devel-2.0.9-VC.zip && ren SDL2-2.0.9 SDL
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER%" == "mingw" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\SDL2-devel-2.0.9-mingw.tar.gz appveyor DownloadFile http://libsdl.org/release/SDL2-devel-2.0.9-mingw.tar.gz
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER%" == "mingw" 7z x SDL2-devel-2.0.9-mingw.tar.gz & 7z x SDL2-devel-2.0.9-mingw.tar & ren SDL2-2.0.9 SDL
+
+# GLFW
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%PLATFORM%" == "" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\glfw-3.2.1.bin.WIN32.zip appveyor DownloadFile https://github.com/glfw/glfw/releases/download/3.2.1/glfw-3.2.1.bin.WIN32.zip
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%PLATFORM%" == "x64" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\glfw-3.2.1.bin.WIN64.zip appveyor DownloadFile https://github.com/glfw/glfw/releases/download/3.2.1/glfw-3.2.1.bin.WIN64.zip
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%PLATFORM%" == "" 7z x glfw-3.2.1.bin.WIN32.zip && ren glfw-3.2.1.bin.WIN32 glfw && mkdir deps && mkdir deps\lib && mkdir deps\bin && mkdir deps\include && xcopy /e glfw\include\* deps\include\
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%PLATFORM%" == "x64" 7z x glfw-3.2.1.bin.WIN64.zip && ren glfw-3.2.1.bin.WIN64 glfw && mkdir deps && mkdir deps\lib && mkdir deps\bin && mkdir deps\include && xcopy /e glfw\include\* deps\include\
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER:~0,4%" == "msvc" copy glfw\lib-vc2015\glfw3.dll deps\bin\ && copy glfw\lib-vc2015\glfw3dll.lib deps\lib\glfw3.lib
+- IF "%BUILD_APPLICATIONS%" == "YES" IF "%COMPILER%" == "mingw" copy glfw\lib-mingw-w64\glfw3.dll deps\bin\ && copy glfw\lib-mingw-w64\libglfw3dll.a deps\lib\libglfw3.a
+
+# SwiftShader for Vulkan + Vulkan loader
+# TODO: re-enable SwiftShader when we figure out why vkCreateInstance fails
+#- IF "%ENABLE_VULKAN%" == "ON" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\swiftshader-vulkan-r5464.a6940c8e6e-windows-2019.zip appveyor DownloadFile https://ci.magnum.graphics/swiftshader-vulkan-r5464.a6940c8e6e-windows-2019.zip
+- IF "%ENABLE_VULKAN%" == "ON" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\vulkan-loader-1.2.153-windows-2019.zip appveyor DownloadFile https://ci.magnum.graphics/vulkan-loader-1.2.153-windows-2019.zip
+#- IF "%ENABLE_VULKAN%" == "ON" 7z x swiftshader-vulkan-r5464.a6940c8e6e-windows-2019.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+- IF "%ENABLE_VULKAN%" == "ON" 7z x vulkan-loader-1.2.153-windows-2019.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+# Angle for WinRT. Zip from https://github.com/mosra/magnum-ci/tree/angle and
+# self-hosted because GH Actions would make it too simple for people if you
+# could just download the artifacts directly, right? RIGHT?
+- IF "%TARGET%" == "rt" IF NOT EXIST %APPVEYOR_BUILD_FOLDER%\angle-4134-windows-uwp.zip appveyor DownloadFile https://ci.magnum.graphics/angle-4134-windows-uwp.zip
+- IF "%TARGET%" == "rt" 7z x angle-4134-windows-uwp.zip -o%APPVEYOR_BUILD_FOLDER%\deps
+
+build_script:
+- IF "%TARGET%" == "desktop" IF "%COMPILER:~0,4%" == "msvc" call package\ci\appveyor-desktop.bat
+- IF "%TARGET%" == "desktop" IF "%COMPILER%" == "mingw" call package\ci\appveyor-desktop-mingw.bat
+- IF "%TARGET%" == "desktop-gles" call package\ci\appveyor-desktop-gles.bat
+- IF "%TARGET%" == "rt" call package\ci\appveyor-rt.bat
+
+cache:
+- ninja-win.zip -> package/ci/appveyor-cache-reset.txt
+- SDL2-devel-2.0.9-VC.zip -> package/ci/appveyor-cache-reset.txt
+- SDL2-devel-2.0.9-mingw.zip -> package/ci/appveyor-cache-reset.txt
+- openal-soft-1.19.1-bin.zip -> package/ci/appveyor-cache-reset.txt
+- glfw-3.2.1.bin.WIN64.zip -> package/ci/appveyor-cache-reset.txt

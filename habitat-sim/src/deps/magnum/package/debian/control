@@ -1,0 +1,21 @@
+Source: magnum
+Priority: optional
+Maintainer: Vladimír Vondruš <mosra@centrum.cz>
+Build-Depends: debhelper (>= 9), cmake (>= 3.4), corrade-dev, libgl-dev, libopenal-dev, libglfw3-dev, libsdl2-dev
+Standards-Version: 3.9.2
+Section: libs
+Homepage: https://magnum.graphics
+Vcs-Git: git://github.com/mosra/magnum.git
+Vcs-Browser: https://github.com/mosra/magnum
+
+Package: magnum-dev
+Section: libdevel
+Architecture: any
+Depends: magnum (= ${binary:Version}), corrade-dev, libgl-dev, libopenal-dev, libglfw3-dev, libsdl2-dev
+Description: C++11/C++14 graphics middleware for games and data visualization
+
+Package: magnum
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, corrade, libgl1, libopenal1, libglfw3, libsdl2-2.0-0
+Description: C++11/C++14 graphics middleware for games and data visualization

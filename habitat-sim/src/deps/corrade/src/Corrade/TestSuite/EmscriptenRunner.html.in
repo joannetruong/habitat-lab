@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>${test_name}</title>
+  <meta charset="utf-8" />
+  <style>
+    /* Colors kept in sync with m.css dark theme, http://mcss.mosra.cz */
+
+    *, ::before, ::after { box-sizing: border-box; }
+
+    body {
+      margin: 1rem;
+      padding: 0;
+      font-family: sans-serif;
+      font-size: 16px;
+      background-color: #2f363f; /*var(--background-color)*/
+      color: #dcdcdc; /*var(--color)*/
+    }
+
+    /* #container         makes the canvas occupy the whole page width
+       #sizer             centers it
+       #expander          does aspect ratio preservation
+       #listener          snaps to #expander edges
+       #listener::before  does the border, which finally goes below the canvas */
+    #container {
+      margin: 1rem -1rem 1rem -1rem;
+    }
+    #sizer {
+      margin-left: auto;
+      margin-right: auto;
+      max-width: 100%;
+      width: 640px;
+    }
+    #expander {
+      position: relative;
+    }
+    #listener {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
+    #listener::before {
+      position: absolute;
+      content: ' ';
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: -1;
+      border-style: solid;
+      border-width: 0.125rem;
+      border-radius: 0.2rem; /*var(--border-radius)*/
+      border-color: #405363; /*var(--line-color)*/
+    }
+
+    #container #sizer { width: 640px; }
+    #container #expander { padding-bottom: 75%; }
+
+    #status, #status-description {
+      position: absolute;
+      text-align: center;
+      width: 100%;
+      z-index: 9;
+    }
+    #status {
+      top: 10%;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+    #status-description {
+      top: 22.5%;
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+    #canvas.hidden {
+      display: none;
+    }
+    pre#log {
+      max-width: 100%;
+      width: 100%;
+      /* Make it fill at least the space given to it but let it expand beyond
+         (scrollbars in that tiny area are useless) */
+      min-height: 100%;
+      z-index: 10;
+      border-radius: 0.2rem; /*var(--border-radius)*/
+      padding: 0.5rem 1rem;
+      white-space: pre-wrap; /* same as .m-console-wrap */
+      word-break: break-all;
+      margin-top: 0; /* stupid defaults */
+      color: #e6e6e6; /*var(--code-color)*/
+      background-color: #282e36; /*var(--code-background-color)*/
+      font-size: 0.8rem; /* so 80 columns fits into 640 pixels */
+    }
+
+    /* Styling for extra content */
+    h1 {
+      text-align: center;
+      font-size: 1.75rem;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <h1>${test_name}</h1>
+  <div id="container">
+    <div id="sizer"><div id="expander"><div id="listener">
+      <canvas id="canvas" class="hidden"></canvas>
+      <pre id="log"></pre>
+      <div id="status">Initialization...</div>
+      <div id="status-description"></div>
+      <script>
+        var Module = {
+            preRun: [],
+            postRun: [],
+
+            arguments: [],
+
+            doNotCaptureKeyboard: true,
+
+            printErr: function(message) {
+                var log = document.getElementById('log');
+                log.innerHTML += Array.prototype.slice.call(arguments).join(' ')
+                    .replace(/[\"&<>]/g, function (a) {
+                        return { '"': '&quot;', '&': '&amp;', '<': '&lt;', '>': '&gt;' }[a];
+                    }) + '\n';
+            },
+
+            print: function(message) {
+                var log = document.getElementById('log');
+                log.innerHTML += Array.prototype.slice.call(arguments).join(' ')
+                    .replace(/[\"&<>]/g, function (a) {
+                        return { '"': '&quot;', '&': '&amp;', '<': '&lt;', '>': '&gt;' }[a];
+                    }) + '\n';
+            },
+
+            /* onAbort not handled here, as the output is printed directly on the page */
+
+            canvas: document.getElementById('canvas'),
+
+            setStatus: function(message) {
+                var status = document.getElementById('status');
+                if(status) status.innerHTML = message;
+            },
+
+            setStatusDescription: function(message) {
+                var statusDescription = document.getElementById('status-description');
+                if(statusDescription) statusDescription.innerHTML = message;
+            },
+
+            totalDependencies: 0,
+
+            monitorRunDependencies: function(left) {
+                this.totalDependencies = Math.max(this.totalDependencies, left);
+
+                if(left) {
+                    Module.setStatus('Downloading...');
+                    Module.setStatusDescription((this.totalDependencies - left) + ' / ' + this.totalDependencies);
+                } else {
+                    Module.setStatus('Download complete');
+                    Module.setStatusDescription('');
+                    document.getElementById('log').style.display = 'block';
+                }
+            }
+        };
+
+        /* Parse arguments, e.g. /app/?foo=bar&fizz&buzz=3 goes to the app as
+          ['--foo', 'bar', '--fizz', '--buzz', '3'] */
+        var args = decodeURIComponent(window.location.search.substr(1)).trim().split('&');
+        for(var i = 0; i != args.length; ++i) {
+            var j = args[i].indexOf('=');
+            /* Key + value */
+            if(j != -1) {
+                Module.arguments.push('--' + args[i].substring(0, j));
+                Module.arguments.push(args[i].substring(j + 1));
+
+            /* Just key */
+            } else Module.arguments.push('--' + args[i]);
+        }
+
+        Module.setStatus('Downloading...');
+        document.getElementById('log').style.display = 'none';
+      </script>
+      <script async="async" src="${test_name}.js"></script>
+    </div></div></div>
+  </div>
+</body>
+</html>
+<!-- kate: hl html -->

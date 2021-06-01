@@ -1,0 +1,222 @@
+/*
+    This file is part of Corrade.
+
+    Copyright © 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016,
+                2017, 2018, 2019, 2020, 2021
+              Vladimír Vondruš <mosra@centrum.cz>
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+    THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/
+
+/** @dir Corrade
+ * @brief Namespace @ref Corrade
+ */
+/** @namespace Corrade
+@brief Root namespace
+
+THe root namespace alone doesn't contain any functionality except for the
+@ref Corrade/Corrade.h header, see subnamespaces for more information. To use
+the base from CMake, request the `Corrade` package and link to the
+`Corrade::Corrade` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::Corrade)
+@endcode
+
+See also @ref building-corrade and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/Containers
+ * @brief Namespace @ref Corrade::Containers, @ref Corrade::Containers::Literals
+ */
+/** @namespace Corrade::Containers
+@brief Container implementations
+
+Implementations for various containers which don't have direct equivalents in
+STL or are better tailored to specific use cases than general standard
+implementations.
+
+This library is built if `WITH_UTILITY` is enabled when building Corrade. To
+use this library with CMake, request the `Containers` component of the
+`Corrade` package and link to the `Corrade::Containers` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED Containers)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::Containers)
+@endcode
+
+Parts of this library are additionally available in a form of
+@ref corrade-singles "single-header libraries". See also
+@ref building-corrade and @ref corrade-cmake for more information.
+*/
+/** @namespace Corrade::Containers::Literals
+@brief Container literals
+@m_since_latest
+
+Literals for easy construction of string views.
+
+This library is built if `WITH_UTILITY` is enabled when building Corrade. To
+use this library with CMake, request the `Containers` component of the
+`Corrade` package and link to the `Corrade::Containers` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED Containers)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::Containers)
+@endcode
+
+Parts of this library are additionally available in a form of
+@ref corrade-singles "single-header libraries". See also
+@ref building-corrade and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/Utility
+ * @brief Namespace @ref Corrade::Utility, @ref Corrade::Utility::Directory, @ref Corrade::Utility::String, @ref Corrade::Utility::System
+ */
+/** @namespace Corrade::Utility
+@brief Utitlities
+
+This library contains utility classes used by all other Corrade parts, like
+debug and error output (class @ref Debug), access to configuration files (class
+@ref Configuration) or compiling data files into the executable (class
+@ref Resource, see also @ref resource-management "tutorial").
+
+This library is built if `WITH_UTILITY` is enabled when building Corrade. To
+use this library with CMake, request the `Utility` component of the `Corrade`
+package and link to the `Corrade::Utility` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED Utility)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::Utility)
+@endcode
+
+Parts of this library are additionally available in a form of
+@ref corrade-singles "single-header libraries". See also @ref building-corrade
+and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/PluginManager
+ * @brief Namespace @ref Corrade::PluginManager
+ */
+/** @namespace Corrade::PluginManager
+@brief Plugin management
+
+This library contains @ref Manager, which takes care of loading, unloading
+and instancing plugins. There is also an @ref AbstractPlugin class, which is
+the base of all plugins. See @ref plugin-management for a brief introduction to
+how plugins work.
+
+This library is built if `WITH_PLUGINMANAGER` is enabled when building Corrade.
+To use this library with CMake, request the `PluginManager` component of the
+`Corrade` package and link to the `Corrade::PluginManager` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED PluginManager)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::PluginManager)
+@endcode
+
+See also @ref building-corrade and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/Interconnect
+ * @brief Namespace @ref Corrade::Interconnect
+ */
+/** @namespace Corrade::Interconnect
+@brief Signal/slot connections
+
+This library allows you to interconnect objects. See @ref interconnect for more
+information.
+
+This library is built if `WITH_INTERCONNECT` is enabled when building Corrade.
+To use this library with CMake, request the `Interconnect` component of the
+`Corrade` package and link to the `Corrade::Interconnect` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED Interconnect)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::Interconnect)
+@endcode
+
+See also @ref building-corrade and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/TestSuite
+ * @brief Namespace @ref Corrade::TestSuite
+ */
+/** @namespace Corrade::TestSuite
+@brief Test suite
+
+Testing and benchmarking framework. See @ref testsuite for more information.
+
+This library is built if `WITH_TESTSUITE` is enabled when building Corrade. To
+use this library with CMake, request the `TestSuite` component of the `Corrade`
+package and link to the `Corrade::TestSuite` target. Most commonly you'll be
+using it through the @ref corrade-cmake-add-test "corrade_add_test()" macro as
+described in the @ref testsuite "tutorial":
+
+@code{.cmake}
+find_package(Corrade REQUIRED TestSuite)
+
+# Link a test app to the library
+target_link_libraries(your-app PRIVATE Corrade::TestSuite)
+
+# Or create a test directly from the sources
+corrade_add_test(YourTest YourTest.cpp)
+@endcode
+
+In case you're building for Emscripten and want to
+@ref TestSuite-Tester-running-cmake "run your tests via CTest", you also need
+to put [FindNodeJs.cmake](https://github.com/mosra/corrade/blob/master/modules/FindNodeJs.cmake) in your `modules/` directory.
+
+See also @ref building-corrade and @ref corrade-cmake for more information.
+*/
+
+/** @dir Corrade/TestSuite/Compare
+ * @brief Namespace @ref Corrade::TestSuite::Compare
+ */
+/** @namespace Corrade::TestSuite::Compare
+@brief Various test suite comparison helpers
+
+See @ref TestSuite-Tester-advanced-comparisons, @ref CORRADE_COMPARE_AS(),
+@ref CORRADE_COMPARE_WITH() and @ref Comparator for more information.
+
+This library is built if `WITH_TESTSUITE` is enabled when building Corrade. To
+use this library with CMake, request the `TestSuite` component of the `Corrade`
+package in CMake and link to the `Corrade::TestSuite` target:
+
+@code{.cmake}
+find_package(Corrade REQUIRED TestSuite)
+
+# ...
+target_link_libraries(your-app PRIVATE Corrade::TestSuite)
+@endcode
+
+See also @ref building-corrade and @ref corrade-cmake for more information.
+*/
