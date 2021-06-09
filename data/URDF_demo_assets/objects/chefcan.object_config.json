@@ -1,0 +1,7 @@
+{
+    "render_asset": "chefcan.glb",
+    "collision_asset": "chefcan_convex.glb",
+    "mass": 0.414,
+    "friction_coefficient": 0.5,
+    "restitution_coefficient": 0.1
+}

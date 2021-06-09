@@ -1,0 +1,8 @@
+{
+    "render_asset": "skillet.glb",
+    "collision_asset": "skillet_convex.glb",
+    "join_collision_meshes": false,
+    "mass": 0.95,
+    "friction_coefficient": 0.4,
+    "restitution_coefficient": 0.5
+}

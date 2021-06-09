@@ -1,0 +1,350 @@
+<robot name="spot">
+  <link name="base">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/base.obj"/>
+      </geometry>
+
+<material name="base"> <color rgba="1 0.8431 0 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/base.stl"/>
+         </geometry>
+       </collision>
+       <inertial>
+      <origin rpy="0 0 0" xyz="0.008465 0.004045 -0.000763"/>
+      <!-- <mass value="9.041"/> -->
+      <mass value="0.01"/>
+      <inertia ixx="0.033260231" ixy="-0.000451628" ixz="0.000487603" iyy="0.16117211" iyz="4.8356e-05" izz="0.17460442"/>
+    </inertial>
+  </link>
+  
+  
+  <link name="fl.hip">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fl.hip.obj"/>
+      </geometry>
+<material name="fl.hip"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/fl.hip.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.022191 0.015144 -1.5e-05"/>
+      <!-- <mass value="1.993"/> -->
+      <mass value="0.01"/>
+      
+      <inertia ixx="0.002903894" ixy="-7.185e-05" ixz="-1.262e-06" iyy="0.004907517" iyz="-1.75e-06" izz="0.005586944"/>
+    </inertial>
+  </link>
+  
+  
+  <joint name="fl.hx" type="revolute">
+    <origin xyz="0.29785 0.05500 0.00000" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base"/>
+    <child link="fl.hip"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.770728" upper="0.80063"/>
+  </joint>
+  <link name="fl.uleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fl.uleg.obj"/>
+      </geometry>
+<material name="fl.uleg"> <color rgba="1 0.8431 0 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/fl.uleg.stl"/>
+         </geometry>
+       </collision>
+      <inertial>
+      <origin rpy="0 0 0" xyz="-0.003237 -0.022327 -0.027326"/>
+      <!--<mass value="1.013"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.005529065" ixy="4.825e-06" ixz="0.000343869" iyy="0.005139339" iyz="2.2448e-05" izz="0.001367788"/>
+    </inertial>
+  </link>
+  
+  
+  <joint name="fl.hy" type="revolute">
+    <origin xyz="0.0 0.110945 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1      0"/>
+    <parent link="fl.hip"/>
+    <child link="fl.uleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.880902" upper="2.25842"/>
+  </joint>
+  <link name="fl.lleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fl.lleg.obj"/>
+      </geometry>
+<material name="fl.lleg"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/fl.lleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.006435 0.0 -0.107388"/>
+      <!--<mass value="0.166"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.002997972" ixy="0.0" ixz="-0.000141163" iyy="0.003014022" iyz="0.0" izz="3.2426e-05"/>
+    </inertial>
+  </link>
+  
+  <joint name="fl.kn" type="revolute">
+    <origin xyz="0.025 0.000 -0.3205" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="fl.uleg"/>
+    <child link="fl.lleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-2.79436" upper="-0.287628"/>
+  </joint>
+  <link name="fr.hip">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fr.hip.obj"/>
+      </geometry>
+<material name="fr.hip"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+       <collision>
+        <geometry>
+          <mesh filename="link_models/fr.hip.stl"/>
+         </geometry>
+       </collision>
+       <inertial>
+      <origin rpy="0 0 0" xyz="-0.022191 -0.015144 -1.5e-05"/>
+      <!--<mass value="1.993"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.002903894" ixy="7.185e-05" ixz="-1.262e-06" iyy="0.004907517" iyz="1.75e-06" izz="0.005586944"/>
+    </inertial>
+  </link>
+  
+  <joint name="fr.hx" type="revolute">
+    <origin xyz="0.29785 -0.05500 0.00000" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base"/>
+    <child link="fr.hip"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.785173" upper="0.785869"/>
+  </joint>
+  <link name="fr.uleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fr.uleg.obj"/>
+      </geometry>
+<material name="fr.uleg"> <color rgba="1 0.8431 0 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/fr.uleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.003237 0.022327 -0.027326"/>
+      <!--<mass value="1.013"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.005529065" ixy="-4.825e-06" ixz="0.000343869" iyy="0.005139339" iyz="-2.2448e-05" izz="0.001367788"/>
+    </inertial>
+  </link>
+  
+  <joint name="fr.hy" type="revolute">
+    <origin xyz="0.0 -0.110945 0.0" rpy="0 0 0"/>
+    <axis xyz="0  1      0"/>
+    <parent link="fr.hip"/>
+    <child link="fr.uleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.878211" upper="2.26376"/>
+  </joint>
+  <link name="fr.lleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/fr.lleg.obj"/>
+      </geometry>
+<material name="fr.lleg"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/fr.lleg.stl"/>
+         </geometry>
+       </collision>
+       <inertial>
+      <origin rpy="0 0 0" xyz="0.006435 0.0 -0.107388"/>
+      <!--<mass value="0.166"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.002997972" ixy="0.0" ixz="-0.000141163" iyy="0.003014022" iyz="0.0" izz="3.2426e-05"/>
+    </inertial>
+  </link>
+  
+  <joint name="fr.kn" type="revolute">
+    <origin xyz="0.025 0.000 -0.3205" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="fr.uleg"/>
+    <child link="fr.lleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-2.79966" upper="-0.283371"/>
+  </joint>
+  <link name="hl.hip">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hl.hip.obj"/>
+      </geometry>
+<material name="hl.hip"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hl.hip.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.022191 0.015144 -1.5e-05"/>
+      <!--<mass value="1.993"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.002903894" ixy="7.185e-05" ixz="1.262e-06" iyy="0.004907517" iyz="-1.75e-06" izz="0.005586944"/>
+    </inertial>
+  </link>
+  
+  <joint name="hl.hx" type="revolute">
+    <origin xyz="-0.29785 0.05500 0.00000" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base"/>
+    <child link="hl.hip"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.787764" upper="0.783786"/>
+  </joint>
+  <link name="hl.uleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hl.uleg.obj"/>
+      </geometry>
+<material name="hl.uleg"> <color rgba="1 0.8431 0 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hl.uleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.003237 -0.022327 -0.027326"/>
+      <!--<mass value="1.013"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.005529065" ixy="4.825e-06" ixz="0.000343869" iyy="0.005139339" iyz="2.2448e-05" izz="0.001367788"/>
+    </inertial>
+  </link>
+  
+  <joint name="hl.hy" type="revolute">
+    <origin xyz="0.0 0.110945 0.0" rpy="0 0 0"/>
+    <axis xyz="0 1      0"/>
+    <parent link="hl.hip"/>
+    <child link="hl.uleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.873887" upper="2.26671"/>
+  </joint>
+  <link name="hl.lleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hl.lleg.obj"/>
+      </geometry>
+<material name="hl.lleg"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hl.lleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.002781 6.3e-05 -0.142518"/>
+      <!--<mass value="0.207"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.006341369" ixy="-3e-09" ixz="-8.7951e-05" iyy="0.006355157" iyz="-1.336e-06" izz="3.9188e-05"/>
+    </inertial>
+  </link>
+  
+  <joint name="hl.kn" type="revolute">
+    <origin xyz="0.025 0.000 -0.3205" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="hl.uleg"/>
+    <child link="hl.lleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-2.79925" upper="-0.284751"/>
+  </joint>
+  <link name="hr.hip">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hr.hip.obj"/>
+      </geometry>
+<material name="hr.hip"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hr.hip.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.022191 -0.015144 -1.5e-05"/>
+      <!--<mass value="1.993"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.002903894" ixy="-7.185e-05" ixz="1.262e-06" iyy="0.004907517" iyz="1.75e-06" izz="0.005586944"/>
+    </inertial>
+  </link>
+  
+  <joint name="hr.hx" type="revolute">
+    <origin xyz="-0.29785 -0.05500 0.00000" rpy="0 0 0"/>
+    <axis xyz="1 0 0"/>
+    <parent link="base"/>
+    <child link="hr.hip"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.78842" upper="0.781105"/>
+  </joint>
+  <link name="hr.uleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hr.uleg.obj"/>
+      </geometry>
+<material name="hr.uleg"> <color rgba="1 0.8431 0 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hr.uleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.003237 0.022327 -0.027326"/>
+      <!--<mass value="1.013"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.005529065" ixy="-4.825e-06" ixz="0.000343869" iyy="0.005139339" iyz="-2.2448e-05" izz="0.001367788"/>
+    </inertial>
+  </link>
+  
+  <joint name="hr.hy" type="revolute">
+    <origin xyz="0.0 -0.110945 0.0" rpy="0 0 0"/>
+    <axis xyz="0  1      0"/>
+    <parent link="hr.hip"/>
+    <child link="hr.uleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-0.874512" upper="2.26129"/>
+  </joint>
+  <link name="hr.lleg">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="link_models/hr.lleg.obj"/>
+      </geometry>
+<material name="hr.lleg"> <color rgba="0.2 0.2 0.2 1"/></material>    </visual>
+      <collision>
+        <geometry>
+          <mesh filename="link_models/hr.lleg.stl"/>
+         </geometry>
+       </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.002781 6.3e-05 -0.142518"/>
+      <!--<mass value="0.207"/>-->
+      <mass value="0.01"/>
+      <inertia ixx="0.006341369" ixy="-3e-09" ixz="-8.7951e-05" iyy="0.006355157" iyz="-1.336e-06" izz="3.9188e-05"/>
+    </inertial>
+  </link>
+  <joint name="hr.kn" type="revolute">
+    <origin xyz="0.025 0.000 -0.3205" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <parent link="hr.uleg"/>
+    <child link="hr.lleg"/>
+     <limit effort="1000" velocity="1000.00" lower="-2.79832" upper="-0.286601"/>
+  </joint>
+</robot>

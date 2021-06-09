@@ -1,0 +1,7 @@
+{
+    "render_asset": "largeclamp.glb",
+    "collision_asset": "largeclamp_convex.glb",
+    "join_collision_meshes": false,
+    "mass": 0.125,
+    "restitution_coefficient": 0.4
+}
