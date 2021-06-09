@@ -196,10 +196,10 @@ class Raibert_controller_turn(Raibert_controller):
 
 
     def plan_latent_action(self, state, target_speed, target_ang_vel=0.0):
-        current_speed = np.array([state['base_velocity'][0], state['base_velocity'][1]])
-        # current_speed = np.array(target_speed)
-        current_yaw_rate = state['base_ang_vel'][2]
-        # current_yaw_rate = target_ang_vel
+        current_speed = np.array(target_speed)
+        current_yaw_rate = target_ang_vel
+        # current_speed = np.array([state['base_velocity'][0], state['base_velocity'][1]])
+        # current_yaw_rate = state['base_ang_vel'][2]
         self.latent_action = np.zeros(3)
         self.target_speed = target_speed[:2]
         acceleration_term = self.speed_gain*(self.target_speed-current_speed) + 0.5*current_speed*self.num_timestep_per_HL_action / self.control_frequency
@@ -216,7 +216,8 @@ class Raibert_controller_turn(Raibert_controller):
     def update_latent_action(self, state, latent_action):
         self.switch_swing_stance()
         self.latent_action = latent_action
-        self.last_com_ori = np.array(state['base_ori_euler'])
+        # self.last_com_ori = np.array(state['base_ori_euler'])
+        self.last_com_ori = np.array([0,0,0])#np.array(state['base_ori_euler'])
         self.last_com_ori[-1] = 0.0
         self.final_des_body_ori[2] = self.latent_action[-1]
 

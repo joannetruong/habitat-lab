@@ -4,7 +4,7 @@ import magnum as mn
 import habitat_sim 
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab
+from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab, scalar_vector_to_quat
 import squaternion
 
 class A1():
@@ -81,7 +81,11 @@ class A1():
         base_position.z = base_pos_tmp[2]
 
         base_orientation_euler = get_rpy(base_orientation_quat)
-        base_orientation_euler_origin = get_rpy(base_orientation_quat, transform=False)
+        # base_orientation_euler_origin = get_rpy(base_orientation_quat, transform=False)
+
+        obs_quat = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector)
+        inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1, 0, 0))
+        base_orientation_quat_trans = obs_quat*inverse_base_transform
 
         if finite_diff:
             if prev_state is None:
@@ -89,7 +93,6 @@ class A1():
                 frame_pos = np.zeros((3))
                 base_angular_velocity_euler = mn.Vector3() # self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
             else:
-                # print(prev_state['base_pos'], base_position)
                 base_velocity = (base_position - prev_state['base_pos']) / self.dt
                 if base_velocity == mn.Vector3():
                     base_velocity = mn.Vector3(prev_state['base_velocity'])
@@ -104,11 +107,12 @@ class A1():
             'base_pos_z': base_position.z,
             'base_pos': np.array([base_position.x, base_position.y, base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
-            'base_ori_quat': base_orientation_quat,
+            'base_ori_quat_hab': base_orientation_quat,
+            'base_ori_quat': base_orientation_quat_trans,
             'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-            # 'base_velocity': list(lin_vel),
+            # 'base_velocity': list(base_velocity),
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
-            # 'base_ang_vel': list(ang_vel),
+            # 'base_ang_vel': list(base_angular_velocity_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities
         }
@@ -145,7 +149,7 @@ class A1():
         #     a = joint_pos[n]
         #     j.reset_joint_state(position=a, velocity=0.0)
 
-    def step(self, action, pos_gain, vel_gain, dt=1.0/240, verbose=False, get_frames=True, follow_robot=False):
+    def step(self, action, pos_gain, vel_gain, dt=1/240.0, verbose=False, get_frames=True, follow_robot=False):
         
         self.apply_robot_action(action, pos_gain, vel_gain)
             # simulate dt seconds at 60Hz to the nearest fixed timestep

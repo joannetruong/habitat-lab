@@ -52,16 +52,19 @@ def cartesian_to_polar(x, y):
     return rho, phi
 
 def get_rpy(rotation, transform=True):
-    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+    tmp_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
     if transform:
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
-        obs_quat = obs_quat*inverse_base_transform
-        # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
-        # inverse_base_transform_yaw = scalar_vector_to_quat(np.pi/2,(1,0,0))
-        # obs_quat = obs_quat * inverse_base_transform_yaw * quat
-    roll, yaw, pitch = obs_quat.to_euler()
-    # yaw -= np.deg2rad(90)
+        tmp_quat = tmp_quat*inverse_base_transform
+        # swap quaternion.y and quaternion.z to get correct roll, pitch, yaw
+        obs_quat = squaternion.Quaternion(tmp_quat.scalar, tmp_quat.vector[0], tmp_quat.vector[2], tmp_quat.vector[1])
+    else:
+        obs_quat = tmp_quat
+    roll, pitch, yaw = obs_quat.to_euler()
     return np.array([roll, pitch, yaw])
+    # import pybullet as p
+    # rpy = p.getEulerFromQuaternion([tmp_quat.x, tmp_quat.z, tmp_quat.y, tmp_quat.w])
+    # return rpy
 
 def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
     a = np.quaternion(1, 0, 0, 0)
