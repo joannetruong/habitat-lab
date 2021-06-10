@@ -28,15 +28,15 @@ class Workspace(object):
         self.ep_id = 1
         self.observations = []
         self.text = []
-        self.pos_gain = np.ones((3,)) * 0.2 # 0.2 
+        self.pos_gain = np.ones((3,)) * 0.15 # 0.2
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
-        self.pos_gain[2] = 0.7 # 0.7
+        self.pos_gain[2] = 0.1 # 0.7
         self.vel_gain[2] = 1.5 # 1.5
-        self.num_steps = 3
+        self.num_steps = 30
         self.ctrl_freq = 240
-        self.time_per_step = 80
+        self.time_per_step = 100
         self.prev_state=None
-        self.finite_diff=False
+        self.finite_diff=True
         self.robot_name = robot
         self.setup()
 
@@ -352,18 +352,18 @@ class Workspace(object):
         # Set desired linear and angular velocities
         print("MOVING FORWARD")
         self.cmd_vel_xyt(0.35, 0.0, 0.0)
-        # print("MOVING BACKWARDS")
-        # self.cmd_vel_xyt(-0.35, 0.0, 0.0)
-        # print("MOVING RIGHT")
-        # self.cmd_vel_xyt(0.0, -0.35, 0.0)
-        # print("MOVING LEFT")
-        # self.cmd_vel_xyt(0.0, 0.35, 0.0)
-        # print("MOVING FORWARD ARC RIGHT")
-        # self.cmd_vel_xyt(0.35, 0.0, -0.15)
-        # print("MOVING FORWARD ARC LEFT")
-        # self.cmd_vel_xyt(0.35, 0.0, 0.15)
-        # print('TURNING IN PLACE LEFT')
-        # self.cmd_vel_xyt(0.0, 0.0, 0.15)
+        print("MOVING BACKWARDS")
+        self.cmd_vel_xyt(-0.35, 0.0, 0.0)
+        print("MOVING RIGHT")
+        self.cmd_vel_xyt(0.0, -0.35, 0.0)
+        print("MOVING LEFT")
+        self.cmd_vel_xyt(0.0, 0.35, 0.0)
+        print("MOVING FORWARD ARC RIGHT")
+        self.cmd_vel_xyt(0.35, 0.0, -0.15)
+        print("MOVING FORWARD ARC LEFT")
+        self.cmd_vel_xyt(0.35, 0.0, 0.15)
+        print('TURNING IN PLACE LEFT')
+        self.cmd_vel_xyt(0.0, 0.0, 0.15)
 
         self.make_video()
         with open(os.path.join(output_path, 'controller_log.json'), 'w') as f:
