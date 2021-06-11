@@ -324,7 +324,6 @@ class Workspace(object):
             ", " + str(np.round(state['base_ang_vel'][2], 3)) +  "]")
             text_to_add.append("Commanded Vel (x,y,ang): (" + str(target_speed) + " " +str(target_ang_vel) + ")")
             text_to_add.append("Pos Gain: " + str(self.pos_gain) + " Vel Gain: " +str(self.vel_gain))
-            text_to_add.append("Pos Gain: " + str(self.pos_gain) + " Vel Gain: " +str(self.vel_gain))
             text_to_add.append("Action #: " + str(self.num_actions))
             self.text.append(text_to_add)
 

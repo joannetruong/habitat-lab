@@ -49,7 +49,7 @@ class SpotWorkspace(Workspace):
         self.success_dist = 0.36
         self.dist_to_goal = 100
         self.ctr = 0
-        self.max_num_actions = 5
+        self.max_num_actions = 500
         self.min_depth = 0.3
         self.max_depth = 10.0
         self.device = 'cpu'
