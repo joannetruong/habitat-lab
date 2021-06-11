@@ -34,13 +34,13 @@ class Workspace(object):
         self.ep_id = 1
         self.depth_ortho_imgs = []
         self.text = []
-        self.pos_gain = np.ones((3,)) * 0.2 # 0.2 
+        self.pos_gain = np.ones((3,)) * 0.15 # 0.2 
         self.vel_gain = np.ones((3,)) * 1.5 # 1.5
-        self.pos_gain[2] = 0.7 # 0.7
+        self.pos_gain[2] = 0.1 # 0.7
         self.vel_gain[2] = 1.5 # 1.5
         self.num_steps = 80
         self.ctrl_freq = 240
-        self.time_per_step = 80
+        self.time_per_step = 100
         self.prev_state=None
         self.finite_diff=False
         self.min_depth = 0.3
@@ -65,6 +65,7 @@ class Workspace(object):
         self.dist_to_goal = 100
         self.ctr = 0
         self.device = 'cpu'
+        self.show_display = False
         model = evaluate_ddppo.load_model(weights_dir, self.dim_actions)
         self.model = model.eval()
 
@@ -343,32 +344,77 @@ class Workspace(object):
             self.check_done(action, state)
             if self.done:
                 break
-        self.stitch_show_img(agent_obs, ortho_obs)        
+        # Get text to add to video
+        text_to_add = []
+        text_to_add.append("Pos: [" + str(np.round(state['base_pos'][0], 3)) + ", " + str(np.round(state['base_pos'][1], 3)) +\
+        ", " + str(np.round(state['base_pos'][2], 3)) +  "]")
+        text_to_add.append("Ori: [" + str(np.round(state['base_ori_euler'][0], 3)) + ", " + str(np.round(state['base_ori_euler'][1], 3)) +\
+        ", " + str(np.round(state['base_ori_euler'][2], 3)) +  "]")
+        text_to_add.append("Vel_lin: [" + str(np.round(state['base_velocity'][0], 3)) + ", " + str(np.round(state['base_velocity'][1], 3)) +\
+        ", " + str(np.round(state['base_velocity'][2], 3)) +  "]")
+        # text_to_add.append("Vel_lin_b: [" + str(np.round(state['base_velocity_b'][0], 3)) + ", " + str(np.round(state['base_velocity_b'][1], 3)) +\
+        # ", " + str(np.round(state['base_velocity_b'][2], 3)) +  "]")
+        text_to_add.append("Vel_ang: [" + str(np.round(state['base_ang_vel'][0], 3)) + ", " + str(np.round(state['base_ang_vel'][1], 3)) +\
+        ", " + str(np.round(state['base_ang_vel'][2], 3)) +  "]")
+        # text_to_add.append("Vel_ang_b: [" + str(np.round(state['base_ang_vel_b]'[0], 3)) + ", " + str(np.round(state['base_ang_vel_b'][1], 3)) +\
+        # ", " + str(np.round(state['base_ang_vel_b'][2], 3)) +  "]")
+        text_to_add.append("Commanded Vel (x,y,ang): (" + str(target_speed) + " " +str(target_ang_vel) + ")")
+        text_to_add.append("Pos Gain: " + str(self.pos_gain) + " Vel Gain: " +str(self.vel_gain))
+        text_to_add.append("Action #: " + str(self.num_actions))
+        self.text.append(text_to_add)
+        self.stitch_show_img(agent_obs, ortho_obs, self.show_display)        
         return agent_obs[0]['depth_camera_1stperson'] 
+
 
     def stitch_show_img(self, agent_obs, ortho_obs, show=True):
         depth_img = cv2.cvtColor(np.uint8(agent_obs[0]['depth_camera_1stperson']/ 10 * 255),cv2.COLOR_RGB2BGR)
         ortho_img = cv2.cvtColor(np.uint8(ortho_obs[0]['ortho']),cv2.COLOR_RGB2BGR)
 
-        height,width,layers=ortho_img.shape
+        height,width,layers = ortho_img.shape
         resize_depth_img = cv2.resize(depth_img, (width, height))
         frames = np.concatenate((resize_depth_img, ortho_img), axis=1)
         self.depth_ortho_imgs.append(frames)
+        # rate = 60 // 30
 
-        key = cv2.waitKey(100)
-        if key == ord('q'):
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
-            self.check_make_dir(self.save_video_dir)
-            video=cv2.VideoWriter(os.path.join(self.save_video_dir, 'spot_coda_ddppo.mp4'),fourcc,10,(2*width,height))
-            for frame in self.depth_ortho_imgs:
-                video.write(frame)
-            exit()
-        cv2.imshow('depth_ortho_imgs',frames)
+        # if self.text is not None:
+        #     self.text= self.text[1::rate]
+
+        # if self.text is not None:
+        #     for i, line in enumerate(self.text[count]):
+        #         font = cv2.FONT_HERSHEY_SIMPLEX
+        #         cv2.putText(frames, line, (20, 100 + i*30), font, 0.5, (0, 0, 0), 2)
+        if show:
+            key = cv2.waitKey(100)
+            if key == ord('q'):
+                fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+                self.check_make_dir(self.save_video_dir)
+                video=cv2.VideoWriter(os.path.join(self.save_video_dir, 'spot_coda_ddppo.mp4'),fourcc,10,(2*width,height))
+                for frame in self.depth_ortho_imgs:
+                    video.write(frame)
+                exit()
+            cv2.imshow('depth_ortho_imgs',frames)
 
     def check_make_dir(self, pth):
         if not os.path.exists(pth):
             os.makedirs(pth)
         return
+
+    def save_video(self):
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
+        self.check_make_dir(self.save_video_dir)
+        rate = self.ctrl_freq // 30
+
+        # if self.text is not None:
+            # self.text= self.text[1::rate]
+
+        video=cv2.VideoWriter(os.path.join(self.save_video_dir, 'spot_coda_ddppo.mp4'),fourcc,10,(1440,540))
+        for idx, frame in enumerate(self.depth_ortho_imgs):
+            if self.text is not None:
+                for i, line in enumerate(self.text[idx]):
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    cv2.putText(frame, line, (20, 100 + i*30), font, 0.5, (0, 0, 0), 2)
+            video.write(frame)
+        print('SAVED VIDEO')
         
     def get_episodes(self):
         start_poses = []
@@ -393,12 +439,9 @@ class Workspace(object):
 
         robot_position = np.array([base_pos_hab[0], base_pos_hab[1], base_pos_hab[2]])
         robot_ori = utils.get_rpy(robot_state.rotation) 
-        # robot_ori[-1] -= np.deg2rad(90)
         return robot_position, robot_ori
 
     def _compute_pointgoal(self, source_position, source_rotation, goal_position):
-        print('source_position: ', source_position)
-        print('source_rotation: ', source_rotation)
         source_position[1] = 0.0
         goal_position[1] = 0.0
         direction_vector = goal_position - source_position
@@ -408,7 +451,6 @@ class Workspace(object):
         rho, phi = utils.cartesian_to_polar(
             -direction_vector_agent[2], direction_vector_agent[0]
         )
-        # phi -= np.pi/2
         print('goal sensor: ', rho, np.rad2deg(-phi), goal_position)
         return np.array([rho, -phi], dtype=np.float32)
 
@@ -428,7 +470,7 @@ class Workspace(object):
         agent_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
         agent_position = agent_state.translation
         roll, pitch, yaw = utils.get_rpy(agent_state.rotation)
-        yaw = yaw-np.deg2rad(90)
+        # yaw = yaw-np.deg2rad(90)
         agent_rotation = squaternion.Quaternion.from_euler(roll, pitch, yaw, degrees=False)
         # source_rotation = utils.quat_from_magnum(agent_rotation)
         # inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
@@ -469,7 +511,7 @@ class Workspace(object):
         self.done = False
         self.success = False
         episode_reward = 0
-        num_actions = 0
+        self.num_actions = 0
         num_processes=1
         test_recurrent_hidden_states = torch.zeros(
                 num_processes, 
@@ -481,7 +523,7 @@ class Workspace(object):
         not_done_masks = torch.zeros(num_processes, 1, dtype=torch.bool, device=self.device)
         self.depth_obs = np.zeros((240, 320))
 
-        while not self.done:
+        while not self.done and self.num_actions < 500:
             observations = {}
 
             # normalize depth images
@@ -534,9 +576,9 @@ class Workspace(object):
             print('[commands]: {} {} {}'.format(linear_velocity, strafe_velocity, angular_velocity))
 
             action = np.array([linear_velocity, strafe_velocity, angular_velocity])
-            print('NUM_ACTIONS: ', num_actions)
+            print('NUM ACTIONS: ', self.num_actions)
             self.depth_obs = self.step_robot(action) 
-            num_actions +=1
+            self.num_actions +=1
         self.save_video()
         # self.make_video()
 
