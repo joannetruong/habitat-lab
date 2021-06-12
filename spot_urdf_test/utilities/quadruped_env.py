@@ -213,7 +213,7 @@ class Laikago(A1):
 class Spot(A1):
     def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
         super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
-        self._initial_joint_positions = [-0.05, 0.60, -1.5,
-                                         0.05, 0.60, -1.5,
-                                         -0.05, 0.65, -1.5,
-                                         0.05, 0.65, -1.5]
+        self._initial_joint_positions = [0.05, 0.7, -1.3,
+                                         -0.05, 0.7, -1.3,
+                                         0.05, 0.7, -1.3,
+                                         -0.05, 0.7, -1.3]

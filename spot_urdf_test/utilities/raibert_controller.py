@@ -202,8 +202,10 @@ class Raibert_controller_turn(Raibert_controller):
         # current_yaw_rate = state['base_ang_vel'][2]
         self.latent_action = np.zeros(3)
         self.target_speed = target_speed[:2]
-        acceleration_term = self.speed_gain*(self.target_speed-current_speed) + 0.5*current_speed*self.num_timestep_per_HL_action / self.control_frequency
-        orientation_speed_term = self.speed_gain*(target_ang_vel-current_yaw_rate) + 0.5*self.num_timestep_per_HL_action / self.control_frequency * current_yaw_rate
+        self.target_ang_vel = target_ang_vel
+        mult_factor = 0.5*self.num_timestep_per_HL_action / self.control_frequency
+        acceleration_term = self.speed_gain*(self.target_speed-current_speed) + current_speed*mult_factor
+        orientation_speed_term = self.speed_gain*(target_ang_vel-current_yaw_rate) + mult_factor* current_yaw_rate
 
         des_footstep = acceleration_term
 
@@ -274,3 +276,38 @@ class Raibert_controller_turn(Raibert_controller):
 
         des_leg_pose = self.kinematics_solver.inverse_kinematics_robot(self.des_foot_position_com)
         return des_leg_pose
+
+
+class Raibert_controller_turn_stable(Raibert_controller_turn):
+    def __init__(self, robot='A1', num_timestep_per_HL_action=50, target=None, speed_gain=0.15, des_body_ori=None,
+                 control_frequency=100, leg_set_1=[1, 2], leg_set_2=[0, 3], leg_clearance=0.1, action_limit=None):
+        Raibert_controller.__init__(
+            self, robot=robot, num_timestep_per_HL_action=num_timestep_per_HL_action, target=target,
+            speed_gain=speed_gain, des_body_ori=des_body_ori,
+            control_frequency=control_frequency, leg_set_1=leg_set_1, leg_set_2=leg_set_2, leg_clearance=leg_clearance,
+            action_limit=action_limit
+        )
+
+    def update_latent_action(self, state, latent_action):
+        self.switch_swing_stance()
+        self.latent_action = latent_action
+        # self.last_com_ori = np.array(state['base_ori_euler'])
+        self.last_com_ori = np.array([0, 0, 0])  # np.array(state['base_ori_euler'])
+        self.last_com_ori[-1] = 0.0
+        self.final_des_body_ori[2] = self.latent_action[-1]
+
+        target_delta_xy = np.zeros(self.num_legs * 3)
+        mult_factor = 0.5*self.num_timestep_per_HL_action / self.control_frequency
+        # import pdb; pdb.set_trace()
+        for i in range(self.num_legs):
+            rad, theta = self.init_r_yaw[i]
+            if i in self.swing_set:
+                # angle = self.latent_action[-1] + self.init_r_yaw[i][1]
+                target_delta_xy[3 * i] = self.latent_action[0] + rad*self.target_ang_vel*math.sin(theta)*mult_factor
+                target_delta_xy[3 * i + 1] = self.latent_action[1] + rad*self.target_ang_vel*math.cos(theta)*mult_factor
+            else:
+                target_delta_xy[3 * i] = -self.latent_action[0] - rad*self.target_ang_vel*math.sin(theta)*mult_factor
+                target_delta_xy[3 * i + 1] = -self.latent_action[1] - rad*self.target_ang_vel*math.cos(theta)*mult_factor
+
+        self.target_delta_xyz_world = self.kinematics_solver.robot_frame_to_world_robot(self.last_com_ori,
+                                                                                        target_delta_xy)

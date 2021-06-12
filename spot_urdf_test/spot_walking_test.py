@@ -12,7 +12,7 @@ import habitat_sim.utils.viz_utils as vut
 from utilities.quadruped_env import A1, AlienGo, Laikago, Spot
 from utilities.daisy_env import Daisy, Daisy_4legged
 from utilities.raibert_controller import Raibert_controller
-from utilities.raibert_controller import Raibert_controller_turn
+from utilities.raibert_controller import Raibert_controller_turn_stable
 import cv2
 import json
 import time
@@ -29,11 +29,11 @@ class Workspace(object):
         self.observations = []
         self.depth_ortho_imgs = []
         self.text = []
-        self.pos_gain = np.ones((3,)) * 0.15 # 0.2 
-        self.vel_gain = np.ones((3,)) * 1.5 # 1.5
+        self.pos_gain = np.ones((3,)) * 0.1 # 0.2
+        self.vel_gain = np.ones((3,)) * 1.0 # 1.5
         self.pos_gain[2] = 0.1 # 0.7
-        self.vel_gain[2] = 1.5 # 1.5
-        self.num_steps = 5
+        self.vel_gain[2] = 1.0 # 1.5
+        self.num_steps = 15
         self.ctrl_freq = 240
         self.time_per_step = 100
         self.prev_state = None
@@ -225,7 +225,7 @@ class Workspace(object):
         action_limit = np.zeros((12, 2))
         action_limit[:, 0] = np.zeros(12) + np.pi / 2
         action_limit[:, 1] = np.zeros(12) - np.pi / 2
-        self.raibert_controller = Raibert_controller_turn(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
+        self.raibert_controller = Raibert_controller_turn_stable(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
 
     def reset_robot(self, start_pose):
         local_base_pos = start_pose
@@ -382,20 +382,22 @@ class Workspace(object):
     def test_robot(self):
         self.reset_robot(np.array([-2,1.3,-4]))
         # Set desired linear and angular velocities
-        # print("MOVING FORWARD")
-        # self.cmd_vel_xyt(0.35, 0.0, 0.0)
-        # print("MOVING BACKWARDS")
-        # self.cmd_vel_xyt(-0.35, 0.0, 0.0)
-        # print("MOVING RIGHT")
-        # self.cmd_vel_xyt(0.0, -0.35, 0.0)
-        # print("MOVING LEFT")
-        # self.cmd_vel_xyt(0.0, 0.35, 0.0)
-        # print("MOVING FORWARD ARC RIGHT")
-        # self.cmd_vel_xyt(0.35, 0.0, -0.15)
+        print("MOVING FORWARD")
+        self.cmd_vel_xyt(0.35, 0.0, 0.0)
+        print("MOVING BACKWARDS")
+        self.cmd_vel_xyt(-0.35, 0.0, 0.0)
+        print("MOVING RIGHT")
+        self.cmd_vel_xyt(0.0, -0.35, 0.0)
+        print("MOVING LEFT")
+        self.cmd_vel_xyt(0.0, 0.35, 0.0)
+        print("MOVING FORWARD ARC RIGHT")
+        self.cmd_vel_xyt(0.35, 0.0, -0.35)
         print("MOVING FORWARD ARC LEFT")
-        self.cmd_vel_xyt(0.35, 0.0, 0.15)
-        # print('TURNING IN PLACE LEFT')
-        # self.cmd_vel_xyt(0.0, 0.0, 0.15)
+        self.cmd_vel_xyt(0.35, 0.0, 0.35)
+        print('TURNING IN PLACE LEFT')
+        self.cmd_vel_xyt(0.0, 0.0, 0.35)
+        print('TURNING IN PLACE RIGHT')
+        self.cmd_vel_xyt(0.0, 0.0, -0.35)
 
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
         save_name = time_str + 'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + \
