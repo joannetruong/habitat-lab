@@ -187,7 +187,7 @@ void BigEnumSetTest::construct() {
        that case not having it noexcept means the constructor call isn't
        noexcept either */
     /** @todo this should be for all the operators as well, sigh */
-    CORRADE_VERIFY((std::is_nothrow_constructible<Features, Feature>::value));
+    CORRADE_VERIFY(std::is_nothrow_constructible<Features, Feature>::value);
 }
 
 void BigEnumSetTest::constructOutOfRange() {
@@ -218,7 +218,7 @@ void BigEnumSetTest::constructNoInit() {
         }
     } {
         Features features{Feature::Tested};
-        new(&features) Features{NoInit};
+        new(&features) Features{Corrade::NoInit};
         #if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 601 && __OPTIMIZE__
         CORRADE_EXPECT_FAIL("GCC 6.1+ misoptimizes and overwrites the value.");
         #pragma GCC diagnostic push

@@ -415,7 +415,7 @@ auto Context::detectedDriver() -> DetectedDrivers {
 
     _detectedDrivers = DetectedDrivers{};
 
-    #ifndef MAGNUM_TARGET_WEBGL
+    #if !defined(MAGNUM_TARGET_WEBGL) && !defined(CORRADE_TARGET_APPLE)
     const Containers::StringView renderer = rendererString();
     #endif
     #if !defined(CORRADE_TARGET_APPLE) && !defined(MAGNUM_TARGET_WEBGL)
@@ -496,7 +496,7 @@ void Context::disableDriverWorkaround(const Containers::StringView workaround) {
         return;
     }
 
-    arrayAppend(_driverWorkarounds, Containers::InPlaceInit, found, true);
+    arrayAppend(_driverWorkarounds, InPlaceInit, found, true);
 }
 
 bool Context::isDriverWorkaroundDisabled(const Containers::StringView workaround) {
@@ -512,7 +512,7 @@ bool Context::isDriverWorkaroundDisabled(const Containers::StringView workaround
        the views in the KnownWorkarounds list. */
     for(const auto& i: _driverWorkarounds)
         if(i.first.data() == found.data()) return i.second;
-    arrayAppend(_driverWorkarounds, Containers::InPlaceInit, found, false);
+    arrayAppend(_driverWorkarounds, InPlaceInit, found, false);
     return false;
 }
 
@@ -633,7 +633,7 @@ Context::Configuration& Context::Configuration::addDisabledWorkarounds(Container
             continue;
         }
 
-        arrayAppend(_disabledWorkarounds, Containers::InPlaceInit, found);
+        arrayAppend(_disabledWorkarounds, InPlaceInit, found);
     }
 
     return *this;

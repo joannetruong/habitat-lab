@@ -161,9 +161,37 @@ if(NOT CORRADE_TARGET_EMSCRIPTEN)
     target_link_libraries(UtilityMacrosTest PRIVATE Threads::Threads)
 endif()
 
+# Build these only if there's no explicit -std= passed in the flags
+if(NOT CMAKE_CXX_FLAGS MATCHES "-std=")
+    # Copied verbatim from src/Corrade/Test/CMakeLists.txt, please keep in sync
+    if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "7.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.3") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.10"))
+        corrade_add_test(UtilityMacrosCpp17Test MacrosCpp17Test.cpp)
+        set_target_properties(UtilityMacrosCpp17Test PROPERTIES
+            CORRADE_CXX_STANDARD 17
+            FOLDER "Corrade/Utility/Test")
+    endif()
+
+    # Copied verbatim from src/Corrade/Test/CMakeLists.txt, please keep in sync
+    if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "10.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.15"))
+        corrade_add_test(UtilityMacrosCpp20Test MacrosCpp20Test.cpp)
+        set_target_properties(UtilityMacrosCpp20Test PROPERTIES
+            CORRADE_CXX_STANDARD 20
+            FOLDER "Corrade/Utility/Test")
+    endif()
+endif()
+
 # It should return with a non-zero exit code
 corrade_add_test(UtilityFatalTest FatalTest.cpp)
 set_tests_properties(UtilityFatalTest PROPERTIES WILL_FAIL ON)
+
+corrade_add_test(UtilityMemoryTest MemoryTest.cpp)
+target_compile_definitions(UtilityMemoryTest PRIVATE "CORRADE_GRACEFUL_ASSERT")
 
 set(UtilityDirectoryTest_SRCS DirectoryTest.cpp)
 if(CORRADE_TARGET_IOS)
@@ -175,6 +203,10 @@ corrade_add_test(UtilityDirectoryTest ${UtilityDirectoryTest_SRCS}
     FILES
         DirectoryTestFiles/dir/dummy
         DirectoryTestFiles/file
+        DirectoryTestFilesSymlink/dir/dummy
+        DirectoryTestFilesSymlink/dir-symlink
+        DirectoryTestFilesSymlink/file
+        DirectoryTestFilesSymlink/file-symlink
         DirectoryTestFilesUtf8/šňůra/dummy
         DirectoryTestFilesUtf8/hýždě)
 target_include_directories(UtilityDirectoryTest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
@@ -269,6 +301,7 @@ set_target_properties(
     UtilityFormatTest
     UtilityHashDigestTest
     UtilityMacrosTest
+    UtilityMemoryTest
     UtilityResourceTest
     UtilityResourceStaticTest
     UtilitySha1Test

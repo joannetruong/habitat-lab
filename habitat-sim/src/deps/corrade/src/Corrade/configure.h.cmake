@@ -66,13 +66,18 @@
 #elif defined(__powerpc64__) || defined(_M_PPC)
 #define CORRADE_TARGET_POWERPC
 
-/* Otherwise one should expect CORRADE_TARGET_EMSCRIPTEN. No other platforms
-   are currently tested for, but that's okay -- a runtime test for this is in
-   Utility/Test/SystemTest.cpp */
+/* WebAssembly (on Emscripten). Old pure asm.js toolchains did not define this,
+   recent Emscripten does that even with `-s WASM=0`. */
+#elif defined(__wasm__)
+#define CORRADE_TARGET_WASM
+
+/* No other platforms are currently tested for, but that's okay -- a runtime
+   test for this is in Utility/Test/SystemTest.cpp */
 #endif
 
-/* Sanity checks */
-#if defined(CORRADE_TARGET_EMSCRIPTEN) && (defined(CORRADE_TARGET_X86) || defined(CORRADE_TARGET_ARM))
+/* Sanity checks. This might happen when using Emscripten-compiled code with
+   native compilers, at which point we should just die. */
+#if defined(CORRADE_TARGET_EMSCRIPTEN) && (defined(CORRADE_TARGET_X86) || defined(CORRADE_TARGET_ARM) || defined(CORRADE_TARGET_POWERPC))
 #error CORRADE_TARGET_X86 / _ARM / _POWERPC defined on Emscripten
 #endif
 
@@ -171,17 +176,100 @@
 #define CORRADE_BIG_ENDIAN
 #endif
 
-/* SIMD extensions. Not much here yet. */
+/* Compile-time SIMD detection */
+#ifdef CORRADE_TARGET_X86
+
+/* SSE on GCC: https://stackoverflow.com/a/28939692 */
 #ifdef CORRADE_TARGET_GCC
 #ifdef __SSE2__
 #define CORRADE_TARGET_SSE2
 #endif
+#ifdef __SSE3__
+#define CORRADE_TARGET_SSE3
+#endif
+#ifdef __SSSE3__
+#define CORRADE_TARGET_SSSE3
+#endif
+#ifdef __SSE4_1__
+#define CORRADE_TARGET_SSE41
+#endif
+#ifdef __SSE4_2__
+#define CORRADE_TARGET_SSE42
+#endif
 
+/* On MSVC: https://docs.microsoft.com/en-us/cpp/preprocessor/predefined-macros */
 #elif defined(CORRADE_TARGET_MSVC)
 /* _M_IX86_FP is defined only on 32bit, 64bit has SSE2 always (so we need to
    detect 64bit instead: https://stackoverflow.com/a/18570487) */
 #if (defined(_M_IX86_FP) && _M_IX86_FP == 2) || defined(_M_AMD64) || defined(_M_X64)
 #define CORRADE_TARGET_SSE2
+#endif
+/* On MSVC there's no way to detect SSE3 and newer, these are only implied by
+   AVX as far as I can tell */
+#ifdef __AVX__
+#define CORRADE_TARGET_SSE3
+#define CORRADE_TARGET_SSSE3
+#define CORRADE_TARGET_SSE41
+#define CORRADE_TARGET_SSE42
+#endif
+#endif
+
+/* Both GCC and MSVC have the same macros for AVX, AVX2 and AVX512F */
+#if defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_MSVC)
+#ifdef __AVX__
+#define CORRADE_TARGET_AVX
+#endif
+#ifdef __AVX2__
+#define CORRADE_TARGET_AVX2
+#endif
+#ifdef __AVX512F__
+#define CORRADE_TARGET_AVX512F
+#endif
+#endif
+
+/* On GCC, F16C and FMA have its own define, on MSVC it's implied by /arch:AVX2
+   (source: https://docs.microsoft.com/en-us/cpp/build/reference/arch-x86 ...
+   or at least the FMA instructions, no word about F16C). */
+#ifdef CORRADE_TARGET_GCC
+#ifdef __F16C__
+#define CORRADE_TARGET_AVX_F16C
+#endif
+#ifdef __FMA__
+#define CORRADE_TARGET_AVX_FMA
+#endif
+#elif defined(CORRADE_TARGET_MSVC) && defined(__AVX2__)
+#define CORRADE_TARGET_AVX_F16C
+#define CORRADE_TARGET_AVX_FMA
+#endif
+
+/* https://stackoverflow.com/a/37056771, confirmed on Android NDK Clang that
+   __ARM_NEON is indeed still set. For MSVC, according to
+   https://docs.microsoft.com/en-us/cpp/intrinsics/arm-intrinsics I would
+   assume that since they use a standard header, they also expose the standard
+   macro name, even though not listed among their predefined macros? Needs
+   testing, though. */
+#elif defined(CORRADE_TARGET_ARM)
+#ifdef __ARM_NEON
+#define CORRADE_TARGET_NEON
+/* Conservatively mark half-floats as supported only if the IEEE variant is
+   supported and not the ARM-specific variant that trades one extra exponent
+   value for a lack of inf and NaN support (ARM C Language Extensions 1.1,
+   §6.5.2: https://developer.arm.com/documentation/ihi0053/b/) */
+#if __ARM_FP16_FORMAT_IEEE && (__ARM_NEON_FP & 0x02)
+#define CORRADE_TARGET_NEON_FP16
+#endif
+/* NEON FMA is available only if __ARM_FEATURE_FMA is defined and some bits of
+   __ARM_NEON_FP as well (ARM C Language Extensions 1.1, §6.5.5:
+   https://developer.arm.com/documentation/ihi0053/b/) */
+#if defined(__ARM_FEATURE_FMA) && __ARM_NEON_FP
+#define CORRADE_TARGET_NEON_FMA
+#endif
+#endif
+
+/* Undocumented, checked via `echo | em++ -x c++ -dM -E - -msimd128` */
+#elif defined(CORRADE_TARGET_WASM)
+#ifdef __wasm_simd128__
+#define CORRADE_TARGET_SIMD128
 #endif
 #endif
 

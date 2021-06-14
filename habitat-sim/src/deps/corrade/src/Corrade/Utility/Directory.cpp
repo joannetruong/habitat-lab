@@ -251,6 +251,8 @@ bool rm(const std::string& path) {
     #ifdef CORRADE_TARGET_EMSCRIPTEN
     /* std::remove() can't remove directories on Emscripten */
     struct stat st;
+    /* using lstat() and not stat() as we care about the symlink, not the
+       file/dir it points to */
     if(lstat(path.data(), &st) == 0 && S_ISDIR(st.st_mode))
         return rmdir(path.data()) == 0;
     #endif
@@ -355,12 +357,15 @@ Containers::Optional<std::size_t> fileSize(const std::string& filename) {
 
 bool isDirectory(const std::string& path) {
     #if defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT)
+    /** @todo symlink support */
     const DWORD fileAttributes = GetFileAttributesW(widen(path).data());
     return fileAttributes != INVALID_FILE_ATTRIBUTES && (fileAttributes & FILE_ATTRIBUTE_DIRECTORY);
 
     #elif defined(CORRADE_TARGET_UNIX) || defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* using stat() instead of lstat() as that follows symlinks and that's what
+       is desired in most cases */
     struct stat st;
-    return lstat(path.data(), &st) == 0 && S_ISDIR(st.st_mode);
+    return stat(path.data(), &st) == 0 && S_ISDIR(st.st_mode);
     #else
     static_cast<void>(path);
     Warning() << "Utility::Directory::isDirectory(): not implemented on this platform";
@@ -608,12 +613,34 @@ std::vector<std::string> list(const std::string& path, Flags flags) {
         #ifndef CORRADE_TARGET_EMSCRIPTEN
         if((flags >= Flag::SkipFiles) && entry->d_type == DT_REG)
             continue;
-        if((flags >= Flag::SkipSpecial) && entry->d_type != DT_DIR && entry->d_type != DT_REG)
+        if((flags >= Flag::SkipSpecial) && entry->d_type != DT_DIR && entry->d_type != DT_REG && entry->d_type != DT_LNK)
             continue;
         #else
-        if((flags >= Flag::SkipFiles || flags >= Flag::SkipSpecial) && entry->d_type != DT_DIR)
+        /* Emscripten doesn't set DT_REG for files, so we treat everything
+           that's not a DT_DIR as a file. SkipSpecial has no effect here. */
+        if(flags >= Flag::SkipFiles && entry->d_type != DT_DIR)
             continue;
         #endif
+
+        /* For symlinks we have to deref the link and ask there again. If that
+           fails for whatever reason, we leave the file in the list -- it can
+           be thought of as "neither a file nor directory" and we're told to
+           skip files/directories, not "include only files/directories".
+
+           Also do this only if we're told to skip certain entry types, for a
+           plain list this is unnecessary overhead. */
+        if((flags & (Flag::SkipDirectories|Flag::SkipFiles|Flag::SkipSpecial)) && entry->d_type == DT_LNK) {
+            /* stat() follows the symlink, lstat() doesn't */
+            struct stat st;
+            if(stat((join(path, entry->d_name)).data(), &st) == 0) {
+                if(flags >= Flag::SkipDirectories && S_ISDIR(st.st_mode))
+                    continue;
+                if(flags >= Flag::SkipFiles && S_ISREG(st.st_mode))
+                    continue;
+                if(flags >= Flag::SkipSpecial && !S_ISDIR(st.st_mode) && !S_ISREG(st.st_mode))
+                    continue;
+            }
+        }
 
         std::string file{entry->d_name};
         if((flags >= Flag::SkipDotAndDotDot) && (file == "." || file == ".."))
@@ -646,6 +673,7 @@ std::vector<std::string> list(const std::string& path, Flags flags) {
             continue;
         if((flags >= Flag::SkipFiles) && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
             continue;
+        /** @todo symlink support */
         /** @todo are there any special files in WINAPI? */
 
         std::string file{narrow(data.cFileName)};

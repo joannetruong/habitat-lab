@@ -110,9 +110,8 @@ Tester::TesterConfiguration& Tester::TesterConfiguration::setCpuScalingGovernorF
 }
 #endif
 
-struct Tester::IterationPrinter::IterationPrinter::Data {
+struct Tester::Printer::Printer::Data {
     std::ostringstream out;
-    IterationPrinter* parent;
 };
 
 struct Tester::TesterState {
@@ -143,7 +142,6 @@ struct Tester::TesterState {
     bool testCaseLabelPrinted{};
     bool isDebugBuild{};
     ExpectedFailure* expectedFailure{};
-    std::string expectedFailureMessage;
     IterationPrinter* iterationPrinter{};
     TesterConfiguration configuration;
 
@@ -650,15 +648,15 @@ void Tester::printTestCaseLabel(Debug& out, const char* const status, const Debu
     out << Debug::resetColor;
 }
 
-void Tester::printFileLineInfo(Debug& out) {
-    out << "at" << _state->testFilename << Debug::nospace << ":" << Debug::nospace << _state->testCaseLine;
+void Tester::printFileLineInfo(Debug& out, std::size_t line) {
+    out << "at" << _state->testFilename << Debug::nospace << ":" << Debug::nospace << line;
 
     /* If we have checks annotated with an iteration macro, print those. These
        are linked in reverse order so we have to reverse the vector before
        printing. */
     if(_state->iterationPrinter) {
         std::vector<std::string> iterations;
-        for(IterationPrinter* iterationPrinter = _state->iterationPrinter; iterationPrinter; iterationPrinter = iterationPrinter->_data->parent) {
+        for(IterationPrinter* iterationPrinter = _state->iterationPrinter; iterationPrinter; iterationPrinter = iterationPrinter->_parent) {
             iterations.push_back(iterationPrinter->_data->out.str());
         }
         std::reverse(iterations.begin(), iterations.end());
@@ -666,6 +664,10 @@ void Tester::printFileLineInfo(Debug& out) {
     }
 
     out << Debug::newline;
+}
+
+void Tester::printFileLineInfo(Debug& out) {
+    printFileLineInfo(out, _state->testCaseLine);
 }
 
 void Tester::verifyInternal(const char* expression, bool expressionValue) {
@@ -678,7 +680,7 @@ void Tester::verifyInternal(const char* expression, bool expressionValue) {
         Debug out{_state->logOutput, _state->useColor};
         printTestCaseLabel(out, " XFAIL", Debug::Color::Yellow, Debug::Color::Default);
         printFileLineInfo(out);
-        out << "       " << _state->expectedFailureMessage << "Expression"
+        out << "       " << _state->expectedFailure->_data->out.str() << "Expression"
             << expression << "failed.";
         return;
     }
@@ -705,12 +707,13 @@ void Tester::printComparisonMessageInternal(ComparisonStatusFlags flags, const c
         Debug out{_state->logOutput, _state->useColor};
         printTestCaseLabel(out, " XFAIL", Debug::Color::Yellow, Debug::Color::Default);
         printFileLineInfo(out);
-        out << "       " << _state->expectedFailureMessage << actual << "and"
+        out << "       " << _state->expectedFailure->_data->out.str() << actual << "and"
             << expected << "failed the comparison.";
 
     /* Otherwise, in case of an unexpected failure or an unexpected pass, print
        an error message */
     } else if(bool(_state->expectedFailure) != bool(flags & ComparisonStatusFlag::Failed)) {
+        /** @todo deduplicate this with fail()? */
         Error out{_state->errorOutput, _state->useColor};
         printTestCaseLabel(out, _state->expectedFailure ? " XPASS" : "  FAIL", Debug::Color::Red, Debug::Color::Default);
         printFileLineInfo(out);
@@ -723,6 +726,7 @@ void Tester::printComparisonMessageInternal(ComparisonStatusFlags flags, const c
     /** @todo print also in case of XFAIL or XPASS? those currently get just a
         static message and printer is never called */
     } else if(flags & (ComparisonStatusFlag::Warning|ComparisonStatusFlag::Message|ComparisonStatusFlag::Verbose)) {
+        /** @todo deduplicate this with infoOrWarn()? */
         Debug out{_state->logOutput, _state->useColor};
         printTestCaseLabel(out,
             flags & ComparisonStatusFlag::Warning ? "  WARN" : "  INFO",
@@ -764,14 +768,43 @@ void Tester::registerTest(const char* filename, const char* name, bool isDebugBu
     _state->isDebugBuild = isDebugBuild;
 }
 
-void Tester::skip(const char* message) {
-    skip(std::string{message});
+void Tester::infoOrWarn(const Printer& printer, std::size_t line, bool warn) {
+    Debug out{_state->logOutput, _state->useColor};
+    printTestCaseLabel(out,
+        warn ? "  WARN" : "  INFO",
+        warn ? Debug::Color::Yellow : Debug::Color::Default,
+        Debug::Color::Default);
+    printFileLineInfo(out, line);
+    out << "       " << printer._data->out.str();
 }
 
-void Tester::skip(const std::string& message) {
+void Tester::failIf(const Printer& printer, const bool fail) {
+    if(_state->expectedFailure && fail) {
+        Debug out{_state->logOutput, _state->useColor};
+        printTestCaseLabel(out, " XFAIL", Debug::Color::Yellow, Debug::Color::Default);
+        printFileLineInfo(out);
+        /** @todo this is extremely uninformative, implement the verbose output
+            for XFAIL/XPASS at least, or figure out a better way to report
+            this */
+        out << "       " << _state->expectedFailure->_data->out.str() << "Condition failed.";
+        return;
+    }
+
+    if(bool(_state->expectedFailure) != fail) {
+        Error out{_state->errorOutput, _state->useColor};
+        printTestCaseLabel(out, _state->expectedFailure ? " XPASS" : "  FAIL", Debug::Color::Red, Debug::Color::Default);
+        printFileLineInfo(out);
+        out << "       ";
+        if(!_state->expectedFailure) out << printer._data->out.str();
+        else out << "Failure was expected to happen.";
+        throw Exception{};
+    }
+}
+
+void Tester::skip(const Printer& printer) {
     Debug out{_state->logOutput, _state->useColor};
     printTestCaseLabel(out, "  SKIP", Debug::Color::Default, Debug::Color::Default);
-    out << Debug::newline << "       " << message;
+    out << Debug::newline << "       " << printer._data->out.str();
     throw SkipException();
 }
 
@@ -865,17 +898,24 @@ void Tester::setBenchmarkName(const char* name) {
     _state->benchmarkName = name;
 }
 
-void Tester::registerTestCase(const char* name, int line) {
+void Tester::registerTestCase(const char* name) {
     CORRADE_ASSERT(_state->testCase,
         "TestSuite::Tester: using verification macros outside of test cases is not allowed", );
 
     if(_state->testCaseName.empty()) _state->testCaseName = std::move(name);
+}
+
+void Tester::registerTestCase(const char* name, int line) {
+    registerTestCase(name);
     _state->testCaseLine = line;
 }
 
 Tester::BenchmarkRunner Tester::createBenchmarkRunner(const std::size_t batchSize) {
     CORRADE_ASSERT(_state->testCase,
         "TestSuite::Tester: using benchmark macros outside of test cases is not allowed",
+        (BenchmarkRunner{nullptr, nullptr}));
+    CORRADE_ASSERT(_state->testCase->benchmarkBegin && _state->testCase->benchmarkEnd,
+        "TestSuite::Tester: CORRADE_BENCHMARK() can be called only inside a benchmark",
         (BenchmarkRunner{nullptr, nullptr}));
 
     _state->benchmarkBatchSize = batchSize;
@@ -913,25 +953,28 @@ void Tester::addTestCaseInternal(const TestCase& testCase) {
     _state->testCases.push_back(testCase);
 }
 
-Tester::ExpectedFailure::ExpectedFailure(std::string&& message, const bool enabled) {
+Utility::Debug Tester::Printer::debug() {
+    return Debug{&_data->out, Debug::Flag::NoNewlineAtTheEnd};
+}
+
+Tester::Printer::Printer(): _data{InPlaceInit} {}
+
+Tester::Printer::~Printer() = default;
+
+Tester::ExpectedFailure::ExpectedFailure(const bool enabled) {
     Tester& instance = Tester::instance();
     if(!enabled || instance._state->expectedFailuresDisabled) return;
-    instance._state->expectedFailureMessage = message;
     instance._state->expectedFailure = this;
 }
 
-Tester::ExpectedFailure::ExpectedFailure(const std::string& message, const bool enabled): ExpectedFailure{std::string{message}, enabled} {}
-
-Tester::ExpectedFailure::ExpectedFailure(const char* message, const bool enabled): ExpectedFailure{std::string{message}, enabled} {}
-
 Tester::ExpectedFailure::~ExpectedFailure() {
-    instance()._state->expectedFailure = nullptr;
+    Tester::instance()._state->expectedFailure = nullptr;
 }
 
 Tester::IterationPrinter::IterationPrinter() {
     Tester& instance = Tester::instance();
     /* Insert itself into the list of iteration printers */
-    _data.emplace().parent = instance._state->iterationPrinter;
+    _parent = instance._state->iterationPrinter;
     instance._state->iterationPrinter = this;
 }
 
@@ -939,11 +982,7 @@ Tester::IterationPrinter::~IterationPrinter() {
     /* Remove itself from the list of iteration printers (assuming destruction
        of those goes in inverse order) */
     CORRADE_INTERNAL_ASSERT(instance()._state->iterationPrinter == this);
-    instance()._state->iterationPrinter = _data->parent;
-}
-
-Utility::Debug Tester::IterationPrinter::debug() {
-    return Debug{&_data->out, Debug::Flag::NoNewlineAtTheEnd};
+    instance()._state->iterationPrinter = _parent;
 }
 
 Tester::BenchmarkRunner::~BenchmarkRunner() {

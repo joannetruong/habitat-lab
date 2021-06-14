@@ -23,10 +23,10 @@
     DEALINGS IN THE SOFTWARE.
 */
 
-#include <sstream>
+#include <new>
 #include <Corrade/TestSuite/Tester.h>
-#include <Corrade/Utility/DebugStl.h>
 
+#include "Magnum/Math/Matrix4.h"
 #include "Magnum/Shaders/MeshVisualizer.h"
 
 namespace Magnum { namespace Shaders { namespace Test { namespace {
@@ -34,108 +34,284 @@ namespace Magnum { namespace Shaders { namespace Test { namespace {
 struct MeshVisualizerTest: TestSuite::Tester {
     explicit MeshVisualizerTest();
 
-    void constructNoCreate2D();
-    void constructNoCreate3D();
+    template<class T> void uniformSizeAlignment();
 
-    void constructCopy2D();
-    void constructCopy3D();
+    void drawUniform2DConstructDefault();
+    void drawUniform2DConstructNoInit();
+    void drawUniform2DSetters();
+    void drawUniform2DMaterialIdPacking();
 
-    void vertexIndexSameAsObjectId();
+    void drawUniform3DConstructDefault();
+    void drawUniform3DConstructNoInit();
+    void drawUniform3DSetters();
+    void drawUniform3DMaterialIdPacking();
 
-    void debugFlag2D();
-    void debugFlag3D();
-    void debugFlags2D();
-    void debugFlags3D();
+    void materialUniformConstructDefault();
+    void materialUniformConstructNoInit();
+    void materialUniformSetters();
 };
 
 MeshVisualizerTest::MeshVisualizerTest() {
-    addTests({&MeshVisualizerTest::constructNoCreate2D,
-              &MeshVisualizerTest::constructNoCreate3D,
+    addTests({&MeshVisualizerTest::uniformSizeAlignment<MeshVisualizerDrawUniform2D>,
+              &MeshVisualizerTest::uniformSizeAlignment<MeshVisualizerDrawUniform3D>,
+              &MeshVisualizerTest::uniformSizeAlignment<MeshVisualizerMaterialUniform>,
 
-              &MeshVisualizerTest::constructCopy2D,
-              &MeshVisualizerTest::constructCopy3D,
+              &MeshVisualizerTest::drawUniform2DConstructDefault,
+              &MeshVisualizerTest::drawUniform2DConstructNoInit,
+              &MeshVisualizerTest::drawUniform2DSetters,
+              &MeshVisualizerTest::drawUniform2DMaterialIdPacking,
 
-              &MeshVisualizerTest::vertexIndexSameAsObjectId,
+              &MeshVisualizerTest::drawUniform3DConstructDefault,
+              &MeshVisualizerTest::drawUniform3DConstructNoInit,
+              &MeshVisualizerTest::drawUniform3DSetters,
+              &MeshVisualizerTest::drawUniform3DMaterialIdPacking,
 
-              &MeshVisualizerTest::debugFlag2D,
-              &MeshVisualizerTest::debugFlag3D,
-              &MeshVisualizerTest::debugFlags2D,
-              &MeshVisualizerTest::debugFlags3D});
+              &MeshVisualizerTest::materialUniformConstructDefault,
+              &MeshVisualizerTest::materialUniformConstructNoInit,
+              &MeshVisualizerTest::materialUniformSetters});
 }
 
-void MeshVisualizerTest::constructNoCreate2D() {
+using namespace Math::Literals;
+
+template<class> struct UniformTraits;
+template<> struct UniformTraits<MeshVisualizerDrawUniform2D> {
+    static const char* name() { return "MeshVisualizerDrawUniform2D"; }
+};
+template<> struct UniformTraits<MeshVisualizerDrawUniform3D> {
+    static const char* name() { return "MeshVisualizerDrawUniform3D"; }
+};
+template<> struct UniformTraits<MeshVisualizerMaterialUniform> {
+    static const char* name() { return "MeshVisualizerMaterialUniform"; }
+};
+
+template<class T> void MeshVisualizerTest::uniformSizeAlignment() {
+    setTestCaseTemplateName(UniformTraits<T>::name());
+
+    CORRADE_FAIL_IF(sizeof(T) % sizeof(Vector4) != 0, sizeof(T) << "is not a multiple of vec4 for UBO alignment");
+
+    /* 48-byte structures are fine, we'll align them to 768 bytes and not
+       256, but warn about that */
+    CORRADE_FAIL_IF(768 % sizeof(T) != 0, sizeof(T) << "can't fit exactly into 768-byte UBO alignment");
+    if(256 % sizeof(T) != 0)
+        CORRADE_WARN(sizeof(T) << "can't fit exactly into 256-byte UBO alignment, only 768");
+
+    CORRADE_COMPARE(alignof(T), 4);
+}
+
+void MeshVisualizerTest::drawUniform2DConstructDefault() {
+    MeshVisualizerDrawUniform2D a;
+    MeshVisualizerDrawUniform2D b{DefaultInit};
+    CORRADE_COMPARE(a.materialId, 0);
+    CORRADE_COMPARE(b.materialId, 0);
+
+    constexpr MeshVisualizerDrawUniform2D ca;
+    constexpr MeshVisualizerDrawUniform2D cb{DefaultInit};
+    CORRADE_COMPARE(ca.materialId, 0);
+    CORRADE_COMPARE(cb.materialId, 0);
+
+    CORRADE_VERIFY(std::is_nothrow_default_constructible<MeshVisualizerDrawUniform2D>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerDrawUniform2D, DefaultInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<DefaultInitT, MeshVisualizerDrawUniform2D>::value);
+}
+
+void MeshVisualizerTest::drawUniform2DConstructNoInit() {
+    /* Testing only some fields, should be enough */
+    MeshVisualizerDrawUniform2D a;
+    a.materialId = 73;
+
+    new(&a) MeshVisualizerDrawUniform2D{NoInit};
     {
-        MeshVisualizer2D shader{NoCreate};
-        CORRADE_COMPARE(shader.id(), 0);
-        CORRADE_COMPARE(shader.flags(), MeshVisualizer2D::Flags{});
+        #if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 601 && __OPTIMIZE__
+        CORRADE_EXPECT_FAIL("GCC 6.1+ misoptimizes and overwrites the value.");
+        #endif
+        CORRADE_COMPARE(a.materialId, 73);
     }
 
-    CORRADE_VERIFY(true);
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerDrawUniform2D, NoInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<NoInitT, MeshVisualizerDrawUniform2D>::value);
 }
 
-void MeshVisualizerTest::constructNoCreate3D() {
+void MeshVisualizerTest::drawUniform2DSetters() {
+    MeshVisualizerDrawUniform2D a;
+    a.setMaterialId(73);
+    CORRADE_COMPARE(a.materialId, 73);
+}
+
+void MeshVisualizerTest::drawUniform2DMaterialIdPacking() {
+    MeshVisualizerDrawUniform2D a;
+    a.setMaterialId(13765);
+    /* materialId should be right at the beginning, in the low 16 bits on both
+       LE and BE */
+    CORRADE_COMPARE(reinterpret_cast<UnsignedInt*>(&a)[0] & 0xffff, 13765);
+}
+
+void MeshVisualizerTest::drawUniform3DConstructDefault() {
+    MeshVisualizerDrawUniform3D a;
+    MeshVisualizerDrawUniform3D b{DefaultInit};
+    CORRADE_COMPARE(a.normalMatrix, (Matrix3x4{
+        Vector4{1.0f, 0.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 1.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 0.0f, 1.0f, 0.0f}
+    }));
+    CORRADE_COMPARE(b.normalMatrix, (Matrix3x4{
+        Vector4{1.0f, 0.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 1.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 0.0f, 1.0f, 0.0f}
+    }));
+    CORRADE_COMPARE(a.materialId, 0);
+    CORRADE_COMPARE(b.materialId, 0);
+
+    constexpr MeshVisualizerDrawUniform3D ca;
+    constexpr MeshVisualizerDrawUniform3D cb{DefaultInit};
+    CORRADE_COMPARE(ca.normalMatrix, (Matrix3x4{
+        Vector4{1.0f, 0.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 1.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 0.0f, 1.0f, 0.0f}
+    }));
+    CORRADE_COMPARE(cb.normalMatrix, (Matrix3x4{
+        Vector4{1.0f, 0.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 1.0f, 0.0f, 0.0f},
+        Vector4{0.0f, 0.0f, 1.0f, 0.0f}
+    }));
+    CORRADE_COMPARE(ca.materialId, 0);
+    CORRADE_COMPARE(cb.materialId, 0);
+
+    CORRADE_VERIFY(std::is_nothrow_default_constructible<MeshVisualizerDrawUniform3D>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerDrawUniform3D, DefaultInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<DefaultInitT, MeshVisualizerDrawUniform2D>::value);
+}
+
+void MeshVisualizerTest::drawUniform3DConstructNoInit() {
+    /* Testing only some fields, should be enough */
+    MeshVisualizerDrawUniform3D a;
+    a.normalMatrix[2] = {1.5f, 0.3f, 3.1f, 0.5f};
+    a.materialId = 5;
+
+    new(&a) MeshVisualizerDrawUniform3D{NoInit};
     {
-        MeshVisualizer3D shader{NoCreate};
-        CORRADE_COMPARE(shader.id(), 0);
-        CORRADE_COMPARE(shader.flags(), MeshVisualizer3D::Flags{});
+        #if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 601 && __OPTIMIZE__
+        CORRADE_EXPECT_FAIL("GCC 6.1+ misoptimizes and overwrites the value.");
+        #endif
+        CORRADE_COMPARE(a.normalMatrix[2], (Vector4{1.5f, 0.3f, 3.1f, 0.5f}));
+        CORRADE_COMPARE(a.materialId, 5);
     }
 
-    CORRADE_VERIFY(true);
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerDrawUniform3D, NoInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<NoInitT, MeshVisualizerDrawUniform3D>::value);
 }
 
-void MeshVisualizerTest::constructCopy2D() {
-    CORRADE_VERIFY(!std::is_copy_constructible<MeshVisualizer2D>{});
-    CORRADE_VERIFY(!std::is_copy_assignable<MeshVisualizer2D>{});
+void MeshVisualizerTest::drawUniform3DSetters() {
+    MeshVisualizerDrawUniform3D a;
+    a.setNormalMatrix(Matrix4::rotationX(90.0_degf).normalMatrix())
+     .setMaterialId(5);
+    CORRADE_COMPARE(a.normalMatrix, (Matrix3x4{
+        Vector4{1.0f,  0.0f, 0.0f, 0.0f},
+        Vector4{0.0f,  0.0f, 1.0f, 0.0f},
+        Vector4{0.0f, -1.0f, 0.0f, 0.0f}
+    }));
+    CORRADE_COMPARE(a.materialId, 5);
 }
 
-void MeshVisualizerTest::constructCopy3D() {
-    CORRADE_VERIFY(!std::is_copy_constructible<MeshVisualizer3D>{});
-    CORRADE_VERIFY(!std::is_copy_assignable<MeshVisualizer3D>{});
+void MeshVisualizerTest::drawUniform3DMaterialIdPacking() {
+    MeshVisualizerDrawUniform3D a;
+    a.setMaterialId(13765);
+    /* The normalMatrix field is 3x4 floats, materialId should be right after
+       in the low 16 bits on both LE and BE */
+    CORRADE_COMPARE(reinterpret_cast<UnsignedInt*>(&a)[12] & 0xffff, 13765);
 }
 
-void MeshVisualizerTest::vertexIndexSameAsObjectId() {
-    #ifdef MAGNUM_TARGET_GLES2
-    CORRADE_SKIP("Object ID is not available on ES2.");
-    #else
-    CORRADE_COMPARE(MeshVisualizer2D::VertexIndex::Location, Generic2D::ObjectId::Location);
-    CORRADE_COMPARE(MeshVisualizer3D::VertexIndex::Location, Generic3D::ObjectId::Location);
-    #endif
+void MeshVisualizerTest::materialUniformConstructDefault() {
+    MeshVisualizerMaterialUniform a;
+    MeshVisualizerMaterialUniform b{DefaultInit};
+    CORRADE_COMPARE(a.color, 0xffffffff_rgbaf);
+    CORRADE_COMPARE(b.color, 0xffffffff_rgbaf);
+    CORRADE_COMPARE(a.wireframeColor, 0x000000ff_rgbaf);
+    CORRADE_COMPARE(b.wireframeColor, 0x000000ff_rgbaf);
+    CORRADE_COMPARE(a.wireframeWidth, 1.0f);
+    CORRADE_COMPARE(b.wireframeWidth, 1.0f);
+    CORRADE_COMPARE(a.colorMapOffset, 1.0f/512.0f);
+    CORRADE_COMPARE(b.colorMapOffset, 1.0f/512.0f);
+    CORRADE_COMPARE(a.colorMapScale, 1.0f/256.0f);
+    CORRADE_COMPARE(b.colorMapScale, 1.0f/256.0f);
+    CORRADE_COMPARE(a.lineWidth, 1.0f);
+    CORRADE_COMPARE(b.lineWidth, 1.0f);
+    CORRADE_COMPARE(a.lineLength, 1.0f);
+    CORRADE_COMPARE(b.lineLength, 1.0f);
+    CORRADE_COMPARE(a.smoothness, 2.0f);
+    CORRADE_COMPARE(b.smoothness, 2.0f);
+
+    constexpr MeshVisualizerMaterialUniform ca;
+    constexpr MeshVisualizerMaterialUniform cb{DefaultInit};
+    CORRADE_COMPARE(ca.color, 0xffffffff_rgbaf);
+    CORRADE_COMPARE(cb.color, 0xffffffff_rgbaf);
+    CORRADE_COMPARE(ca.wireframeColor, 0x000000ff_rgbaf);
+    CORRADE_COMPARE(cb.wireframeColor, 0x000000ff_rgbaf);
+    CORRADE_COMPARE(ca.wireframeWidth, 1.0f);
+    CORRADE_COMPARE(cb.wireframeWidth, 1.0f);
+    CORRADE_COMPARE(ca.colorMapOffset, 1.0f/512.0f);
+    CORRADE_COMPARE(cb.colorMapOffset, 1.0f/512.0f);
+    CORRADE_COMPARE(ca.colorMapScale, 1.0f/256.0f);
+    CORRADE_COMPARE(cb.colorMapScale, 1.0f/256.0f);
+    CORRADE_COMPARE(ca.lineWidth, 1.0f);
+    CORRADE_COMPARE(cb.lineWidth, 1.0f);
+    CORRADE_COMPARE(ca.lineLength, 1.0f);
+    CORRADE_COMPARE(cb.lineLength, 1.0f);
+    CORRADE_COMPARE(ca.smoothness, 2.0f);
+    CORRADE_COMPARE(cb.smoothness, 2.0f);
+
+    CORRADE_VERIFY(std::is_nothrow_default_constructible<MeshVisualizerMaterialUniform>::value);
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerMaterialUniform, DefaultInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<DefaultInitT, MeshVisualizerMaterialUniform>::value);
 }
 
-void MeshVisualizerTest::debugFlag2D() {
-    std::ostringstream out;
+void MeshVisualizerTest::materialUniformConstructNoInit() {
+    /* Testing only some fields, should be enough */
+    MeshVisualizerMaterialUniform a;
+    a.color = 0x354565fc_rgbaf;
+    a.lineWidth = 0.765f;
 
-    Debug{&out} << MeshVisualizer2D::Flag::Wireframe << MeshVisualizer2D::Flag(0xf0);
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer2D::Flag::Wireframe Shaders::MeshVisualizer2D::Flag(0xf0)\n");
+    new(&a) MeshVisualizerMaterialUniform{NoInit};
+    {
+        #if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 601 && __OPTIMIZE__
+        CORRADE_EXPECT_FAIL("GCC 6.1+ misoptimizes and overwrites the value.");
+        #endif
+        CORRADE_COMPARE(a.color, 0x354565fc_rgbaf);
+        CORRADE_COMPARE(a.lineWidth, 0.765f);
+    }
+
+    CORRADE_VERIFY(std::is_nothrow_constructible<MeshVisualizerMaterialUniform, NoInitT>::value);
+
+    /* Implicit construction is not allowed */
+    CORRADE_VERIFY(!std::is_convertible<NoInitT, MeshVisualizerMaterialUniform>::value);
 }
 
-void MeshVisualizerTest::debugFlag3D() {
-    std::ostringstream out;
-
-    Debug{&out} << MeshVisualizer3D::Flag::Wireframe << MeshVisualizer3D::Flag(0xf0);
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer3D::Flag::Wireframe Shaders::MeshVisualizer3D::Flag(0xf0)\n");
-}
-
-void MeshVisualizerTest::debugFlags2D() {
-    std::ostringstream out;
-
-    Debug{&out} << (MeshVisualizer2D::Flag::Wireframe|MeshVisualizer2D::Flag::NoGeometryShader) << MeshVisualizer2D::Flags{};
-    #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer2D::Flag::Wireframe|Shaders::MeshVisualizer2D::Flag::NoGeometryShader Shaders::MeshVisualizer2D::Flags{}\n");
-    #else
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer2D::Flag::Wireframe Shaders::MeshVisualizer2D::Flags{}\n");
-    #endif
-}
-
-void MeshVisualizerTest::debugFlags3D() {
-    std::ostringstream out;
-
-    Debug{&out} << (MeshVisualizer3D::Flag::Wireframe|MeshVisualizer3D::Flag::NoGeometryShader) << MeshVisualizer3D::Flags{};
-    #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer3D::Flag::Wireframe|Shaders::MeshVisualizer3D::Flag::NoGeometryShader Shaders::MeshVisualizer3D::Flags{}\n");
-    #else
-    CORRADE_COMPARE(out.str(), "Shaders::MeshVisualizer3D::Flag::Wireframe Shaders::MeshVisualizer3D::Flags{}\n");
-    #endif
+void MeshVisualizerTest::materialUniformSetters() {
+    MeshVisualizerMaterialUniform a;
+    a.setColor(0x354565fc_rgbaf)
+     .setWireframeColor(0x9876fadc_rgbaf)
+     .setWireframeWidth(3.5f)
+     .setColorMapTransformation(35.5f, 0.5f)
+     .setLineWidth(3.0f)
+     .setLineLength(4.0f)
+     .setSmoothness(5.0f);
+    CORRADE_COMPARE(a.color, 0x354565fc_rgbaf);
+    CORRADE_COMPARE(a.wireframeColor, 0x9876fadc_rgbaf);
+    CORRADE_COMPARE(a.wireframeWidth, 3.5f);
+    CORRADE_COMPARE(a.colorMapOffset, 35.5f);
+    CORRADE_COMPARE(a.colorMapScale, 0.5f);
+    CORRADE_COMPARE(a.lineWidth, 3.0f);
+    CORRADE_COMPARE(a.lineLength, 4.0f);
+    CORRADE_COMPARE(a.smoothness, 5.0f);
 }
 
 }}}}

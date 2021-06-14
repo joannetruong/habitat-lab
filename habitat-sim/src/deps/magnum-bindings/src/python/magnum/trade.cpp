@@ -32,6 +32,7 @@
 #include <Magnum/Trade/MeshData.h>
 
 #include "Corrade/Containers/PythonBindings.h"
+#include "Corrade/Containers/StridedArrayViewPythonBindings.h"
 #include "Magnum/PythonBindings.h"
 
 #include "corrade/pluginmanager.h"
@@ -132,7 +133,7 @@ template<UnsignedInt dimensions> void imageData(py::class_<Trade::ImageData<dime
                 throw py::error_already_set{};
             }
 
-            return Containers::pyArrayViewHolder(self.pixels(), py::cast(self));
+            return Containers::pyArrayViewHolder(Containers::PyStridedArrayView<dimensions + 1, const char>{self.pixels()}, py::cast(self));
         }, "View on pixel data");
 }
 

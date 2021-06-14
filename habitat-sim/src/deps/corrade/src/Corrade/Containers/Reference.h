@@ -47,13 +47,18 @@ namespace Implementation {
 @brief Lightweight non-owning reference wrapper
 
 Equivalent to @ref std::reference_wrapper from C++11, provides a copyable
-non-owning wrapper over references to allow storing them in containers. Unlike
-@ref std::reference_wrapper, this class does not provide @cpp operator() @ce
-and there are no equivalents to @ref std::ref() / @ref std::cref() as they are
-not deemed necessary --- in most contexts where @ref Reference is used, passing
-a plain reference works just as well. This class is trivially copyable
-(@ref std::reference_wrapper is guaranteed to be so only since C++17) and also
-works on incomplete types, which @ref std::reference_wrapper knows since C++20.
+non-owning wrapper over l-value references to allow storing them in containers.
+Unlike @ref std::reference_wrapper, this class does not provide
+@cpp operator() @ce and there are no equivalents to @ref std::ref() /
+@ref std::cref() as they are not deemed necessary --- in most contexts where
+@ref Reference is used, passing a plain reference works just as well. This
+class is trivially copyable (@ref std::reference_wrapper is guaranteed to be so
+only since C++17) and also works on incomplete types, which
+@ref std::reference_wrapper knows since C++20.
+
+This class is exclusively for l-value references. If you want to accept r-value
+references instead, use a @ref MoveReference; if you want to accept both, use
+an @ref AnyReference.
 
 @section Containers-Reference-stl STL compatibility
 
@@ -96,6 +101,7 @@ template<class T> class Reference {
         /**
          * @brief Construction from r-value references is not allowed
          *
+         * A @ref MoveReference can be created from r-value references instead.
          * @todo Fix LWG 2993 / LWG 3041 (details in the skipped test)
          */
         Reference(T&&) = delete;
@@ -105,7 +111,7 @@ template<class T> class Reference {
          *
          * Expects that @p T is a base of @p U.
          */
-        template<class U, class = typename std::enable_if<std::is_base_of<T, U>::value>::type> constexpr /*implicit*/ Reference(Reference<U> other) noexcept: _reference{&*other} {}
+        template<class U, class = typename std::enable_if<std::is_base_of<T, U>::value>::type> constexpr /*implicit*/ Reference(Reference<U> other) noexcept: _reference{other._reference} {}
 
         /**
          * @brief Convert the reference to external representation
@@ -118,7 +124,8 @@ template<class T> class Reference {
 
         /** @brief Underlying reference */
         constexpr /*implicit*/ operator T&() const { return *_reference; }
-        constexpr /*implicit*/ operator Reference<const T>() const { return *_reference; } /**< @overload */
+        /** @overload */
+        constexpr /*implicit*/ operator Reference<const T>() const { return *_reference; }
 
         /** @brief Underlying reference */
         constexpr T& get() const { return *_reference; }
@@ -128,26 +135,25 @@ template<class T> class Reference {
          *
          * @ref get(), @ref operator*()
          */
-        constexpr T* operator->() const {
-            return _reference;
-        }
+        constexpr T* operator->() const { return _reference; }
 
         /**
          * @brief Access the underlying reference
          *
          * @see @ref get(), @ref operator->()
          */
-        constexpr T& operator*() const {
-            return *_reference;
-        }
+        constexpr T& operator*() const { return *_reference; }
 
     private:
+        /* For the conversion constructor */
+        template<class U> friend class Reference;
+
         T* _reference;
 };
 
 #ifndef CORRADE_NO_DEBUG
 /** @debugoperator{Reference} */
-template<class T> Utility::Debug& operator<<(Utility::Debug& debug, const Reference<T>& value) {
+template<class T> Utility::Debug& operator<<(Utility::Debug& debug, Reference<T> value) {
     return debug << value.get();
 }
 #endif

@@ -196,7 +196,7 @@ void ArrayTest::constructNullptr() {
     CORRADE_COMPARE(c.size(), 0);
 
     /* Implicit construction from nullptr should be allowed */
-    CORRADE_VERIFY((std::is_convertible<std::nullptr_t, Array>::value));
+    CORRADE_VERIFY(std::is_convertible<std::nullptr_t, Array>::value);
 }
 
 void ArrayTest::construct() {
@@ -212,7 +212,7 @@ void ArrayTest::construct() {
     CORRADE_COMPARE(a[4], 0);
 
     /* Implicit construction from std::size_t is not allowed */
-    CORRADE_VERIFY(!(std::is_convertible<std::size_t, Array>::value));
+    CORRADE_VERIFY(!std::is_convertible<std::size_t, Array>::value);
 }
 
 void ArrayTest::constructFromExisting() {
@@ -223,7 +223,7 @@ void ArrayTest::constructFromExisting() {
 }
 
 void ArrayTest::constructDefaultInit() {
-    const Array a{DefaultInit, 5};
+    const Array a{Corrade::DefaultInit, 5};
     CORRADE_VERIFY(a);
     CORRADE_COMPARE(a.size(), 5);
 
@@ -231,7 +231,7 @@ void ArrayTest::constructDefaultInit() {
 }
 
 void ArrayTest::constructValueInit() {
-    const Array a{ValueInit, 5};
+    const Array a{Corrade::ValueInit, 5};
     CORRADE_VERIFY(a);
     CORRADE_COMPARE(a.size(), 5);
 
@@ -244,7 +244,7 @@ void ArrayTest::constructValueInit() {
 }
 
 void ArrayTest::constructNoInitTrivial() {
-    const Array a{NoInit, 5};
+    const Array a{Corrade::NoInit, 5};
     CORRADE_VERIFY(a);
     CORRADE_COMPARE(a.size(), 5);
     CORRADE_VERIFY(!a.deleter());
@@ -258,18 +258,18 @@ struct Foo {
 int Foo::constructorCallCount = 0;
 
 void ArrayTest::constructNoInitNonTrivial() {
-    const Containers::Array<Foo> a{NoInit, 5};
+    const Containers::Array<Foo> a{Corrade::NoInit, 5};
     CORRADE_VERIFY(a);
     CORRADE_COMPARE(a.size(), 5);
     CORRADE_VERIFY(a.deleter());
     CORRADE_COMPARE(Foo::constructorCallCount, 0);
 
-    const Containers::Array<Foo> b{DefaultInit, 7};
+    const Containers::Array<Foo> b{Corrade::DefaultInit, 7};
     CORRADE_COMPARE(Foo::constructorCallCount, 7);
 }
 
 void ArrayTest::constructDirectInit() {
-    const Array a{DirectInit, 2, -37};
+    const Array a{Corrade::DirectInit, 2, -37};
     CORRADE_VERIFY(a);
     CORRADE_COMPARE(a.size(), 2);
     CORRADE_COMPARE(a[0], -37);
@@ -277,7 +277,7 @@ void ArrayTest::constructDirectInit() {
 }
 
 void ArrayTest::constructInPlaceInit() {
-    Array a1{InPlaceInit, {1, 3, 127, -48}};
+    Array a1{Corrade::InPlaceInit, {1, 3, 127, -48}};
     CORRADE_VERIFY(a1);
     CORRADE_COMPARE(a1.size(), 4);
     CORRADE_COMPARE(a1[0], 1);
@@ -293,7 +293,7 @@ void ArrayTest::constructInPlaceInit() {
     CORRADE_COMPARE(a2[2], 127);
     CORRADE_COMPARE(a2[3], -48);
 
-    Array b1{InPlaceInit, {}};
+    Array b1{Corrade::InPlaceInit, {}};
     CORRADE_VERIFY(!b1);
 
     Array b2 = array<int>({});
@@ -348,7 +348,7 @@ void ArrayTest::constructDirectReferences() {
         Reference(NonCopyable&) {}
     };
 
-    const Containers::Array<Reference> b{Containers::DirectInit, 5, a};
+    const Containers::Array<Reference> b{Corrade::DirectInit, 5, a};
     CORRADE_COMPARE(b.size(), 5);
 }
 
@@ -357,8 +357,8 @@ void ArrayTest::convertBool() {
     CORRADE_VERIFY(!Array());
 
     /* Explicit conversion to bool is allowed, but not to int */
-    CORRADE_VERIFY((std::is_constructible<bool, Array>::value));
-    CORRADE_VERIFY(!(std::is_constructible<int, Array>::value));
+    CORRADE_VERIFY(std::is_constructible<bool, Array>::value);
+    CORRADE_VERIFY(!std::is_constructible<int, Array>::value);
 }
 
 void ArrayTest::convertPointer() {
@@ -376,10 +376,10 @@ void ArrayTest::convertPointer() {
     CORRADE_COMPARE(f, &e[2]);
 
     /* Verify that we can't convert rvalues */
-    CORRADE_VERIFY((std::is_convertible<Array&, int*>::value));
-    CORRADE_VERIFY((std::is_convertible<const Array&, const int*>::value));
-    CORRADE_VERIFY(!(std::is_convertible<Array, int*>::value));
-    CORRADE_VERIFY(!(std::is_convertible<Array&&, int*>::value));
+    CORRADE_VERIFY(std::is_convertible<Array&, int*>::value);
+    CORRADE_VERIFY(std::is_convertible<const Array&, const int*>::value);
+    CORRADE_VERIFY(!std::is_convertible<Array, int*>::value);
+    CORRADE_VERIFY(!std::is_convertible<Array&&, int*>::value);
 
     /* Deleting const&& overload and leaving only const& one will not, in fact,
        disable conversion of const Array&& to pointer, but rather make the
@@ -387,8 +387,8 @@ void ArrayTest::convertPointer() {
        rvalueArrayAccess() test. */
     {
         CORRADE_EXPECT_FAIL("I don't know how to properly disable conversion of const Array&& to pointer.");
-        CORRADE_VERIFY(!(std::is_convertible<const Array, const int*>::value));
-        CORRADE_VERIFY(!(std::is_convertible<const Array&&, const int*>::value));
+        CORRADE_VERIFY(!std::is_convertible<const Array, const int*>::value);
+        CORRADE_VERIFY(!std::is_convertible<const Array&&, const int*>::value);
     }
 }
 
@@ -420,10 +420,10 @@ void ArrayTest::convertView() {
         const auto cb = arrayView(ca);
         const auto bc = arrayView(ac);
         const auto cbc = arrayView(cac);
-        CORRADE_VERIFY((std::is_same<decltype(b), const ArrayView>::value));
-        CORRADE_VERIFY((std::is_same<decltype(cb), const ConstArrayView>::value));
-        CORRADE_VERIFY((std::is_same<decltype(bc), const ConstArrayView>::value));
-        CORRADE_VERIFY((std::is_same<decltype(cbc), const ConstArrayView>::value));
+        CORRADE_VERIFY(std::is_same<decltype(b), const ArrayView>::value);
+        CORRADE_VERIFY(std::is_same<decltype(cb), const ConstArrayView>::value);
+        CORRADE_VERIFY(std::is_same<decltype(bc), const ConstArrayView>::value);
+        CORRADE_VERIFY(std::is_same<decltype(cbc), const ConstArrayView>::value);
         CORRADE_VERIFY(b.begin() == a.begin());
         CORRADE_VERIFY(bc.begin() == ac.begin());
         CORRADE_VERIFY(cb.begin() == ca.begin());
@@ -434,7 +434,7 @@ void ArrayTest::convertView() {
         CORRADE_COMPARE(cbc.size(), 5);
 
         auto c = arrayView(Array{3});
-        CORRADE_VERIFY((std::is_same<decltype(c), ArrayView>::value));
+        CORRADE_VERIFY(std::is_same<decltype(c), ArrayView>::value);
         CORRADE_COMPARE(c.size(), 3);
         /* The rest is a dangling pointer, can't test */
     }
@@ -488,7 +488,7 @@ void ArrayTest::convertConstVoid() {
 }
 
 void ArrayTest::convertToExternalView() {
-    Array a{InPlaceInit, {1, 2, 3, 4, 5}};
+    Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     IntView b = a;
     CORRADE_COMPARE(b.data, a);
@@ -499,22 +499,22 @@ void ArrayTest::convertToExternalView() {
     CORRADE_COMPARE(cb.size, a.size());
 
     /* Conversion to a different type is not allowed */
-    CORRADE_VERIFY((std::is_convertible<Containers::Array<int>, IntView>::value));
-    CORRADE_VERIFY((std::is_convertible<Containers::Array<int>, ConstIntView>::value));
-    CORRADE_VERIFY(!(std::is_convertible<Containers::Array<float>, IntView>::value));
-    CORRADE_VERIFY(!(std::is_convertible<Containers::Array<float>, ConstIntView>::value));
+    CORRADE_VERIFY(std::is_convertible<Containers::Array<int>, IntView>::value);
+    CORRADE_VERIFY(std::is_convertible<Containers::Array<int>, ConstIntView>::value);
+    CORRADE_VERIFY(!std::is_convertible<Containers::Array<float>, IntView>::value);
+    CORRADE_VERIFY(!std::is_convertible<Containers::Array<float>, ConstIntView>::value);
 }
 
 void ArrayTest::convertToConstExternalView() {
-    const Array a{InPlaceInit, {1, 2, 3, 4, 5}};
+    const Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     ConstIntView b = a;
     CORRADE_COMPARE(b.data, a);
     CORRADE_COMPARE(b.size, a.size());
 
     /* Conversion to a different type is not allowed */
-    CORRADE_VERIFY((std::is_convertible<const Containers::Array<int>, ConstIntView>::value));
-    CORRADE_VERIFY(!(std::is_convertible<const Containers::Array<float>, ConstIntView>::value));
+    CORRADE_VERIFY(std::is_convertible<const Containers::Array<int>, ConstIntView>::value);
+    CORRADE_VERIFY(!std::is_convertible<const Containers::Array<float>, ConstIntView>::value);
 }
 
 void ArrayTest::emptyCheck() {
@@ -541,7 +541,7 @@ void ArrayTest::access() {
     CORRADE_COMPARE(a.cbegin(), a.begin());
     CORRADE_COMPARE(a.cend(), a.end());
 
-    const Array b{InPlaceInit, {7, 3, 5, 4}};
+    const Array b{Corrade::InPlaceInit, {7, 3, 5, 4}};
     CORRADE_COMPARE(b.data(), static_cast<const int*>(b));
     CORRADE_COMPARE(b[2], 5);
 }
@@ -579,7 +579,7 @@ void ArrayTest::accessInvalid() {
 }
 
 void ArrayTest::rvalueArrayAccess() {
-    CORRADE_COMPARE((Array{InPlaceInit, {1, 2, 3, 4}}[2]), 3);
+    CORRADE_COMPARE((Array{Corrade::InPlaceInit, {1, 2, 3, 4}}[2]), 3);
 }
 
 void ArrayTest::rangeBasedFor() {
@@ -600,8 +600,8 @@ void ArrayTest::rangeBasedFor() {
 }
 
 void ArrayTest::slice() {
-    Array a{InPlaceInit, {1, 2, 3, 4, 5}};
-    const Array ac{InPlaceInit, {1, 2, 3, 4, 5}};
+    Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
+    const Array ac{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     ArrayView b = a.slice(1, 4);
     CORRADE_COMPARE(b.size(), 3);
@@ -653,8 +653,8 @@ void ArrayTest::slice() {
 }
 
 void ArrayTest::slicePointer() {
-    Array a{InPlaceInit, {1, 2, 3, 4, 5}};
-    const Array ac{InPlaceInit, {1, 2, 3, 4, 5}};
+    Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
+    const Array ac{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     ArrayView b = a.slice(a + 1, a + 4);
     CORRADE_COMPARE(b.size(), 3);
@@ -694,8 +694,8 @@ void ArrayTest::slicePointer() {
 }
 
 void ArrayTest::sliceToStatic() {
-    Array a{InPlaceInit, {1, 2, 3, 4, 5}};
-    const Array ac{InPlaceInit, {1, 2, 3, 4, 5}};
+    Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
+    const Array ac{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     StaticArrayView<3, int> b1 = a.slice<3>(1);
     CORRADE_COMPARE(b1[0], 2);
@@ -731,8 +731,8 @@ void ArrayTest::sliceToStatic() {
 }
 
 void ArrayTest::sliceToStaticPointer() {
-    Array a{InPlaceInit, {1, 2, 3, 4, 5}};
-    const Array ac{InPlaceInit, {1, 2, 3, 4, 5}};
+    Array a{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
+    const Array ac{Corrade::InPlaceInit, {1, 2, 3, 4, 5}};
 
     StaticArrayView<3, int> b = a.slice<3>(a + 1);
     CORRADE_COMPARE(b[0], 2);
@@ -829,15 +829,15 @@ void ArrayTest::cast() {
     auto cd = Containers::arrayCast<const std::uint16_t>(ca);
     auto cdc = Containers::arrayCast<const std::uint16_t>(cac);
 
-    CORRADE_VERIFY((std::is_same<decltype(b), Containers::ArrayView<std::uint64_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(bc), Containers::ArrayView<const std::uint64_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(cb), Containers::ArrayView<const std::uint64_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(cbc), Containers::ArrayView<const std::uint64_t>>::value));
+    CORRADE_VERIFY(std::is_same<decltype(b), Containers::ArrayView<std::uint64_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(bc), Containers::ArrayView<const std::uint64_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(cb), Containers::ArrayView<const std::uint64_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(cbc), Containers::ArrayView<const std::uint64_t>>::value);
 
-    CORRADE_VERIFY((std::is_same<decltype(d), Containers::ArrayView<std::uint16_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(cd), Containers::ArrayView<const std::uint16_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(dc), Containers::ArrayView<const std::uint16_t>>::value));
-    CORRADE_VERIFY((std::is_same<decltype(cdc), Containers::ArrayView<const std::uint16_t>>::value));
+    CORRADE_VERIFY(std::is_same<decltype(d), Containers::ArrayView<std::uint16_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(cd), Containers::ArrayView<const std::uint16_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(dc), Containers::ArrayView<const std::uint16_t>>::value);
+    CORRADE_VERIFY(std::is_same<decltype(cdc), Containers::ArrayView<const std::uint16_t>>::value);
 
     CORRADE_COMPARE(static_cast<void*>(b.begin()), static_cast<void*>(a.begin()));
     CORRADE_COMPARE(static_cast<const void*>(cb.begin()), static_cast<const void*>(ca.begin()));
@@ -886,7 +886,7 @@ void ArrayTest::emplaceConstructorExplicitInCopyInitialization() {
     static_cast<void>(a);
 
     /* So this should too */
-    Containers::Array<ContainingExplicitDefaultWithImplicitConstructor> b{DirectInit, 5};
+    Containers::Array<ContainingExplicitDefaultWithImplicitConstructor> b{Corrade::DirectInit, 5};
     CORRADE_COMPARE(b.size(), 5);
 }
 
@@ -899,11 +899,11 @@ void ArrayTest::copyConstructPlainStruct() {
     /* This needs special handling on GCC 4.8, where T{b} (copy-construction)
        attempts to convert ExtremelyTrivial to int to initialize the first
        argument and fails miserably. */
-    Containers::Array<ExtremelyTrivial> a{DirectInit, 2, 3, 'a'};
+    Containers::Array<ExtremelyTrivial> a{Corrade::DirectInit, 2, 3, 'a'};
     CORRADE_COMPARE(a.size(), 2);
 
     /* This copy-constructs the new values */
-    Containers::Array<ExtremelyTrivial> b{InPlaceInit, {
+    Containers::Array<ExtremelyTrivial> b{Corrade::InPlaceInit, {
         {4, 'b'},
         {5, 'c'},
         {6, 'd'}
@@ -921,7 +921,7 @@ void ArrayTest::moveConstructPlainStruct() {
     /* This needs special handling on GCC 4.8, where T{std::move(b)} attempts
        to convert MoveOnlyStruct to int to initialize the first argument and
        fails miserably. */
-    Containers::Array<MoveOnlyStruct> a{DirectInit, 2, 3, 'a', nullptr};
+    Containers::Array<MoveOnlyStruct> a{Corrade::DirectInit, 2, 3, 'a', nullptr};
     CORRADE_COMPARE(a.size(), 2);
 
     /* Unlike with copyConstructPlainStruct(), the InPlaceInit doesn't use

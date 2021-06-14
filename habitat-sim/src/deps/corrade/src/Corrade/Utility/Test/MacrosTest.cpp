@@ -43,12 +43,12 @@ struct MacrosTest: TestSuite::Tester {
 
     void defer();
 
-    void alignAs();
     void deprecated();
-    void noreturn();
+    void unused();
     void fallthrough();
     void cxxStandard();
     void alwaysNeverInline();
+    void likelyUnlikely();
     void function();
     void lineString();
 
@@ -60,12 +60,12 @@ struct MacrosTest: TestSuite::Tester {
 MacrosTest::MacrosTest() {
     addTests({&MacrosTest::defer,
 
-              &MacrosTest::alignAs,
               &MacrosTest::deprecated,
-              &MacrosTest::noreturn,
+              &MacrosTest::unused,
               &MacrosTest::fallthrough,
               &MacrosTest::cxxStandard,
               &MacrosTest::alwaysNeverInline,
+              &MacrosTest::likelyUnlikely,
               &MacrosTest::function,
               &MacrosTest::lineString,
 
@@ -87,11 +87,6 @@ void MacrosTest::defer() {
     #else
     CORRADE_SKIP("Defer functionality not available on this compiler.");
     #endif
-}
-
-void MacrosTest::alignAs() {
-    CORRADE_ALIGNAS(16) const char aligned[3]{};
-    CORRADE_COMPARE(reinterpret_cast<std::uintptr_t>(aligned) % 16, 0);
 }
 
 /* Declarations on their own shouldn't produce any compiler diagnostics */
@@ -155,11 +150,10 @@ void MacrosTest::deprecated() {
 CORRADE_IGNORE_DEPRECATED_POP
 #endif
 
-CORRADE_NORETURN void foo() { std::exit(42); }
+int three(CORRADE_UNUSED int somenumber) { return 3; }
 
-void MacrosTest::noreturn() {
-    if(false) foo();
-    CORRADE_VERIFY(true);
+void MacrosTest::unused() {
+    CORRADE_COMPARE(three(6), 3);
 }
 
 void MacrosTest::fallthrough() {
@@ -188,6 +182,22 @@ CORRADE_NEVER_INLINE int neverInline() { return 37; }
 
 void MacrosTest::alwaysNeverInline() {
     CORRADE_COMPARE(alwaysInline() + neverInline(), 42);
+}
+
+void MacrosTest::likelyUnlikely() {
+    int a = 3;
+
+    /* Test that the macro can handle commas */
+    if CORRADE_LIKELY(std::is_same<decltype(a), int>::value && a < 5) {
+        a += 1;
+    }
+
+    /* Missugestion, but should still go through */
+    if CORRADE_UNLIKELY(std::is_same<decltype(a), int>::value && a < 5) {
+        a += 1;
+    }
+
+    CORRADE_COMPARE(a, 5);
 }
 
 /* Needs another inner anonymous namespace otherwise Clang complains about a

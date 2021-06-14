@@ -43,7 +43,9 @@
 #include "Corrade/Utility/Format.h"
 #include "Corrade/Utility/FormatStl.h"
 #include "Corrade/Utility/Macros.h"
+#include "Corrade/Utility/Memory.h"
 #include "Corrade/Utility/Sha1.h"
+#include "Corrade/Utility/StlMath.h"
 
 /* [Tweakable-disable-header] */
 #define CORRADE_TWEAKABLE
@@ -52,6 +54,8 @@
 
 /* [ConfigurationValue] */
 #include <Corrade/Utility/ConfigurationGroup.h>
+
+#define DOXYGEN_IGNORE(...) __VA_ARGS__
 
 struct Foo {
     int a, b;
@@ -349,6 +353,38 @@ args.addOption("input")
 };
 
 int main() {
+{
+typedef float __m256;
+std::size_t size{};
+/* [allocateAligned] */
+Containers::Array<__m256> avxVectors =
+    Utility::allocateAligned<__m256>(size);
+/* [allocateAligned] */
+}
+
+{
+typedef float Matrix4;
+std::size_t size{};
+/* [allocateAligned-explicit] */
+Containers::Array<Matrix4> avxMatrices =
+    Utility::allocateAligned<Matrix4, 32>(size);
+/* [allocateAligned-explicit] */
+}
+
+{
+/* [allocateAligned-NoInit] */
+struct Foo {
+    explicit Foo(int) {}
+    DOXYGEN_IGNORE()
+};
+
+Containers::Array<Foo> data = Utility::allocateAligned<Foo>(NoInit, 5);
+
+int index = 0;
+for(Foo& f: data) new(&f) Foo{index++};
+/* [allocateAligned-NoInit] */
+}
+
 {
 /* [Configuration-usage] */
 Utility::Configuration conf{"my.conf"};
@@ -668,6 +704,41 @@ switch(a) {
 }
 
 {
+std::size_t size{};
+/** @todo use Containers::BoolArray once it exists */
+/* [CORRADE_LIKELY] */
+float* in = DOXYGEN_IGNORE(nullptr);
+float* out = DOXYGEN_IGNORE(nullptr);
+std::vector<bool> mask = DOXYGEN_IGNORE({});
+for(std::size_t i = 0; i != size; ++i) {
+    if CORRADE_LIKELY(mask[i]) {
+        out[i] = in[i];
+    } else {
+        out[i] = std::acos(in[i]);
+    }
+}
+/* [CORRADE_LIKELY] */
+}
+
+{
+std::size_t size{};
+auto someComplexOperation = []() { return 0.0f; };
+/* [CORRADE_UNLIKELY] */
+float* data = DOXYGEN_IGNORE(nullptr);
+unsigned* indices = DOXYGEN_IGNORE(nullptr);
+unsigned previousIndex = ~unsigned{};
+float factor;
+for(std::size_t i = 0; i != size; ++i) {
+    if CORRADE_UNLIKELY(indices[i] != previousIndex) {
+        factor = someComplexOperation();
+    }
+
+    data[i] *= factor;
+}
+/* [CORRADE_UNLIKELY] */
+}
+
+{
 /* [CORRADE_LINE_STRING] */
 const char* shader = "#line " CORRADE_LINE_STRING "\n" R"GLSL(
     in vec3 position;
@@ -829,20 +900,10 @@ int foo(int a, CORRADE_UNUSED int b) {
 }
 /* [CORRADE_UNUSED] */
 
-/* [CORRADE_ALIGNAS] */
-CORRADE_ALIGNAS(4) char data[16]; // so it can be read as 32-bit integers
-/* [CORRADE_ALIGNAS] */
-
-CORRADE_NORETURN void exit42();
-/* [CORRADE_NORETURN] */
-CORRADE_NORETURN void exit42() { std::exit(42); }
-/* [CORRADE_NORETURN] */
-
 /* [CORRADE_ALWAYS_INLINE] */
 CORRADE_ALWAYS_INLINE int addOne(int a);
 /* [CORRADE_ALWAYS_INLINE] */
 
-int counter = 0;
 /* [CORRADE_NEVER_INLINE] */
 CORRADE_NEVER_INLINE void testFunctionCallOverhead();
 /* [CORRADE_NEVER_INLINE] */

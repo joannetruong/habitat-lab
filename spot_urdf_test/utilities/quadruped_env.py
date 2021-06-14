@@ -69,8 +69,11 @@ class A1():
         joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
 
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        vels = self.sim.get_articulated_link_velocity(self.robot_id, 0)
-        lin_vel, ang_vel = vels[0], vels[1]
+
+        # Must comment out for habitat migration
+        # vels = self.sim.get_articulated_link_velocity(self.robot_id, 0)
+        # lin_vel, ang_vel = vels[0], vels[1]
+        
         base_pos = robot_state.translation
         # base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation

@@ -40,11 +40,21 @@ if(APPLE AND CMAKE_GENERATOR STREQUAL Xcode AND NOT XCODE_VERSION VERSION_LESS 1
     message(FATAL_ERROR "CMake < 3.12 and Xcode 10 have various compatibility issues, breaking the Corrade build. Please upgrade to CMake 3.12 to use Xcode 10.")
 endif()
 
-# Configuration fails on < 3.9 if only C++ is enabled (TestBigEndian macro)
-if(NOT CMAKE_VERSION VERSION_LESS 3.9.0)
-    set(LANG CXX)
+# Don't restrict INTERPROCEDURAL_OPTIMIZATION only for icc on Linux
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)
 endif()
-project(Corrade ${LANG})
+# If CMAKE_AUTOMOC is set, all uses of corrade_add_resource() would otherwise
+# complain on 3.10 that AUTOMOC is not processing GENERATED files
+if(POLICY CMP0071)
+    cmake_policy(SET CMP0071 NEW)
+endif()
+# Superprojects can use just set(WITH_BLAH ON) without FORCE CACHE on 3.13+
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
+project(Corrade CXX)
 
 # Use folders for nice tree in Visual Studio and XCode
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -82,9 +92,6 @@ endif()
 cmake_dependent_option(BUILD_STATIC_PIC "Build static libraries with position-independent code" ${ON_EXCEPT_EMSCRIPTEN} "BUILD_STATIC" OFF)
 cmake_dependent_option(BUILD_STATIC_UNIQUE_GLOBALS "Build static libraries with globals unique across shared libraries" ${ON_EXCEPT_EMSCRIPTEN} "BUILD_STATIC" OFF)
 option(BUILD_TESTS "Build unit tests" OFF)
-
-set(CORRADE_INCLUDE_INSTALL_PREFIX "."
-    CACHE STRING "Prefix where to put platform-independent include and other files")
 
 if(CMAKE_SYSTEM_NAME STREQUAL Emscripten)
     set(CORRADE_TARGET_EMSCRIPTEN 1)
@@ -237,9 +244,17 @@ include(UseCorrade)
 include(CorradeLibSuffix)
 set(CORRADE_BINARY_INSTALL_DIR bin)
 set(CORRADE_LIBRARY_INSTALL_DIR lib${LIB_SUFFIX})
-set(CORRADE_DATA_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/share/corrade)
-set(CORRADE_CMAKE_MODULE_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/share/cmake/Corrade)
-set(CORRADE_INCLUDE_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/include/Corrade)
+set(CORRADE_DATA_INSTALL_DIR share/corrade)
+set(CORRADE_CMAKE_MODULE_INSTALL_DIR share/cmake/Corrade)
+set(CORRADE_INCLUDE_INSTALL_DIR include/Corrade)
+# Prefix the non-binary paths with the obsolete CORRADE_INCLUDE_INSTALL_PREFIX,
+# if set
+if(CORRADE_BUILD_DEPRECATED AND CORRADE_INCLUDE_INSTALL_PREFIX AND NOT CORRADE_INCLUDE_INSTALL_PREFIX STREQUAL ".")
+    message(DEPRECATION "CORRADE_INCLUDE_INSTALL_PREFIX is obsolete as its primary use was for old Android NDK versions. Please switch to the NDK r19+ layout instead of using this variable and recreate your build directory to get rid of this warning.")
+    set(CORRADE_DATA_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/${CORRADE_DATA_INSTALL_DIR})
+    set(CORRADE_CMAKE_MODULE_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/${CORRADE_CMAKE_MODULE_INSTALL_DIR})
+    set(CORRADE_INCLUDE_INSTALL_DIR ${CORRADE_INCLUDE_INSTALL_PREFIX}/${CORRADE_INCLUDE_INSTALL_DIR})
+endif()
 
 # Library version. CORRADE_VERSION_YEAR/MONTH is used in
 # src/Corrade/CMakeLists.txt to generate the version.h header.

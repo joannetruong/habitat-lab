@@ -72,6 +72,7 @@ struct DirectoryTest: TestSuite::Tester {
     void existsUtf8();
 
     void isDirectory();
+    void isDirectorySymlink();
     void isDirectoryUtf8();
 
     void removeFile();
@@ -107,8 +108,11 @@ struct DirectoryTest: TestSuite::Tester {
 
     void list();
     void listSkipDirectories();
+    void listSkipDirectoriesSymlinks();
     void listSkipFiles();
+    void listSkipFilesSymlinks();
     void listSkipSpecial();
+    void listSkipSpecialSymlink();
     void listSkipDotAndDotDot();
     void listSort();
     void listSortPrecedence();
@@ -168,6 +172,7 @@ struct DirectoryTest: TestSuite::Tester {
     void mapWriteUtf8();
 
     std::string _testDir,
+        _testDirSymlink,
         _testDirUtf8,
         _writeTestDir;
 };
@@ -192,6 +197,7 @@ DirectoryTest::DirectoryTest() {
               &DirectoryTest::existsUtf8,
 
               &DirectoryTest::isDirectory,
+              &DirectoryTest::isDirectorySymlink,
               &DirectoryTest::isDirectoryUtf8,
 
               &DirectoryTest::removeFile,
@@ -227,8 +233,11 @@ DirectoryTest::DirectoryTest() {
 
               &DirectoryTest::list,
               &DirectoryTest::listSkipDirectories,
+              &DirectoryTest::listSkipDirectoriesSymlinks,
               &DirectoryTest::listSkipFiles,
+              &DirectoryTest::listSkipFilesSymlinks,
               &DirectoryTest::listSkipSpecial,
+              &DirectoryTest::listSkipSpecialSymlink,
               &DirectoryTest::listSkipDotAndDotDot,
               &DirectoryTest::listSort,
               &DirectoryTest::listSortPrecedence,
@@ -300,12 +309,14 @@ DirectoryTest::DirectoryTest() {
         #endif
     ) {
         _testDir = Directory::join(Directory::path(Directory::executableLocation()), "DirectoryTestFiles");
+        _testDirSymlink = Directory::join(Directory::path(Directory::executableLocation()), "DirectoryTestFilesSymlink");
         _testDirUtf8 = Directory::join(Directory::path(Directory::executableLocation()), "DirectoryTestFilesUtf8");
         _writeTestDir = Directory::join(Directory::home(), "Library/Caches");
     } else
     #endif
     {
         _testDir = DIRECTORY_TEST_DIR;
+        _testDirSymlink = DIRECTORY_TEST_DIR_SYMLINK;
         _testDirUtf8 = DIRECTORY_TEST_DIR_UTF8;
         _writeTestDir = DIRECTORY_WRITE_TEST_DIR;
     }
@@ -466,6 +477,22 @@ void DirectoryTest::isDirectory() {
 
     /* Nonexistent file */
     CORRADE_VERIFY(!Directory::isDirectory(Directory::join(_testDir, "nonexistentFile")));
+}
+
+void DirectoryTest::isDirectorySymlink() {
+
+    CORRADE_VERIFY(Directory::exists(Directory::join(_testDirSymlink, "file-symlink")));
+    CORRADE_VERIFY(!Directory::isDirectory(Directory::join(_testDirSymlink, "file-symlink")));
+
+    CORRADE_VERIFY(Directory::exists(Directory::join(_testDirSymlink, "dir-symlink")));
+    {
+        #if !defined(CORRADE_TARGET_UNIX) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+        /* Possible on Windows too, but there we'd need to first detect if the
+           Git clone has the symlinks preserved */
+        CORRADE_EXPECT_FAIL("Symlink support is implemented on Unix systems and Emscripten only.");
+        #endif
+        CORRADE_VERIFY(Directory::isDirectory(Directory::join(_testDirSymlink, "dir-symlink")));
+    }
 }
 
 void DirectoryTest::isDirectoryUtf8() {
@@ -674,7 +701,7 @@ void DirectoryTest::isSandboxed() {
 
 void DirectoryTest::current() {
     const std::string current = Directory::current();
-    Debug() << "Current directory found as:" << current;
+    CORRADE_INFO("Current directory found as:" << current);
 
     /* Ensure the test is not accidentally false positive due to stale files */
     if(Directory::exists("currentDir.mark"))
@@ -703,7 +730,7 @@ void DirectoryTest::libraryLocation() {
     #if defined(CORRADE_TARGET_UNIX) || (defined(CORRADE_TARGET_WINDOWS) && !defined(CORRADE_TARGET_WINDOWS_RT))
     const std::string libraryLocation = Directory::libraryLocation(&Utility::Directory::rm);
 
-    Debug{} << "Corrade::Utility library location found as:" << libraryLocation;
+    CORRADE_INFO("Corrade::Utility library location found as:" << libraryLocation);
 
     /* Shouldn't be empty */
     CORRADE_VERIFY(!libraryLocation.empty());
@@ -769,7 +796,7 @@ void DirectoryTest::libraryLocationUtf8() {
 
 void DirectoryTest::executableLocation() {
     const std::string executableLocation = Directory::executableLocation();
-    Debug() << "Executable location found as:" << executableLocation;
+    CORRADE_INFO("Executable location found as:" << executableLocation);
 
     /* On sandboxed macOS and iOS verify that the directory contains Info.plist
        file */
@@ -819,7 +846,7 @@ void DirectoryTest::executableLocationUtf8() {
 
 void DirectoryTest::home() {
     const std::string home = Directory::home();
-    Debug() << "Home dir found as:" << home;
+    CORRADE_INFO("Home dir found as:" << home);
 
     /* On macOS and iOS verify that the home dir contains `Library` directory */
     #ifdef CORRADE_TARGET_APPLE
@@ -859,7 +886,7 @@ void DirectoryTest::homeUtf8() {
 
 void DirectoryTest::configurationDir() {
     const std::string dir = Directory::configurationDir("Corrade");
-    Debug() << "Configuration dir found as:" << dir;
+    CORRADE_INFO("Configuration dir found as:" << dir);
 
     #ifdef CORRADE_TARGET_APPLE
     CORRADE_COMPARE(dir.substr(dir.size() - 7), "Corrade");
@@ -909,7 +936,7 @@ void DirectoryTest::configurationDirUtf8() {
 
 void DirectoryTest::tmp() {
     const std::string dir = Directory::tmp();
-    Debug() << "Temporary dir found as:" << dir;
+    CORRADE_INFO("Temporary dir found as:" << dir);
 
     #if defined(CORRADE_TARGET_UNIX) || defined(CORRADE_TARGET_EMSCRIPTEN)
     {
@@ -977,6 +1004,22 @@ void DirectoryTest::listSkipDirectories() {
         TestSuite::Compare::SortedContainer);
 }
 
+void DirectoryTest::listSkipDirectoriesSymlinks() {
+    #if defined(CORRADE_TARGET_IOS) && defined(CORRADE_TESTSUITE_TARGET_XCTEST)
+    CORRADE_EXPECT_FAIL_IF(!std::getenv("SIMULATOR_UDID"),
+        "CTest is not able to run XCTest executables properly in the simulator.");
+    #endif
+
+    #if !defined(CORRADE_TARGET_UNIX) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Possible on Windows too, but there we'd need to first detect if the
+       Git clone has the symlinks preserved */
+    CORRADE_EXPECT_FAIL("Symlink support is implemented on Unix systems and Emscripten only.");
+    #endif
+    CORRADE_COMPARE_AS(Directory::list(_testDirSymlink, Directory::Flag::SkipDirectories),
+        (std::vector<std::string>{"file", "file-symlink"}),
+        TestSuite::Compare::SortedContainer);
+}
+
 void DirectoryTest::listSkipFiles() {
     #if defined(CORRADE_TARGET_IOS) && defined(CORRADE_TESTSUITE_TARGET_XCTEST)
     CORRADE_EXPECT_FAIL_IF(!std::getenv("SIMULATOR_UDID"),
@@ -988,10 +1031,23 @@ void DirectoryTest::listSkipFiles() {
         TestSuite::Compare::SortedContainer);
 }
 
-void DirectoryTest::listSkipSpecial() {
-    #ifdef CORRADE_TARGET_EMSCRIPTEN
-    CORRADE_EXPECT_FAIL("Files are treated as special in Emscripten.");
+void DirectoryTest::listSkipFilesSymlinks() {
+    #if defined(CORRADE_TARGET_IOS) && defined(CORRADE_TESTSUITE_TARGET_XCTEST)
+    CORRADE_EXPECT_FAIL_IF(!std::getenv("SIMULATOR_UDID"),
+        "CTest is not able to run XCTest executables properly in the simulator.");
     #endif
+
+    #if !defined(CORRADE_TARGET_UNIX) && !defined(CORRADE_TARGET_EMSCRIPTEN)
+    /* Possible on Windows too, but there we'd need to first detect if the
+       Git clone has the symlinks preserved */
+    CORRADE_EXPECT_FAIL("Symlink support is implemented on Unix systems and Emscripten only.");
+    #endif
+    CORRADE_COMPARE_AS(Directory::list(_testDirSymlink, Directory::Flag::SkipFiles),
+        (std::vector<std::string>{".", "..", "dir", "dir-symlink"}),
+        TestSuite::Compare::SortedContainer);
+}
+
+void DirectoryTest::listSkipSpecial() {
     #if defined(CORRADE_TARGET_IOS) && defined(CORRADE_TESTSUITE_TARGET_XCTEST)
     CORRADE_EXPECT_FAIL_IF(!std::getenv("SIMULATOR_UDID"),
         "CTest is not able to run XCTest executables properly in the simulator.");
@@ -999,6 +1055,18 @@ void DirectoryTest::listSkipSpecial() {
 
     CORRADE_COMPARE_AS(Directory::list(_testDir, Directory::Flag::SkipSpecial),
         (std::vector<std::string>{".", "..", "dir", "file"}),
+        TestSuite::Compare::SortedContainer);
+}
+
+void DirectoryTest::listSkipSpecialSymlink() {
+    #if defined(CORRADE_TARGET_IOS) && defined(CORRADE_TESTSUITE_TARGET_XCTEST)
+    CORRADE_EXPECT_FAIL_IF(!std::getenv("SIMULATOR_UDID"),
+        "CTest is not able to run XCTest executables properly in the simulator.");
+    #endif
+
+    /* Symlinks should not be treated as special files, so they're shown */
+    CORRADE_COMPARE_AS(Directory::list(_testDirSymlink, Directory::Flag::SkipSpecial),
+        (std::vector<std::string>{".", "..", "dir", "dir-symlink", "file", "file-symlink"}),
         TestSuite::Compare::SortedContainer);
 }
 
@@ -1285,7 +1353,7 @@ void DirectoryTest::prepareFileToCopy() {
     if(Directory::exists(Directory::join(_writeTestDir, "copySource.dat")))
         return;
 
-    Containers::Array<int> data{Containers::NoInit, 150000};
+    Containers::Array<int> data{NoInit, 150000};
     for(std::size_t i = 0; i != data.size(); ++i) data[i] = 4678641 + i;
 
     Directory::write(Directory::join(_writeTestDir, "copySource.dat"), data);
@@ -1353,7 +1421,7 @@ void DirectoryTest::prepareFileToBenchmarkCopy() {
         return;
 
     /* Append a megabyte file 50 times to create a 50MB file */
-    Containers::Array<int> data{Containers::ValueInit, 256*1024};
+    Containers::Array<int> data{ValueInit, 256*1024};
     for(std::size_t i = 0; i != data.size(); ++i) data[i] = 4678641 + i;
 
     for(std::size_t i = 0; i != 50; ++i)
@@ -1453,8 +1521,7 @@ void DirectoryTest::mapRead() {
     {
         const auto mappedFile = Directory::mapRead(Directory::join(_testDir, "file"));
         CORRADE_COMPARE_AS(Containers::ArrayView<const char>(mappedFile),
-            (Containers::Array<char>{Containers::InPlaceInit,
-                {'\xCA', '\xFE', '\xBA', '\xBE', '\x0D', '\x0A', '\x00', '\xDE', '\xAD', '\xBE', '\xEF'}}),
+            Containers::arrayView<char>({'\xCA', '\xFE', '\xBA', '\xBE', '\x0D', '\x0A', '\x00', '\xDE', '\xAD', '\xBE', '\xEF'}),
             TestSuite::Compare::Container);
     }
     #else
@@ -1480,8 +1547,7 @@ void DirectoryTest::mapReadUtf8() {
     {
         const auto mappedFile = Directory::mapRead(Directory::join(_testDirUtf8, "hýždě"));
         CORRADE_COMPARE_AS(Containers::ArrayView<const char>(mappedFile),
-            (Containers::Array<char>{Containers::InPlaceInit,
-                {'\xCA', '\xFE', '\xBA', '\xBE', '\x0D', '\x0A', '\x00', '\xDE', '\xAD', '\xBE', '\xEF'}}),
+            Containers::arrayView<char>({'\xCA', '\xFE', '\xBA', '\xBE', '\x0D', '\x0A', '\x00', '\xDE', '\xAD', '\xBE', '\xEF'}),
             TestSuite::Compare::Container);
     }
     #else

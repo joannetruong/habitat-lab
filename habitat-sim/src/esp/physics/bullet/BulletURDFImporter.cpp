@@ -27,28 +27,31 @@ namespace physics {
 static float gUrdfDefaultCollisionMargin = 0.001;
 
 btCollisionShape* BulletURDFImporter::convertURDFToCollisionShape(
-    const io::URDF::CollisionShape* collision) {
+    const io::URDF::CollisionShape* collision,
+    std::vector<std::unique_ptr<btCollisionShape>>& linkChildShapes) {
   Mn::Debug silence{logMessages ? &std::cout : nullptr};
   Mn::Debug{} << "convertURDFToCollisionShape";
 
-  btCollisionShape* shape = 0;
+  btCollisionShape* shape = nullptr;
 
   switch (collision->m_geometry.m_type) {
     case io::URDF::GEOM_PLANE: {
       Mn::Vector3 planeNormal = collision->m_geometry.m_planeNormal;
       float planeConstant = 0;  // not available?
-      btStaticPlaneShape* plane =
-          new btStaticPlaneShape(btVector3(planeNormal), planeConstant);
-      shape = plane;
+      auto plane = std::make_unique<btStaticPlaneShape>(btVector3(planeNormal),
+                                                        planeConstant);
+      shape = plane.get();
       shape->setMargin(gUrdfDefaultCollisionMargin);
+      linkChildShapes.emplace_back(std::move(plane));
       break;
     }
     case io::URDF::GEOM_CAPSULE: {
       float radius = collision->m_geometry.m_capsuleRadius;
       float height = collision->m_geometry.m_capsuleHeight;
-      btCapsuleShapeZ* capsuleShape = new btCapsuleShapeZ(radius, height);
-      shape = capsuleShape;
+      auto capsuleShape = std::make_unique<btCapsuleShapeZ>(radius, height);
+      shape = capsuleShape.get();
       shape->setMargin(gUrdfDefaultCollisionMargin);
+      linkChildShapes.emplace_back(std::move(capsuleShape));
       break;
     }
 
@@ -59,14 +62,14 @@ btCollisionShape* BulletURDFImporter::convertURDFToCollisionShape(
       // always be better.
 
       btVector3 halfExtents(cylRadius, cylRadius, cylHalfLength);
-      btCylinderShapeZ* cylZShape = new btCylinderShapeZ(halfExtents);
-      shape = cylZShape;
-
+      auto cylZShape = std::make_unique<btCylinderShapeZ>(halfExtents);
+      shape = cylZShape.get();
+      linkChildShapes.emplace_back(std::move(cylZShape));
       break;
     }
     case io::URDF::GEOM_BOX: {
       btVector3 extents = btVector3(collision->m_geometry.m_boxSize);
-      btBoxShape* boxShape = new btBoxShape(extents * 0.5f);
+      auto boxShape = std::make_unique<btBoxShape>(extents * 0.5f);
       // TODO: off for now, but may be necessary for better contacts?
       /*
       if (m_data->m_flags & CUF_INITIALIZE_SAT_FEATURES)
@@ -74,71 +77,58 @@ btCollisionShape* BulletURDFImporter::convertURDFToCollisionShape(
                               boxShape->initializePolyhedralFeatures();
                       }
       */
-      shape = boxShape;
+      shape = boxShape.get();
       shape->setMargin(gUrdfDefaultCollisionMargin);
+      linkChildShapes.emplace_back(std::move(boxShape));
       break;
     }
     case io::URDF::GEOM_SPHERE: {
       float radius = collision->m_geometry.m_sphereRadius;
-      btSphereShape* sphereShape = new btSphereShape(radius);
-      shape = sphereShape;
+      auto sphereShape = std::make_unique<btSphereShape>(radius);
+      shape = sphereShape.get();
       shape->setMargin(gUrdfDefaultCollisionMargin);
+      linkChildShapes.emplace_back(std::move(sphereShape));
       break;
     }
     case io::URDF::GEOM_MESH: {
-      // TODO: implement this from resourceManager_ structures. Share with
-      // RigidBody interface (pull that out?)
-      bool meshSuccess =
-          resourceManager_.importAsset(collision->m_geometry.m_meshFileName);
+      const std::vector<assets::CollisionMeshData>& meshGroup =
+          resourceManager_.getCollisionMesh(
+              collision->m_geometry.m_meshFileName);
+      const assets::MeshMetaData& metaData = resourceManager_.getMeshMetaData(
+          collision->m_geometry.m_meshFileName);
 
-      if (meshSuccess) {
-        const std::vector<assets::CollisionMeshData>& meshGroup =
-            resourceManager_.getCollisionMesh(
-                collision->m_geometry.m_meshFileName);
-        const assets::MeshMetaData& metaData = resourceManager_.getMeshMetaData(
-            collision->m_geometry.m_meshFileName);
-
-        auto convexShape = new btConvexHullShape();
-        esp::physics::BulletBase::constructJoinedConvexShapeFromMeshes(
-            Magnum::Matrix4{}, meshGroup, metaData.root, convexShape);
-        convexShape->setLocalScaling(
-            btVector3(collision->m_geometry.m_meshScale));
-        convexShape->recalcLocalAabb();
-        shape = convexShape;
-        shape->setMargin(gUrdfDefaultCollisionMargin);
-      } else {
-        Mn::Debug{}
-            << "BulletURDFImporter::convertURDFToCollisionShape : E - could "
-               "not load collision mesh \""
-            << collision->m_geometry.m_meshFileName << "\"";
+      auto compoundShape = std::make_unique<btCompoundShape>();
+      std::vector<std::unique_ptr<btConvexHullShape>> convexShapes;
+      esp::physics::BulletBase::constructConvexShapesFromMeshes(
+          Magnum::Matrix4{}, meshGroup, metaData.root, compoundShape.get(),
+          convexShapes);
+      // move ownership of convexes
+      for (auto& convex : convexShapes) {
+        linkChildShapes.emplace_back(std::move(convex));
       }
-      break;
-    }  // mesh case
+      compoundShape->setLocalScaling(
+          btVector3(collision->m_geometry.m_meshScale));
+      compoundShape->setMargin(gUrdfDefaultCollisionMargin);
+      compoundShape->recalculateLocalAabb();
+      shape = compoundShape.get();
+      linkChildShapes.emplace_back(std::move(compoundShape));
+    } break;  // mesh case
 
     default:
       Mn::Debug{} << "E - unknown collision geometry type: "
                   << collision->m_geometry.m_type;
   }
-  // TODO: need this to store collision mesh info? May be OK to create another
-  // structure for that explicitly.
-  /*
-        if (shape && collision->m_geometry.m_type == URDF_GEOM_MESH)
-        {
-                m_data->m_bulletCollisionShape2UrdfCollision.insert(shape,
-     *collision);
-        }
-   */
+
   return shape;
 }
 
 btCompoundShape* BulletURDFImporter::convertLinkCollisionShapes(
     int linkIndex,
-    const btTransform& localInertiaFrame) {
+    const btTransform& localInertiaFrame,
+    std::vector<std::unique_ptr<btCollisionShape>>& linkChildShapes) {
   Mn::Debug silence{logMessages ? &std::cout : nullptr};
   // TODO: smart pointer
   btCompoundShape* compoundShape = new btCompoundShape();
-  // TODO: store this somewhere
-  // allocatedCollisionShapes_.push_back(compoundShape);
 
   compoundShape->setMargin(gUrdfDefaultCollisionMargin);
 
@@ -153,18 +143,9 @@ btCompoundShape* BulletURDFImporter::convertLinkCollisionShapes(
 
     for (size_t v = 0; v < link->m_collisionArray.size(); ++v) {
       const io::URDF::CollisionShape& col = link->m_collisionArray[v];
-      btCollisionShape* childShape = convertURDFToCollisionShape(&col);
+      btCollisionShape* childShape =
+          convertURDFToCollisionShape(&col, linkChildShapes);
       if (childShape) {
-        /*
-        allocatedCollisionShapes_.push_back(childShape);
-        if (childShape->getShapeType() == COMPOUND_SHAPE_PROXYTYPE) {
-          btCompoundShape* compound = (btCompoundShape*)childShape;
-          for (int i = 0; i < compound->getNumChildShapes(); i++) {
-            allocatedCollisionShapes_.push_back(compound->getChildShape(i));
-          }
-        }
-        */
-
         Magnum::Matrix4 childTrans = col.m_linkLocalFrame;
         Mn::Debug{} << "col.m_linkLocalFrame: "
                     << Magnum::Matrix4(col.m_linkLocalFrame);
@@ -192,11 +173,11 @@ int BulletURDFImporter::getCollisionGroupAndMask(int linkIndex,
     std::shared_ptr<io::URDF::Link> link = itr->second;
     for (size_t v = 0; v < link->m_collisionArray.size(); ++v) {
       const io::URDF::CollisionShape& col = link->m_collisionArray[v];
-      if (col.m_flags & io::URDF::HAS_COLLISION_GROUP) {
+      if ((col.m_flags & io::URDF::HAS_COLLISION_GROUP) != 0) {
         colGroup = col.m_collisionGroup;
         result |= io::URDF::HAS_COLLISION_GROUP;
       }
-      if (col.m_flags & io::URDF::HAS_COLLISION_MASK) {
+      if ((col.m_flags & io::URDF::HAS_COLLISION_MASK) != 0) {
         colMask = col.m_collisionMask;
         result |= io::URDF::HAS_COLLISION_MASK;
       }
@@ -300,7 +281,9 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
     const Mn::Matrix4& parentTransformInWorldSpace,
     btMultiBodyDynamicsWorld* world1,
     int flags,
-    std::map<int, std::unique_ptr<btCollisionShape>>& linkCollisionShapes) {
+    std::map<int, std::unique_ptr<btCompoundShape>>& linkCompoundShapes,
+    std::map<int, std::vector<std::unique_ptr<btCollisionShape>>>&
+        linkChildShapes) {
   Mn::Debug silence{logMessages ? &std::cout : nullptr};
   Mn::Debug{} << "++++++++++++++++++++++++++++++++++++++";
   Mn::Debug{} << "ConvertURDF2BulletInternal...";
@@ -339,21 +322,21 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
   Mn::Debug{} << "  about to get joint info";
 
   Mn::Matrix4 parent2joint;
-  int jointType;
+  int jointType = 0;
   Mn::Vector3 jointAxisInJointSpace;
-  btScalar jointLowerLimit;
-  btScalar jointUpperLimit;
-  btScalar jointDamping;
-  btScalar jointFriction;
-  btScalar jointMaxForce;
-  btScalar jointMaxVelocity;
+  btScalar jointLowerLimit = NAN;
+  btScalar jointUpperLimit = NAN;
+  btScalar jointDamping = NAN;
+  btScalar jointFriction = NAN;
+  btScalar jointMaxForce = NAN;
+  btScalar jointMaxVelocity = NAN;
 
   bool hasParentJoint = getJointInfo2(
       urdfLinkIndex, parent2joint, linkTransformInWorldSpace,
       jointAxisInJointSpace, jointType, jointLowerLimit, jointUpperLimit,
       jointDamping, jointFriction, jointMaxForce, jointMaxVelocity);
 
-  if (flags & CUF_USE_MJCF) {
+  if ((flags & CUF_USE_MJCF) != 0) {
     linkTransformInWorldSpace =
         parentTransformInWorldSpace * linkTransformInWorldSpace;
   } else {
@@ -362,18 +345,14 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
 
   Mn::Debug{} << "  about to convert link collision shapes";
 
-  btCompoundShape* tmpShape = convertLinkCollisionShapes(
-      urdfLinkIndex, btTransform(localInertialFrame));
-  btCollisionShape* compoundShape = tmpShape;
-  if (tmpShape->getNumChildShapes() == 1 &&
-      tmpShape->getChildTransform(0) == btTransform::getIdentity()) {
-    compoundShape = tmpShape->getChildShape(0);
-  }
+  btCompoundShape* compoundShape =
+      convertLinkCollisionShapes(urdfLinkIndex, btTransform(localInertialFrame),
+                                 linkChildShapes[mbLinkIndex]);
 
   Mn::Debug{} << "  about to deal with compoundShape";
   if (compoundShape) {
-    if (mass) {
-      if (!(flags & CUF_USE_URDF_INERTIA)) {
+    if (mass != 0) {
+      if ((flags & CUF_USE_URDF_INERTIA) == 0) {
         btVector3 btLocalIntertiaDiagonal;
         compoundShape->calculateLocalInertia(mass, btLocalIntertiaDiagonal);
         localInertiaDiagonal = Mn::Vector3(btLocalIntertiaDiagonal);
@@ -384,33 +363,30 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
       io::URDF::LinkContactInfo contactInfo;
       getLinkContactInfo(urdfLinkIndex, contactInfo);
       // temporary inertia scaling until we load inertia from URDF
-      if (contactInfo.m_flags & io::URDF::CONTACT_HAS_INERTIA_SCALING) {
+      if ((contactInfo.m_flags & io::URDF::CONTACT_HAS_INERTIA_SCALING) != 0) {
         localInertiaDiagonal *= contactInfo.m_inertiaScaling;
       }
     }
 
-    Mn::Matrix4 inertialFrameInWorldSpace =
-        linkTransformInWorldSpace * localInertialFrame;
     bool canSleep = (flags & CUF_ENABLE_SLEEPING) != 0;
 
-    if (cache.m_bulletMultiBody == 0) {
+    if (cache.m_bulletMultiBody == nullptr) {
       bool isFixedBase = (mass == 0);
       int totalNumJoints = cache.m_totalNumJoints1;
       cache.m_bulletMultiBody =
           new btMultiBody(totalNumJoints, mass, btVector3(localInertiaDiagonal),
                           isFixedBase, canSleep);
-      if (flags & CUF_GLOBAL_VELOCITIES_MB) {
+      if ((flags & CUF_GLOBAL_VELOCITIES_MB) != 0) {
         cache.m_bulletMultiBody->useGlobalVelocities(true);
       }
-      if (flags & CUF_USE_MJCF) {
+      if ((flags & CUF_USE_MJCF) != 0) {
         cache.m_bulletMultiBody->setBaseWorldTransform(
             btTransform(linkTransformInWorldSpace));
       }
 
-      cache.registerMultiBody(urdfLinkIndex, cache.m_bulletMultiBody,
-                              btTransform(inertialFrameInWorldSpace), mass,
-                              btVector3(localInertiaDiagonal), compoundShape,
-                              btTransform(localInertialFrame));
+      // registerMultiBody
+      cache.m_urdfLinkLocalInertialFrames[urdfLinkIndex] =
+          btTransform(localInertialFrame);
     }
 
     // create a joint if necessary
@@ -542,30 +518,14 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
       }
     }
 
-    // if (compoundShape->getNumChildShapes()>0)
     {
-      // btMultiBodyLinkCollider* col =
-      // creation.allocateMultiBodyLinkCollider(urdfLinkIndex, mbLinkIndex,
-      // cache.m_bulletMultiBody);
       btMultiBodyLinkCollider* col =
           new btMultiBodyLinkCollider(cache.m_bulletMultiBody, mbLinkIndex);
-
-      // compoundShape->setUserIndex(graphicsIndex);
 
       col->setCollisionShape(compoundShape);
 
       // TODO: better track the collision shapes
-      linkCollisionShapes[mbLinkIndex].reset(compoundShape);
-
-      if (compoundShape->getShapeType() == TRIANGLE_MESH_SHAPE_PROXYTYPE) {
-        btBvhTriangleMeshShape* trimeshShape =
-            static_cast<btBvhTriangleMeshShape*>(compoundShape);
-        if (trimeshShape->getTriangleInfoMap()) {
-          col->setCollisionFlags(
-              col->getCollisionFlags() |
-              btCollisionObject::CF_CUSTOM_MATERIAL_CALLBACK);
-        }
-      }
+      linkCompoundShapes[mbLinkIndex].reset(compoundShape);
 
       Mn::Matrix4 tr = linkTransformInWorldSpace;
       // if we don't set the initial pose of the btCollisionObject, the
@@ -579,8 +539,7 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
 
       // base and fixed? -> static, otherwise flag as dynamic
       bool isDynamic =
-          (mbLinkIndex < 0 && cache.m_bulletMultiBody->hasFixedBase()) ? false
-                                                                       : true;
+          !(mbLinkIndex < 0 && cache.m_bulletMultiBody->hasFixedBase());
       io::URDF::LinkContactInfo contactInfo;
       getLinkContactInfo(urdfLinkIndex, contactInfo);
 
@@ -610,11 +569,11 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
           }
         }
         cache.m_bulletMultiBody->getLink(mbLinkIndex).m_collider = col;
-        if (flags & CUF_USE_SELF_COLLISION_INCLUDE_PARENT) {
+        if ((flags & CUF_USE_SELF_COLLISION_INCLUDE_PARENT) != 0) {
           cache.m_bulletMultiBody->getLink(mbLinkIndex).m_flags &=
               ~BT_MULTIBODYLINKFLAGS_DISABLE_PARENT_COLLISION;
         }
-        if (flags & CUF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS) {
+        if ((flags & CUF_USE_SELF_COLLISION_EXCLUDE_ALL_PARENTS) != 0) {
           cache.m_bulletMultiBody->getLink(mbLinkIndex).m_flags |=
               BT_MULTIBODYLINKFLAGS_DISABLE_ALL_PARENT_COLLISION;
         }
@@ -634,7 +593,9 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
         cache.m_bulletMultiBody->setBaseCollider(col);
       }
 
-      ASSERT(isDynamic != col->isStaticOrKinematicObject());
+      ASSERT(isDynamic != col->isStaticOrKinematicObject(),
+             "Static or Kinematic object erroneously marked dynamic. This "
+             "should not happen.");
 
       // This group-selection logic isn't very useful. We can't distinguish
       // between articulated objects here, e.g. cabinets versus robots. Users
@@ -644,19 +605,21 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
       // Noncollidable. Then, we will create fixed rigid bodies, separate from
       // the multibody, which will be collidable (CollisionGroup::Static) (see
       // BulletArticulatedObject.cpp).
-      int collisionFilterGroup = isDynamic ? int(CollisionGroup::Robot)
-                                           : int(CollisionGroup::Noncollidable);
+      // int collisionFilterGroup = isDynamic ? int(CollisionGroup::Robot)
+      //                                     :
+      //                                     int(CollisionGroup::Noncollidable);
+      int collisionFilterGroup = int(CollisionGroup::Robot);
 
       int colGroup = 0, colMask = 0;
       int collisionFlags =
           getCollisionGroupAndMask(urdfLinkIndex, colGroup, colMask);
 
-      if (collisionFlags & io::URDF::HAS_COLLISION_GROUP) {
+      if ((collisionFlags & io::URDF::HAS_COLLISION_GROUP) != 0) {
         collisionFilterGroup = colGroup;
       }
 
-      int collisionFilterMask = CollisionGroupHelper::getMaskForGroup(
-          CollisionGroup(collisionFilterGroup));
+      int collisionFilterMask = uint32_t(CollisionGroupHelper::getMaskForGroup(
+          CollisionGroup(collisionFilterGroup)));
 // We don't like overriding the mask in the URDF; we disable support for this.
 // We prefer to only override the group, while still using getMaskForGroup
 // (above) for mask computation.
@@ -694,7 +657,7 @@ Mn::Matrix4 BulletURDFImporter::ConvertURDF2BulletInternal(
 
     ConvertURDF2BulletInternal(cache, urdfChildLinkIndex,
                                linkTransformInWorldSpace, world1, flags,
-                               linkCollisionShapes);
+                               linkCompoundShapes, linkChildShapes);
   }
   return linkTransformInWorldSpace;
 }

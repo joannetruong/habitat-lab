@@ -29,6 +29,7 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include <Corrade/PluginManager/AbstractManager.h>
+#include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/Unicode.h>
 #include <Magnum/Image.h>
 #include <Magnum/ImageView.h>
@@ -82,8 +83,8 @@ bool FreeTypeFont::doIsOpened() const { return ftFont; }
 
 auto FreeTypeFont::doOpenData(const Containers::ArrayView<const char> data, const Float size) -> Metrics {
     /* We need to preserve the data for whole FT_Face lifetime */
-    _data = Containers::Array<unsigned char>(data.size());
-    std::copy(data.begin(), data.end(), _data.begin());
+    _data = Containers::Array<unsigned char>{NoInit, data.size()};
+    Utility::copy(Containers::arrayCast<const unsigned char>(data), _data);
 
     CORRADE_ASSERT(library, "Text::FreeTypeFont::openSingleData(): initialize() was not called", {});
     /** @todo ability to specify different font in TTC collection */
@@ -139,7 +140,7 @@ void FreeTypeFont::doFillGlyphCache(AbstractGlyphCache& cache, const std::u32str
     const std::vector<Range2Di> charPositions = cache.reserve(charSizes);
 
     /* Render all characters to the atlas and create character map */
-    Containers::Array<char> pixmap{Containers::ValueInit, std::size_t(cache.textureSize().product())};
+    Containers::Array<char> pixmap{ValueInit, std::size_t(cache.textureSize().product())};
     for(std::size_t i = 0; i != charPositions.size(); ++i) {
         /* Load and render glyph */
         /** @todo B&W only if radius != 0 */

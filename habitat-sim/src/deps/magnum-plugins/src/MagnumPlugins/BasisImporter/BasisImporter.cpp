@@ -3,7 +3,7 @@
 
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
                 2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
-    Copyright © 2019 Jonathan Hale <squareys@googlemail.com>
+    Copyright © 2019, 2021 Jonathan Hale <squareys@googlemail.com>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,7 @@
 
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/Containers/ScopeGuard.h>
+#include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/ConfigurationGroup.h>
 #include <Corrade/Utility/ConfigurationValue.h>
 #include <Corrade/Utility/Debug.h>
@@ -125,7 +126,7 @@ struct BasisImporter::State {
     /* There is only this type of codebook */
     basist::etc1_global_selector_codebook codebook;
     Containers::Optional<basist::basisu_transcoder> transcoder;
-    Containers::Array<unsigned char> in;
+    Containers::Array<char> in;
     basist::basisu_file_info fileInfo;
 
     bool noTranscodeFormatWarningPrinted = false;
@@ -138,7 +139,11 @@ void BasisImporter::initialize() {
     basist::basisu_transcoder_init();
 }
 
-BasisImporter::BasisImporter() = default;
+BasisImporter::BasisImporter(): _state{InPlaceInit} {
+    /* Initialize default configuration values */
+    /** @todo horrible workaround, fix this properly */
+    configuration().setValue("format", "");
+}
 
 BasisImporter::BasisImporter(PluginManager::AbstractManager& manager, const std::string& plugin): AbstractImporter{manager, plugin} {
     /* Initializes codebook */
@@ -200,8 +205,8 @@ void BasisImporter::doOpenData(const Containers::ArrayView<const char> data) {
 
     /* All good, release the transcoder guard and keep a copy of the data */
     transcoderGuard.release();
-    _state->in = Containers::Array<unsigned char>(data.size());
-    std::copy(data.begin(), data.end(), _state->in.begin());
+    _state->in = Containers::Array<char>{NoInit, data.size()};
+    Utility::copy(data, _state->in);
 }
 
 UnsignedInt BasisImporter::doImage2DCount() const {
@@ -266,7 +271,7 @@ Containers::Optional<ImageData2D> BasisImporter::doImage2D(const UnsignedInt id,
         outputSizeInBlocksOrPixels = totalBlocks;
         dataSize = basis_get_bytes_per_block(format)*totalBlocks;
     }
-    Containers::Array<char> dest{Containers::DefaultInit, dataSize};
+    Containers::Array<char> dest{DefaultInit, dataSize};
     if(!_state->transcoder->transcode_image_level(_state->in.data(), _state->in.size(), id, level, dest.data(), outputSizeInBlocksOrPixels, basist::transcoder_texture_format(format), flags, rowStride, nullptr, outputRowsInPixels)) {
         Error{} << "Trade::BasisImporter::image2D(): transcoding failed";
         return Containers::NullOpt;

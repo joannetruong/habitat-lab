@@ -26,207 +26,234 @@
 */
 
 /** @file
- * @brief Class @ref Magnum::Shaders::Vector, typedef @ref Magnum::Shaders::Vector2D, @ref Magnum::Shaders::Vector3D
+ * @brief Struct @ref Magnum::Shaders::VectorDrawUniform, @ref Magnum::Shaders::VectorMaterialUniform
  */
 
-#include "Magnum/DimensionTraits.h"
-#include "Magnum/Shaders/AbstractVector.h"
-#include "Magnum/Shaders/visibility.h"
+#include "Magnum/Magnum.h"
+#include "Magnum/Math/Color.h"
+
+#ifdef MAGNUM_BUILD_DEPRECATED
+#include <Corrade/Utility/Macros.h>
+
+#include "Magnum/Shaders/VectorGL.h"
+#endif
 
 namespace Magnum { namespace Shaders {
 
-namespace Implementation {
-    enum class VectorFlag: UnsignedByte {
-        TextureTransformation = 1 << 0
-    };
-    typedef Containers::EnumSet<VectorFlag> VectorFlags;
-}
-
 /**
-@brief Vector shader
+@brief Per-draw uniform for vector shaders
+@m_since_latest
 
-Renders vector art in plain grayscale form. See also @ref DistanceFieldVector
-for more advanced effects. For rendering an unchanged texture you can use the
-@ref Flat shader. You need to provide the @ref Position and
-@ref TextureCoordinates attributes in your triangle mesh and call at least
-@ref bindVectorTexture(). By default, the shader renders the texture with a
-white color in an identity transformation. Use
-@ref setTransformationProjectionMatrix(), @ref setColor() and others to
-configure the shader.
-
-@image html shaders-vector.png width=256px
-
-Alpha / transparency is supported by the shader implicitly, but to have it
-working on the framebuffer, you need to enable
-@ref GL::Renderer::Feature::Blending and set up the blending function. See
-@ref GL::Renderer::setBlendFunction() for details.
-
-@section Shaders-Vector-usage Example usage
-
-Common mesh setup:
-
-@snippet MagnumShaders.cpp Vector-usage1
-
-Common rendering setup:
-
-@snippet MagnumShaders.cpp Vector-usage2
-
-@see @ref shaders, @ref Vector2D, @ref Vector3D
+Together with the generic @ref TransformationProjectionUniform2D /
+@ref TransformationProjectionUniform3D contains parameters that are specific to
+each draw call. Texture transformation, if needed, is supplied separately in a
+@ref TextureTransformationUniform; material-related properties are expected to
+be shared among multiple draw calls and thus are provided in a separate
+@ref VectorMaterialUniform structure, referenced by @ref materialId.
+@see @ref VectorGL::bindDrawBuffer()
 */
-template<UnsignedInt dimensions> class MAGNUM_SHADERS_EXPORT Vector: public AbstractVector<dimensions> {
-    public:
-        #ifdef DOXYGEN_GENERATING_OUTPUT
-        /**
-         * @brief Flag
-         * @m_since{2020,06}
-         *
-         * @see @ref Flags, @ref flags()
-         */
-        enum class Flag: UnsignedByte {
-            /**
-             * Enable texture coordinate transformation.
-             * @see @ref setTextureMatrix()
-             * @m_since{2020,06}
-             */
-            TextureTransformation = 1 << 0
-        };
-
-        /**
-         * @brief Flags
-         * @m_since{2020,06}
-         *
-         * @see @ref flags()
-         */
-        typedef Containers::EnumSet<Flag> Flags;
-        #else
-        /* Done this way to be prepared for possible future diversion of 2D
-           and 3D flags (e.g. introducing 3D-specific features) */
-        typedef Implementation::VectorFlag Flag;
-        typedef Implementation::VectorFlags Flags;
+struct VectorDrawUniform {
+    /** @brief Construct with default parameters */
+    constexpr explicit VectorDrawUniform(DefaultInitT = DefaultInit) noexcept:
+        #if ((defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)) && defined(CORRADE_TARGET_BIG_ENDIAN)
+        _pad0{}, /* Otherwise it refuses to constexpr, on 3.8 at least */
         #endif
-
-        /**
-         * @brief Constructor
-         * @param flags     Flags
-         */
-        explicit Vector(Flags flags = {});
-
-        /**
-         * @brief Construct without creating the underlying OpenGL object
-         *
-         * The constructed instance is equivalent to a moved-from state. Useful
-         * in cases where you will overwrite the instance later anyway. Move
-         * another object over it to make it useful.
-         *
-         * This function can be safely used for constructing (and later
-         * destructing) objects even without any OpenGL context being active.
-         * However note that this is a low-level and a potentially dangerous
-         * API, see the documentation of @ref NoCreate for alternatives.
-         */
-        explicit Vector(NoCreateT) noexcept
-            /** @todoc remove workaround when doxygen is sane */
-            #ifndef DOXYGEN_GENERATING_OUTPUT
-            : AbstractVector<dimensions>{NoCreate}
-            #endif
-            {}
-
-        /** @brief Copying is not allowed */
-        Vector(const Vector<dimensions>&) = delete;
-
-        /** @brief Move constructor */
-        Vector(Vector<dimensions>&&) noexcept = default;
-
-        /** @brief Copying is not allowed */
-        Vector<dimensions>& operator=(const Vector<dimensions>&) = delete;
-
-        /** @brief Move assignment */
-        Vector<dimensions>& operator=(Vector<dimensions>&&) noexcept = default;
-
-        /**
-         * @brief Flags
-         * @m_since{2020,06}
-         */
-        Flags flags() const { return _flags; }
-
-        /**
-         * @brief Set transformation and projection matrix
-         * @return Reference to self (for method chaining)
-         *
-         * Default is an identity matrix.
-         */
-        Vector<dimensions>& setTransformationProjectionMatrix(const MatrixTypeFor<dimensions, Float>& matrix);
-
-        /**
-         * @brief Set texture coordinate transformation matrix
-         * @return Reference to self (for method chaining)
-         * @m_since{2020,06}
-         *
-         * Expects that the shader was created with
-         * @ref Flag::TextureTransformation enabled. Initial value is an
-         * identity matrix.
-         */
-        Vector<dimensions>& setTextureMatrix(const Matrix3& matrix);
-
-        /**
-         * @brief Set background color
-         * @return Reference to self (for method chaining)
-         *
-         * Default is @cpp 0x00000000_rgbaf @ce.
-         * @see @ref setColor()
-         */
-        Vector<dimensions>& setBackgroundColor(const Color4& color);
-
-        /**
-         * @brief Set fill color
-         * @return Reference to self (for method chaining)
-         *
-         * Default is @cpp 0xffffffff_rgbaf @ce.
-         * @see @ref setBackgroundColor()
-         */
-        Vector<dimensions>& setColor(const Color4& color);
-
-        #ifndef DOXYGEN_GENERATING_OUTPUT
-        /* Overloads to remove WTF-factor from method chaining order */
-        Vector<dimensions>& bindVectorTexture(GL::Texture2D& texture) {
-            AbstractVector<dimensions>::bindVectorTexture(texture);
-            return *this;
-        }
+        materialId{0}
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8) && !defined(CORRADE_TARGET_BIG_ENDIAN)
+        , _pad0{}, _pad1{}, _pad2{}, _pad3{}
         #endif
+        {}
 
-    private:
-        /* Prevent accidentally calling irrelevant functions */
-        #ifndef MAGNUM_TARGET_GLES
-        using GL::AbstractShaderProgram::drawTransformFeedback;
-        #endif
-        #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
-        using GL::AbstractShaderProgram::dispatchCompute;
-        #endif
+    /** @brief Construct without initializing the contents */
+    explicit VectorDrawUniform(NoInitT) noexcept {}
 
-        Flags _flags;
-        Int _transformationProjectionMatrixUniform{0},
-            _textureMatrixUniform{1},
-            _backgroundColorUniform{2},
-            _colorUniform{3};
+    /** @{
+     * @name Convenience setters
+     *
+     * Provided to allow the use of method chaining for populating a structure
+     * in a single expression, otherwise equivalent to accessing the fields
+     * directly. Also guaranteed to provide backwards compatibility when
+     * packing of the actual fields changes.
+     */
+
+    /**
+     * @brief Set the @ref materialId field
+     * @return Reference to self (for method chaining)
+     */
+    VectorDrawUniform& setMaterialId(UnsignedInt id) {
+        materialId = id;
+        return *this;
+    }
+
+    /**
+     * @}
+     */
+
+    /** @var materialId
+     * @brief Material ID
+     *
+     * References a particular material from a @ref VectorMaterialUniform
+     * array. Useful when an UBO with more than one material is supplied or in
+     * a multi-draw scenario. Should be less than the material count passed to
+     * the @ref VectorGL::VectorGL(Flags, UnsignedInt, UnsignedInt)
+     * constructor, if material count is @cpp 1 @ce, this field is assumed to
+     * be @cpp 0 @ce and isn't even read by the shader. Default value is
+     * @cpp 0 @ce, meaning the first material gets used.
+     */
+
+    /* This field is an UnsignedInt in the shader and materialId is extracted
+       as (value & 0xffff), so the order has to be different on BE */
+    #ifndef CORRADE_TARGET_BIG_ENDIAN
+    alignas(4) UnsignedShort materialId;
+    /* warning: Member __pad0__ is not documented. FFS DOXYGEN WHY DO YOU THINK
+       I MADE THOSE UNNAMED, YOU DUMB FOOL */
+    #ifndef DOXYGEN_GENERATING_OUTPUT
+    UnsignedShort
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad0 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :16; /* reserved for skinOffset */
+    #endif
+    #else
+    alignas(4) UnsignedShort
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad0 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :16; /* reserved for skinOffset */
+    UnsignedShort materialId;
+    #endif
+
+    /* warning: Member __pad1__ is not documented. FFS DOXYGEN WHY DO YOU THINK
+       I MADE THOSE UNNAMED, YOU DUMB FOOL */
+    #ifndef DOXYGEN_GENERATING_OUTPUT
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad1 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32; /* reserved for objectId */
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad2 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32;
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad3 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32;
+    #endif
 };
 
-/** @brief Two-dimensional vector shader */
-typedef Vector<2> Vector2D;
+/**
+@brief Material uniform for vector shaders
+@m_since_latest
 
-/** @brief Three-dimensional vector shader */
-typedef Vector<3> Vector3D;
+Describes material properties referenced from
+@ref VectorDrawUniform::materialId.
+@see @ref VectorGL::bindMaterialBuffer()
+*/
+struct VectorMaterialUniform {
+    /** @brief Construct with default parameters */
+    constexpr explicit VectorMaterialUniform(DefaultInitT = DefaultInit) noexcept: color{1.0f, 1.0f, 1.0f, 1.0f}, backgroundColor{0.0f, 0.0f, 0.0f, 0.0f}
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        /* Otherwise it refuses to constexpr, on 3.8 at least */
+        , _pad0{}, _pad1{}, _pad2{}, _pad3{}
+        #endif
+        {}
 
-#ifdef DOXYGEN_GENERATING_OUTPUT
-/** @debugoperatorclassenum{Vector,Vector::Flag} */
-template<UnsignedInt dimensions> Debug& operator<<(Debug& debug, Vector<dimensions>::Flag value);
+    /** @brief Construct without initializing the contents */
+    explicit VectorMaterialUniform(NoInitT) noexcept: color{NoInit}, backgroundColor{NoInit} {}
 
-/** @debugoperatorclassenum{Vector,Vector::Flags} */
-template<UnsignedInt dimensions> Debug& operator<<(Debug& debug, Vector<dimensions>::Flags value);
-#else
-namespace Implementation {
-    MAGNUM_SHADERS_EXPORT Debug& operator<<(Debug& debug, VectorFlag value);
-    MAGNUM_SHADERS_EXPORT Debug& operator<<(Debug& debug, VectorFlags value);
-    CORRADE_ENUMSET_OPERATORS(VectorFlags)
-}
+    /** @{
+     * @name Convenience setters
+     *
+     * Provided to allow the use of method chaining for populating a structure
+     * in a single expression, otherwise equivalent to accessing the fields
+     * directly. Also guaranteed to provide backwards compatibility when
+     * packing of the actual fields changes.
+     */
+
+    /**
+     * @brief Set the @ref color field
+     * @return Reference to self (for method chaining)
+     */
+    VectorMaterialUniform& setColor(const Color4& color) {
+        this->color = color;
+        return *this;
+    }
+
+    /**
+     * @brief Set the @ref backgroundColor field
+     * @return Reference to self (for method chaining)
+     */
+    VectorMaterialUniform& setBackgroundColor(const Color4& color) {
+        backgroundColor = color;
+        return *this;
+    }
+
+    /**
+     * @}
+     */
+
+    /**
+     * @brief Fill color
+     *
+     * Default is @cpp 0xffffffff_rgbaf @ce.
+     * @see @ref VectorGL::setColor()
+     */
+    Color4 color;
+
+    /**
+     * @brief Background color
+     *
+     * Default is @cpp 0x00000000_rgbaf @ce.
+     * @see @ref VectorGL::setBackgroundColor()
+     */
+    Color4 backgroundColor;
+
+    /* warning: Member __pad0__ is not documented. FFS DOXYGEN WHY DO YOU THINK
+       I MADE THOSE UNNAMED, YOU DUMB FOOL */
+    #ifndef DOXYGEN_GENERATING_OUTPUT
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad0 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32; /* reserved for alpha mask */
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad1 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32;
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad2 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32;
+    Int
+        #if (defined(CORRADE_TARGET_CLANG) && __clang_major__ < 4) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 8)
+        _pad3 /* Otherwise it refuses to constexpr, on 3.8 at least */
+        #endif
+        :32;
+    #endif
+};
+
+#ifdef MAGNUM_BUILD_DEPRECATED
+/** @brief @copybrief Shaders::VectorGL
+ * @m_deprecated_since_latest Use @ref Shaders::VectorGL "VectorGL" instead.
+ */
+#ifndef CORRADE_MSVC2015_COMPATIBILITY /* Multiple definitions still broken */
+template<UnsignedInt dimensions> using Vector CORRADE_DEPRECATED_ALIAS("use VectorGL instead") = VectorGL<dimensions>;
+#endif
+
+/** @brief @copybrief VectorGL2D
+ * @m_deprecated_since_latest Use @ref VectorGL2D instead.
+ */
+typedef CORRADE_DEPRECATED("use VectorGL2D instead") VectorGL2D Vector2D;
+
+/** @brief @copybrief VectorGL3D
+ * @m_deprecated_since_latest Use @ref VectorGL3D instead.
+ */
+typedef CORRADE_DEPRECATED("use VectorGL3D instead") VectorGL3D Vector3D;
 #endif
 
 }}

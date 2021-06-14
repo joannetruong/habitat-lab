@@ -14,9 +14,9 @@ TEST_EPISODE_COUNT: -1
 NUM_ENVIRONMENTS: 8
 SENSORS: ["DEPTH_SENSOR"]
 NUM_UPDATES: -1
-TOTAL_NUM_STEPS: 2.5e9
+TOTAL_NUM_STEPS: 2e8
 LOG_INTERVAL: 10
-NUM_CHECKPOINTS: 100
+NUM_CHECKPOINTS: 50
 # Force PyTorch to be single threaded as
 # this improves performance considerably
 FORCE_TORCH_SINGLE_THREADED: True
@@ -26,7 +26,7 @@ RL:
   SUCCESS_REWARD: 5.0
   STEP_PROXIMITY_THRESHOLD: 0.15  # maxium proximity threshold (0.15)
   STEP_PROXIMITY_PENALTY: -0.1 # penalty multiplier  
-  PROXIMITY_PENALTY_TYPE: COLL # penalty multiplier  
+  PROXIMITY_PENALTY_TYPE: None   
 
   POLICY:
     name: "PointNavResNetPolicy"
@@ -63,7 +63,7 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: /coc/testnvme/jtruong33/habitat-cont/habitat-lab/ddppo-models/gibson-4plus-resnet50.pth
+    pretrained_weights: /coc/testnvme/jtruong33/habitat-cont-v2/habitat-lab/ddppo-models/locobot_sliding_125M.pth
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights

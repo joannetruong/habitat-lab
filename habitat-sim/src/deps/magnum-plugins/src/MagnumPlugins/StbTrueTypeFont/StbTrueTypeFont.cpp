@@ -27,6 +27,7 @@
 
 #include <algorithm>
 #include <Corrade/PluginManager/AbstractManager.h>
+#include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/Unicode.h>
 #include <Magnum/Image.h>
 #include <Magnum/ImageView.h>
@@ -82,19 +83,19 @@ FontFeatures StbTrueTypeFont::doFeatures() const { return FontFeature::OpenData;
 bool StbTrueTypeFont::doIsOpened() const { return !!_font; }
 
 auto StbTrueTypeFont::doOpenData(const Containers::ArrayView<const char> data, const Float size) -> Metrics {
-    Containers::Pointer<Font> font{Containers::InPlaceInit};
-
-    /* TrueType fonts are memory-mapped, thus we need to preserve the data for
-       the whole plugin lifetime */
-    font->data = Containers::Array<unsigned char>(data.size());
-    std::copy(data.begin(), data.end(), font->data.begin());
-
     /* stbtt_GetFontOffsetForIndex() fails hard when passed it an empty file
        (because of course it doesn't take a size, ffs), check explicitly */
     if(data.empty()) {
         Error{} << "Text::StbTrueTypeFont::openData(): the file is empty";
         return {};
     }
+
+    Containers::Pointer<Font> font{InPlaceInit};
+
+    /* TrueType fonts are memory-mapped, thus we need to preserve the data for
+       the whole plugin lifetime */
+    font->data = Containers::Array<unsigned char>(NoInit, data.size());
+    Utility::copy(Containers::arrayCast<const unsigned char>(data), font->data);
 
     /** @todo ability to specify different font index in TTC collection */
     const int offset = stbtt_GetFontOffsetForIndex(font->data, 0);
@@ -136,7 +137,7 @@ Vector2 StbTrueTypeFont::doGlyphAdvance(const UnsignedInt glyph) {
 
 void StbTrueTypeFont::doFillGlyphCache(AbstractGlyphCache& cache, const std::u32string& characters) {
     /* Get glyph codes from characters */
-    Containers::Array<Int> glyphIndices{Containers::NoInit, characters.size() + 1};
+    Containers::Array<Int> glyphIndices{NoInit, characters.size() + 1};
     glyphIndices[0] = 0;
     std::transform(characters.begin(), characters.end(), glyphIndices.begin()+1,
         [this](const char32_t c) { return stbtt_FindGlyphIndex(&_font->info, c); });
@@ -163,11 +164,11 @@ void StbTrueTypeFont::doFillGlyphCache(AbstractGlyphCache& cache, const std::u32
        directly into the texture. What a pity. */
     Range2Di maxBox;
     stbtt_GetFontBoundingBox(&_font->info, &maxBox.min().x(), &maxBox.min().y(), &maxBox.max().x(), &maxBox.max().y());
-    Containers::Array<UnsignedByte> glyphPixmap{Containers::NoInit,
+    Containers::Array<UnsignedByte> glyphPixmap{NoInit,
         std::size_t(maxBox.size().product())};
 
     /* Render all characters to the atlas and create character map */
-    Containers::Array<char> pixmap{Containers::ValueInit, std::size_t(cache.textureSize().product())};
+    Containers::Array<char> pixmap{ValueInit, std::size_t(cache.textureSize().product())};
     for(std::size_t i = 0; i != glyphPositions.size(); ++i) {
         /* Render glyph */
         Range2Di box;

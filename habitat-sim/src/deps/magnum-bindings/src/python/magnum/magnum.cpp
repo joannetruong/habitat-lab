@@ -35,6 +35,7 @@
 
 #include "Corrade/PythonBindings.h"
 #include "Corrade/Containers/PythonBindings.h"
+#include "Corrade/Containers/StridedArrayViewPythonBindings.h"
 #include "Magnum/PythonBindings.h"
 
 #include "magnum/bootstrap.h"
@@ -66,7 +67,7 @@ template<class T> void image(py::class_<T>& c) {
             return Containers::pyArrayViewHolder(self.data(), self.data() ? py::cast(self) : py::none{});
         }, "Image data")
         .def_property_readonly("pixels", [](T& self) {
-            return Containers::pyArrayViewHolder(self.pixels(), self.data() ? py::cast(self) : py::none{});
+            return Containers::pyArrayViewHolder(Containers::PyStridedArrayView<T::Dimensions + 1, const char>{self.pixels()}, self.data() ? py::cast(self) : py::none{});
         }, "View on pixel data");
 }
 
@@ -136,7 +137,7 @@ template<class T> void imageView(py::class_<T, PyImageViewHolder<T>>& c) {
             pyObjectHolderFor<Containers::PyArrayViewHolder>(data).owner;
         }, "Image data")
         .def_property_readonly("pixels", [](T& self) {
-            return Containers::pyArrayViewHolder(self.pixels(), pyObjectHolderFor<PyImageViewHolder>(self).owner);
+            return Containers::pyArrayViewHolder(Containers::PyStridedArrayView<T::Dimensions + 1, typename T::Type>{self.pixels()}, pyObjectHolderFor<PyImageViewHolder>(self).owner);
         }, "View on pixel data")
 
         .def_property_readonly("owner", [](T& self) {

@@ -85,6 +85,7 @@ ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
 ACTIONS.VELOCITY_CONTROL.USE_STRAFE = False 
 ACTIONS.VELOCITY_CONTROL.AUTO_STOP = False 
 ACTIONS.VELOCITY_CONTROL.MAX_COLLISIONS = -1  
+ACTIONS.VELOCITY_CONTROL.USE_OBLONG_ROBOT = False
 
 _C.TASK.ACTIONS = ACTIONS
 # -----------------------------------------------------------------------------
@@ -355,6 +356,7 @@ _C.PYROBOT.LOCOBOT.CAMERA_ACTIONS = ["set_pan", "set_tilt", "set_pan_tilt"]
 _C.DATASET = CN()
 _C.DATASET.TYPE = "PointNav-v1"
 _C.DATASET.SPLIT = "train"
+_C.DATASET.VAL_SPLIT = "val_split5"
 _C.DATASET.SCENES_DIR = "data/scene_datasets"
 _C.DATASET.CONTENT_SCENES = ["*"]
 _C.DATASET.DATA_PATH = (

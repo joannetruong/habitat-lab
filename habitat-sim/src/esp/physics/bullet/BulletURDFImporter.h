@@ -4,7 +4,8 @@
 
 // Code adapted from Bullet3/examples/Importers/ImportURDFDemo ...
 
-#pragma once
+#ifndef ESP_PHYSICS_BULLET_BULLETURDFIMPORTER_H_
+#define ESP_PHYSICS_BULLET_BULLETURDFIMPORTER_H_
 
 #include <btBulletDynamicsCommon.h>
 #include "BulletDynamics/Featherstone/btMultiBodyDynamicsWorld.h"
@@ -35,24 +36,21 @@ struct JointLimitConstraintInfo {
  * @brief Structure to hold construction time multi-body data.
  */
 struct URDF2BulletCached {
-  URDF2BulletCached()
-      : m_currentMultiBodyLinkIndex(-1),
-        m_bulletMultiBody(0),
-        m_totalNumJoints1(0) {}
+  URDF2BulletCached() = default;
   // these arrays will be initialized in the 'InitURDF2BulletCache'
 
   std::vector<int> m_urdfLinkParentIndices;
   std::vector<int> m_urdfLinkIndices2BulletLinkIndices;
   std::vector<btTransform> m_urdfLinkLocalInertialFrames;
 
-  int m_currentMultiBodyLinkIndex;
+  int m_currentMultiBodyLinkIndex{-1};
 
-  class btMultiBody* m_bulletMultiBody;
+  class btMultiBody* m_bulletMultiBody{nullptr};
 
   std::map<int, JointLimitConstraintInfo> m_jointLimitConstraints;
 
   // this will be initialized in the constructor
-  int m_totalNumJoints1;
+  int m_totalNumJoints1{0};
   int getParentUrdfIndex(int linkIndex) const {
     return m_urdfLinkParentIndices[linkIndex];
   }
@@ -62,16 +60,6 @@ struct URDF2BulletCached {
       return -2;
     return m_urdfLinkIndices2BulletLinkIndices[urdfIndex];
   }
-
-  void registerMultiBody(int urdfLinkIndex,
-                         class btMultiBody* body,
-                         const btTransform& worldTransform,
-                         btScalar mass,
-                         const btVector3& localInertiaDiagonal,
-                         const class btCollisionShape* compound,
-                         const btTransform& localInertialFrame) {
-    m_urdfLinkLocalInertialFrames[urdfLinkIndex] = localInertialFrame;
-  }
 };
 
 /**
@@ -79,17 +67,19 @@ struct URDF2BulletCached {
  */
 class BulletURDFImporter : public URDFImporter {
  public:
-  BulletURDFImporter(esp::assets::ResourceManager& resourceManager)
-      : URDFImporter(resourceManager){};
+  explicit BulletURDFImporter(esp::assets::ResourceManager& resourceManager)
+      : URDFImporter(resourceManager) {}
 
   ~BulletURDFImporter() override = default;
 
   btCollisionShape* convertURDFToCollisionShape(
-      const struct io::URDF::CollisionShape* collision);
+      const struct io::URDF::CollisionShape* collision,
+      std::vector<std::unique_ptr<btCollisionShape>>& linkChildShapes);
 
   btCompoundShape* convertLinkCollisionShapes(
       int linkIndex,
-      const btTransform& localInertiaFrame);
+      const btTransform& localInertiaFrame,
+      std::vector<std::unique_ptr<btCollisionShape>>& linkChildShapes);
 
   int getCollisionGroupAndMask(int linkIndex,
                                int& colGroup,
@@ -111,7 +101,9 @@ class BulletURDFImporter : public URDFImporter {
       const Magnum::Matrix4& parentTransformInWorldSpace,
       btMultiBodyDynamicsWorld* world1,
       int flags,
-      std::map<int, std::unique_ptr<btCollisionShape>>& linkCollisionShapes);
+      std::map<int, std::unique_ptr<btCompoundShape>>& linkCompoundShapes,
+      std::map<int, std::vector<std::unique_ptr<btCollisionShape>>>&
+          linkChildShapes);
 };
 
 void processContactParameters(const io::URDF::LinkContactInfo& contactInfo,
@@ -119,3 +111,5 @@ void processContactParameters(const io::URDF::LinkContactInfo& contactInfo,
 
 }  // namespace physics
 }  // namespace esp
+
+#endif  // ESP_PHYSICS_BULLET_BULLETURDFIMPORTER_H_

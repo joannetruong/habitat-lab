@@ -84,9 +84,9 @@ enum class Flag: unsigned char {
 
     /**
      * Skip regular files
-     * @partialsupport On @ref CORRADE_TARGET_WINDOWS "Windows" and in
+     * @partialsupport On @ref CORRADE_TARGET_WINDOWS "Windows" and
      *      @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" skips everything except
-     *      directories.
+     *      directories, as there's no concept of a special file.
      */
     SkipFiles = 1 << 1,
 
@@ -95,9 +95,9 @@ enum class Flag: unsigned char {
 
     /**
      * Skip everything that is not a file or directory
-     * @partialsupport Has no effect on @ref CORRADE_TARGET_WINDOWS "Windows".
-     *      In @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten" skips everything
-     *      except directories.
+     * @partialsupport Has no effect on @ref CORRADE_TARGET_WINDOWS "Windows"
+     *      and @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten", as these platforms
+     *      don't have a concept of a special file.
      */
     SkipSpecial = 1 << 3,
 
@@ -202,7 +202,12 @@ CORRADE_UTILITY_EXPORT std::string join(std::initializer_list<std::string> paths
 /**
 @brief List directory contents
 
-On failure returns empty vector.
+On failure returns an empty vector. Expects that the path is in UTF-8.
+@partialsupport On @ref CORRADE_TARGET_UNIX "Unix" platforms and
+    @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten", symlinks are followed and
+    @ref Flag::SkipFiles and @ref Flag::SkipDirectories affects the link
+    target, not the link itself. This behavior is not implemented on Windows at
+    the moment.
 @see @ref isDirectory(), @ref exists()
 */
 CORRADE_UTILITY_EXPORT std::vector<std::string> list(const std::string& path, Flags flags = Flags());
@@ -393,6 +398,10 @@ CORRADE_UTILITY_EXPORT bool exists(const std::string& filename);
 Returns @cpp true @ce if the path exists, is accessible (i.e., user has a
 permission to open it) and is a directory, @cpp false @ce otherwise. Expects
 that the filename is in UTF-8.
+@partialsupport On @ref CORRADE_TARGET_UNIX "Unix" platforms and
+    @ref CORRADE_TARGET_EMSCRIPTEN "Emscripten", symlinks are followed, so this
+    function will return @cpp true @ce for a symlink that points to a
+    directory. This behavior is not implemented on Windows at the moment.
 @see @ref exists(), @ref list()
 */
 CORRADE_UTILITY_EXPORT bool isDirectory(const std::string& path);

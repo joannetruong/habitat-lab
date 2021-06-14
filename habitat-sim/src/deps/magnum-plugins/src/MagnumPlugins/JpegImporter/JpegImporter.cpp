@@ -27,6 +27,7 @@
 
 #include <csetjmp>
 #include <Corrade/Containers/Optional.h>
+#include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/Debug.h>
 #include <Magnum/PixelFormat.h>
 #include <Magnum/Trade/ImageData.h>
@@ -78,8 +79,8 @@ void JpegImporter::doOpenData(const Containers::ArrayView<const char> data) {
         return;
     }
 
-    _in = Containers::Array<unsigned char>(data.size());
-    std::copy(data.begin(), data.end(), _in.begin());
+    _in = Containers::Array<unsigned char>{NoInit, data.size()};
+    Utility::copy(Containers::arrayCast<const unsigned char>(data), _in);
 }
 
 UnsignedInt JpegImporter::doImage2DCount() const { return 1; }

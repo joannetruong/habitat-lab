@@ -55,6 +55,8 @@ struct ArrayTupleTest: TestSuite::Tester {
     void constructCopy();
     void constructMove();
 
+    void constructBig();
+
     void allocatorAlignmentEmpty();
     template<int a> void allocatorAlignmentFromItems();
     template<int a> void allocatorAlignmentFromDeleter();
@@ -85,6 +87,8 @@ ArrayTupleTest::ArrayTupleTest() {
 
               &ArrayTupleTest::constructCopy,
               &ArrayTupleTest::constructMove,
+
+              &ArrayTupleTest::constructBig,
 
               &ArrayTupleTest::allocatorAlignmentEmpty,
               &ArrayTupleTest::allocatorAlignmentFromItems<1>,
@@ -171,7 +175,7 @@ void ArrayTupleTest::constructEmptyArrays() {
     CORRADE_COMPARE(NonCopyable::destructed, 0);
 }
 
-template<int align> struct CORRADE_ALIGNAS(align) Aligned {
+template<int align> struct alignas(align) Aligned {
     Aligned() {
         ++constructed;
     }
@@ -264,10 +268,10 @@ void ArrayTupleTest::constructNoInit() {
         ArrayView<NonCopyable> noncopyable;
         ArrayView<NonCopyable> initializedNoncopyable;
         ArrayTuple data{
-            {{NoInit, 15, chars},
-             {ValueInit, 15, initializedChars},
-             {NoInit, 3, noncopyable},
-             {ValueInit, 2, initializedNoncopyable}},
+            {{Corrade::NoInit, 15, chars},
+             {Corrade::ValueInit, 15, initializedChars},
+             {Corrade::NoInit, 3, noncopyable},
+             {Corrade::ValueInit, 2, initializedNoncopyable}},
             [&](std::size_t, std::size_t) -> std::pair<char*, void(*)(char*, std::size_t)> {
                 return {storage, [](char*, std::size_t) { }};
             }
@@ -375,7 +379,7 @@ void ArrayTupleTest::constructStatelessDeleter() {
     CORRADE_COMPARE(NonCopyable::destructed, 3);
 }
 
-struct CORRADE_ALIGNAS(16) StatefulAlignedNonTriviallyDestructibleDeleter {
+struct alignas(16) StatefulAlignedNonTriviallyDestructibleDeleter {
     explicit StatefulAlignedNonTriviallyDestructibleDeleter(void*& thisPointer, char*& usedDeleterPointer, std::size_t& usedDeleterSize, int& copyConstructorCallCount, int& destructorCallCount): _usedThisPointer{&thisPointer}, _usedDeleterPointer{&usedDeleterPointer}, _usedDeleterSize{&usedDeleterSize}, _copyConstructorCallCount{&copyConstructorCallCount}, _destructorCallCount{&destructorCallCount} {}
 
     void operator()(char* data, std::size_t size) {
@@ -651,6 +655,80 @@ void ArrayTupleTest::constructMove() {
     CORRADE_VERIFY(std::is_nothrow_move_assignable<ArrayTuple>::value);
 }
 
+struct Big {
+    Big(const Big&) = delete;
+    Big(Big&&) = delete;
+    Big& operator=(const Big&) = delete;
+    Big& operator=(Big&&) = delete;
+    Big() {
+        ++constructed;
+        thisPointer = this;
+        thisPointer2 = this;
+    }
+
+    ~Big() {
+        /* Just a check that the deleter is really called on a correct address.
+           If it's not, the memory will contain something different and this
+           won't match. */
+        if(thisPointer == this && thisPointer2 == this)
+            ++destructed;
+    }
+
+    Big* thisPointer;
+    Big* thisPointer2;
+
+    static int constructed;
+    static int destructed;
+};
+
+int Big::constructed = 0;
+int Big::destructed = 0;
+
+void ArrayTupleTest::constructBig()
+{
+    Big::constructed = 0;
+    Big::destructed = 0;
+
+    {
+        ArrayView<char> chars;
+        ArrayView<Big> bigs;
+        ArrayTuple data{
+            {17, chars},
+            {7, bigs}
+        };
+
+        /* Check base properties */
+        CORRADE_COMPARE(data.size(),
+            sizeof(void*) +         /* destructible item count */
+            2*(4*sizeof(void*)) +   /* one destructible item + deleter */
+            17 +                    /* chars, padding */
+                (sizeof(void*) == 4 ? 3 : 7) +
+            7*sizeof(Big)           /* bigs */
+        );
+        CORRADE_VERIFY(data.data());
+        /* Custom deleter to call the destructors */
+        CORRADE_VERIFY(data.deleter());
+
+        /* Check array sizes and offsets */
+        CORRADE_COMPARE(chars.size(), 17);
+        CORRADE_COMPARE(bigs.size(), 7);
+        CORRADE_COMPARE(static_cast<void*>(chars.data()), data.data() +
+            sizeof(void*) + 2*(4*sizeof(void*)));
+        CORRADE_COMPARE(static_cast<void*>(bigs.data()), data.data() +
+            sizeof(void*) + 2*(4*sizeof(void*)) + 17 + (sizeof(void*) == 4 ? 3 : 7));
+
+        /* Check that trivial types are zero-init'd and nontrivial had their
+           constructor called */
+        for(char i: chars) CORRADE_COMPARE(i, 0);
+        CORRADE_COMPARE(Big::constructed, 7);
+        CORRADE_COMPARE(Big::destructed, 0);
+    }
+
+    /* Check that non-trivial destructors were called */
+    CORRADE_COMPARE(Big::constructed, 7);
+    CORRADE_COMPARE(Big::destructed, 7);
+}
+
 void ArrayTupleTest::allocatorAlignmentEmpty() {
     std::size_t alignmentRequirement = ~std::size_t{};
 
@@ -692,7 +770,7 @@ template<int a> void ArrayTupleTest::allocatorAlignmentFromDeleter() {
 
     CORRADE_VERIFY(true); /* Just to register correct function name */
 
-    struct CORRADE_ALIGNAS(a) Deleter {
+    struct alignas(a) Deleter {
         #ifdef CORRADE_MSVC2015_COMPATIBILITY
         /* If this is not present on MSVC2015, the test segfaults. HEH */
         char aehhhhh;

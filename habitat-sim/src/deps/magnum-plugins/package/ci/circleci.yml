@@ -146,6 +146,22 @@ commands:
           wget -nc https://github.com/BinomialLLC/basis_universal/archive/$BASIS_VERSION.tar.gz
           tar --strip-components 1 -xzf $BASIS_VERSION.tar.gz
 
+  install-openexr:
+    parameters:
+      build:
+        type: string
+    steps:
+    - run:
+        name: Install OpenEXR
+        # Zip from https://github.com/mosra/magnum-ci/tree/openexr and
+        # self-hosted because GH Actions would make it too simple for people if
+        # you could just download the artifacts directly, right? RIGHT?
+        command: |
+          apt install -y wget unzip
+          mkdir -p $HOME/deps && cd $HOME/deps
+          wget https://ci.magnum.graphics/openexr-2.5.5-<< parameters.build >>.zip
+          unzip openexr-2.5.5-<< parameters.build >>.zip
+
   install-glslang:
     parameters:
       build:
@@ -222,6 +238,8 @@ jobs:
     - install-meshoptimizer
     - install-glslang:
         build: ubuntu-16.04-gcc4.8
+    - install-openexr:
+        build: ubuntu-16.04-gcc4.8
     - install-spirv-tools:
         build: ubuntu-16.04-gcc4.8
     - build:
@@ -245,6 +263,9 @@ jobs:
     - install-meshoptimizer
     - install-glslang:
         build: ubuntu-16.04-gcc4.8
+    # Can't use libopenexr-dev because of GCC 4.8 / 5 ABI break in std::string
+    - install-openexr:
+        build: ubuntu-16.04-gcc4.8
     - install-spirv-tools:
         build: ubuntu-16.04-gcc4.8
     - build:
@@ -266,6 +287,9 @@ jobs:
     - install-basis
     - install-meshoptimizer
     - install-glslang:
+        build: ubuntu-16.04-gcc4.8
+    # Can't use libopenexr-dev because of GCC 4.8 / 5 ABI break in std::string
+    - install-openexr:
         build: ubuntu-16.04-gcc4.8
     - install-spirv-tools:
         build: ubuntu-16.04-gcc4.8
@@ -290,6 +314,13 @@ jobs:
     - install-meshoptimizer
     - install-glslang:
         build: ubuntu-16.04-gcc5
+    # Even though Clang 3.8 is able to work with libopenexr-dev, the version
+    # 2.2 present in the 16.04 repos leaks like crazy, which is in direct
+    # conflict to what this job is trying to test for. The only job that
+    # actually runs against libopenexr-dev (and thus verifies compatibility
+    # with 2.2) is the ThreadSanitizer build below.
+    - install-openexr:
+        build: ubuntu-16.04-gcc5
     - install-spirv-tools:
         build: ubuntu-16.04-gcc5
     - build:
@@ -306,7 +337,7 @@ jobs:
       CONFIGURATION: Debug
     steps:
     - install-base-linux:
-        extra: libfaad-dev libfreetype6-dev libjpeg-dev libopenal-dev libpng12-dev libdevil-dev libharfbuzz-dev libassimp-dev wget
+        extra: libfaad-dev libfreetype6-dev libjpeg-dev libopenal-dev libpng12-dev libdevil-dev libharfbuzz-dev libassimp-dev libopenexr-dev wget
     - install-clang-3_8
     - install-cmake-3_4
     - install-basis
@@ -327,7 +358,7 @@ jobs:
       CONFIGURATION: Debug
     steps:
     - install-base-macos:
-        extra: faad2 harfbuzz assimp devil spirv-tools glslang wget
+        extra: faad2 harfbuzz assimp devil spirv-tools glslang openexr wget
     - install-basis
     - install-meshoptimizer
     - build:
@@ -345,7 +376,7 @@ jobs:
       CONFIGURATION: Debug
     steps:
     - install-base-macos:
-        extra: faad2 harfbuzz assimp devil spirv-tools glslang wget
+        extra: faad2 harfbuzz assimp devil spirv-tools glslang openexr wget
     - install-basis
     - install-meshoptimizer
     - build:

@@ -380,6 +380,7 @@ template<class T> void vector3(py::class_<Math::Vector3<T>>& c) {
     c
         /* Constructors */
         .def(py::init<T, T, T>(), "Constructor")
+        .def(py::init<Math::Vector2<T>, T>(), "Constructor")
         .def(py::init([](const std::tuple<T, T, T>& value) {
             return Math::Vector3<T>{std::get<0>(value), std::get<1>(value), std::get<2>(value)};
         }), "Construct from a tuple")
@@ -437,6 +438,7 @@ template<class T> void vector4(py::class_<Math::Vector4<T>>& c) {
     c
         /* Constructors */
         .def(py::init<T, T, T, T>(), "Constructor")
+        .def(py::init<Math::Vector3<T>, T>(), "Constructor")
         .def(py::init([](const std::tuple<T, T, T, T>& value) {
             return Math::Vector4<T>{std::get<0>(value), std::get<1>(value), std::get<2>(value), std::get<3>(value)};
         }), "Construct from a tuple")

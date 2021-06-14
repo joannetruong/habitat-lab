@@ -243,6 +243,34 @@ int answer{};
 }
 
 {
+float delta{};
+/* [CORRADE_INFO] */
+CORRADE_INFO("The calculated delta is" << delta);
+/* [CORRADE_INFO] */
+}
+
+{
+float delta{};
+/* [CORRADE_WARN] */
+if(delta > 0.05f)
+    CORRADE_WARN("The delta" << delta << "is higher than ideal");
+
+CORRADE_VERIFY(delta < 0.1f);
+/* [CORRADE_WARN] */
+}
+
+{
+bool extremelyStable = false;
+float delta{};
+/* [CORRADE_FAIL] */
+CORRADE_FAIL_IF(delta > 0.05f && !extremelyStable,
+    "Low precision due to system instability, delta is" << delta);
+
+CORRADE_VERIFY(delta < 0.1f);
+/* [CORRADE_FAIL] */
+}
+
+{
 bool bigEndian = false;
 /* [CORRADE_SKIP] */
 if(!bigEndian) {

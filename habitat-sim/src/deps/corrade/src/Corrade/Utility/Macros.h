@@ -27,7 +27,7 @@
 */
 
 /** @file
- * @brief Macro @ref CORRADE_DEPRECATED(), @ref CORRADE_DEPRECATED_ALIAS(), @ref CORRADE_DEPRECATED_NAMESPACE(), @ref CORRADE_DEPRECATED_ENUM(), @ref CORRADE_DEPRECATED_FILE(), @ref CORRADE_DEPRECATED_MACRO(), @ref CORRADE_IGNORE_DEPRECATED_PUSH, @ref CORRADE_IGNORE_DEPRECATED_POP, @ref CORRADE_UNUSED, @ref CORRADE_ALIGNAS(), @ref CORRADE_NORETURN, @ref CORRADE_FALLTHROUGH, @ref CORRADE_THREAD_LOCAL, @ref CORRADE_CONSTEXPR14, @ref CORRADE_ALWAYS_INLINE, @ref CORRADE_NEVER_INLINE, @ref CORRADE_FUNCTION, @ref CORRADE_LINE_STRING, @ref CORRADE_AUTOMATIC_INITIALIZER(), @ref CORRADE_AUTOMATIC_FINALIZER()
+ * @brief Macro @ref CORRADE_DEPRECATED(), @ref CORRADE_DEPRECATED_ALIAS(), @ref CORRADE_DEPRECATED_NAMESPACE(), @ref CORRADE_DEPRECATED_ENUM(), @ref CORRADE_DEPRECATED_FILE(), @ref CORRADE_DEPRECATED_MACRO(), @ref CORRADE_IGNORE_DEPRECATED_PUSH, @ref CORRADE_IGNORE_DEPRECATED_POP, @ref CORRADE_UNUSED, @ref CORRADE_FALLTHROUGH, @ref CORRADE_THREAD_LOCAL, @ref CORRADE_CONSTEXPR14, @ref CORRADE_ALWAYS_INLINE, @ref CORRADE_NEVER_INLINE, @ref CORRADE_LIKELY(), @ref CORRADE_UNLIKELY(), @ref CORRADE_FUNCTION, @ref CORRADE_LINE_STRING, @ref CORRADE_AUTOMATIC_INITIALIZER(), @ref CORRADE_AUTOMATIC_FINALIZER()
  */
 
 #include "Corrade/configure.h"
@@ -75,9 +75,9 @@ deprecated classes or typedefs, only when the type is instantiated --- i.e.,
 @cpp DeprecatedStruct a; @ce will warn, but @cpp DeprecatedStruct::Value @ce
 will not.
 */
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_CLANG)
 #define CORRADE_DEPRECATED(message) __attribute((deprecated(message)))
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_DEPRECATED(message) __declspec(deprecated(message))
 #else
 #define CORRADE_DEPRECATED(message)
@@ -100,9 +100,9 @@ will not.
     @ref CORRADE_DEPRECATED_ENUM(), @ref CORRADE_DEPRECATED_FILE(),
     @ref CORRADE_DEPRECATED_MACRO()
 */
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_CLANG)
 #define CORRADE_DEPRECATED_ALIAS(message) __attribute((deprecated(message)))
-#elif defined(_MSC_VER) && _MSC_VER >= 1910
+#elif defined(CORRADE_TARGET_MSVC) && _MSC_VER >= 1910
 #define CORRADE_DEPRECATED_ALIAS(message) [[deprecated(message)]]
 #else
 #define CORRADE_DEPRECATED_ALIAS(message)
@@ -118,24 +118,17 @@ Marked enum or enum value will emit deprecation warning on supported compilers
 
 Note that this doesn't work on namespace aliases (i.e., marking
 @cpp namespace Bar = Foo; @ce with this macro will result in a compile error.
-
-GCC claims support since version 4.9, but even in version 8.2 it only emits an
-"attribute ignored" warning at the declaration location and no diagnostic when
-such namespace is used --- which is practically useless
-([source](https://stackoverflow.com/q/46052410)).
-
 @see @ref CORRADE_DEPRECATED(), @ref CORRADE_DEPRECATED_ALIAS(),
     @ref CORRADE_DEPRECATED_ENUM(), @ref CORRADE_DEPRECATED_FILE(),
     @ref CORRADE_DEPRECATED_MACRO()
 */
-#if defined(__clang__)
+#if defined(CORRADE_TARGET_CLANG)
 /* Clang < 6.0 warns that this is a C++14 extension, Clang 6.0+ warns that
    namespace attributes are a C++17 extension and deprecated attribute is a
    C++14 extension. Clang < 6.0 doesn't know -Wc++17-extensions, so can't
-   disable both in the same macro. Also, Apple has its own versioning of Clang
-   (even in __clang_major__, args) and at the moment (April 2018) latest Xcode
-   9.3 maps to Clang 5.1, so I assume Xcode 10 will be Clang 6. Yay? */
-#if (!defined(CORRADE_TARGET_APPLE) && __clang_major__ < 6) || (defined(CORRADE_TARGET_APPLE) && __clang_major__ < 10)
+   disable both in the same macro. Also, Apple has its own versioning and Clang
+   6 maps to AppleClang 10. */
+#if (!defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 6) || (defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ < 10)
 #define CORRADE_DEPRECATED_NAMESPACE(message) _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wc++14-extensions\"") [[deprecated(message)]] _Pragma("GCC diagnostic pop")
 #else
 #define CORRADE_DEPRECATED_NAMESPACE(message) _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wc++14-extensions\"") _Pragma("GCC diagnostic ignored \"-Wc++17-extensions\"") [[deprecated(message)]] _Pragma("GCC diagnostic pop")
@@ -168,9 +161,9 @@ the annotation, but ignores it for both enums and enum values.
    Qt. Not sure what version was it fixed in as the bugreports don't tell
    (https://bugreports.qt.io/browse/QTBUG-78820) so disabling it for MOC
    altogether */
-#if (defined(__clang__) || (defined(__GNUC__) && __GNUC__ >= 6)) && !defined(Q_MOC_RUN)
+#if (defined(CORRADE_TARGET_CLANG) || (defined(CORRADE_TARGET_GCC) && __GNUC__ >= 6)) && !defined(Q_MOC_RUN)
 #define CORRADE_DEPRECATED_ENUM(message) __attribute((deprecated(message)))
-#elif defined(_MSC_VER) && !defined(Q_MOC_RUN)
+#elif defined(CORRADE_TARGET_MSVC) && !defined(Q_MOC_RUN)
 #define CORRADE_DEPRECATED_ENUM(message) [[deprecated(message)]]
 #else
 #define CORRADE_DEPRECATED_ENUM(message)
@@ -199,11 +192,11 @@ in any way.
     @ref CORRADE_DEPRECATED_NAMESPACE(), @ref CORRADE_DEPRECATED_ENUM(),
     @ref CORRADE_DEPRECATED_MACRO()
 */
-#if defined(__clang__)
+#if defined(CORRADE_TARGET_CLANG)
 #define CORRADE_DEPRECATED_FILE(message) _Pragma(_CORRADE_HELPER_STR(GCC warning ("this file is deprecated: " message)))
-#elif defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 408
+#elif defined(CORRADE_TARGET_GCC) && __GNUC__*100 + __GNUC_MINOR__ >= 408
 #define CORRADE_DEPRECATED_FILE(message) _Pragma(_CORRADE_HELPER_STR(GCC warning message))
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_DEPRECATED_FILE(_message) __pragma(message ("warning: " __FILE__ " is deprecated: " _message))
 #else
 #define CORRADE_DEPRECATED_FILE(message)
@@ -232,11 +225,11 @@ contribute to the warning log or warning count in any way.
     @ref CORRADE_DEPRECATED_NAMESPACE(), @ref CORRADE_DEPRECATED_ENUM(),
     @ref CORRADE_DEPRECATED_FILE()
 */
-#if defined(__clang__)
+#if defined(CORRADE_TARGET_CLANG)
 #define CORRADE_DEPRECATED_MACRO(macro,message) _Pragma(_CORRADE_HELPER_STR(GCC warning ("this macro is deprecated: " message)))
-#elif defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 408
+#elif defined(CORRADE_TARGET_GCC) && __GNUC__*100 + __GNUC_MINOR__ >= 408
 #define CORRADE_DEPRECATED_MACRO(macro,message) _Pragma(_CORRADE_HELPER_STR(GCC warning message))
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_DEPRECATED_MACRO(macro,_message) __pragma(message (__FILE__ ": warning: " _CORRADE_HELPER_STR(macro) " is deprecated: " _message))
 #else
 #define CORRADE_DEPRECATED_MACRO(macro,message)
@@ -259,11 +252,11 @@ In particular, warnings from @ref CORRADE_DEPRECATED(),
 @ref CORRADE_DEPRECATED_FILE() and @ref CORRADE_DEPRECATED_MACRO() warnings are
 suppressed only on Clang.
 */
-#ifdef __clang__
+#ifdef CORRADE_TARGET_CLANG
 #define CORRADE_IGNORE_DEPRECATED_PUSH _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"") _Pragma("GCC diagnostic ignored \"-W#pragma-messages\"")
-#elif defined(__GNUC__)
+#elif defined(CORRADE_TARGET_GCC)
 #define CORRADE_IGNORE_DEPRECATED_PUSH _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_IGNORE_DEPRECATED_PUSH __pragma(warning(push)) __pragma(warning(disable: 4996))
 #else
 #define CORRADE_IGNORE_DEPRECATED_PUSH
@@ -274,9 +267,9 @@ suppressed only on Clang.
 
 See @ref CORRADE_IGNORE_DEPRECATED_PUSH for more information.
 */
-#ifdef __GNUC__
+#ifdef CORRADE_TARGET_GCC
 #define CORRADE_IGNORE_DEPRECATED_POP _Pragma("GCC diagnostic pop")
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_IGNORE_DEPRECATED_POP __pragma(warning(pop))
 #else
 #define CORRADE_IGNORE_DEPRECATED_POP
@@ -290,11 +283,22 @@ being unused. If possible, use @cpp static_cast<void>(var) @ce or nameless
 function parameters instead.
 
 @snippet Utility.cpp CORRADE_UNUSED
+
+Defined as the C++17 @cpp [[maybe_unused]] @ce attribute on GCC >= 7, with a
+compiler-specific variant on Clang, MSVC and older GCC. Clang and MSVC have
+their own specific macro always as they otherwise complain about use of a C++17
+feature when compiling as C++11 or C++14.
 */
-/* clang-cl doesn't understand MSVC warning numbers right now, so the
-   MSVC-specific variant below doesn't work */
-#if defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_CLANG_CL)
+#if (defined(CORRADE_TARGET_GCC) && __GNUC__ >= 7)
+#define CORRADE_UNUSED [[maybe_unused]]
+/* Clang unfortunately warns that [[maybe_unused]] is a C++17 extension, so we
+   use this instead of attempting to suppress the warning like we had to do
+   with CORRADE_DEPRECATED_NAMESPACE(). Also, clang-cl doesn't understand MSVC
+   warning numbers right now, so the MSVC-specific variant below doesn't work. */
+#elif defined(CORRADE_TARGET_GCC) || defined(CORRADE_TARGET_CLANG_CL)
 #define CORRADE_UNUSED __attribute__((__unused__))
+/* MSVC supports this since _MSC_VER >= 1911, unfortunately, the same as Clang,
+   only with /std:c++17. */
 #elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_UNUSED __pragma(warning(suppress:4100))
 #else
@@ -303,49 +307,51 @@ function parameters instead.
 
 /** @hideinitializer
 @brief Switch case fall-through
+@m_since{2020,06}
 
-Suppresses a warning about a @cpp case @ce fallthrough in a @cpp switch @ce on
-GCC >= 7 and Clang. GCC versions before 7 don't warn about the fallthrough, so
-there's no need to suppress anything; for the same reason the macro does
-nothing on MSVC. Expected to be put at a place where a @cpp break; @ce would
-usually be:
+Suppresses a warning about a @cpp case @ce fallthrough in a @cpp switch @ce.
+Expected to be put at a place where a @cpp break; @ce would usually be:
 
 @snippet Utility.cpp CORRADE_FALLTHROUGH
+
+@note Note that the semicolon is added by the macro itself --- it's done this
+    way to avoid warnings about superfluous semicolon on compilers where the
+    fallthrough attribute is unsupported.
+
+Defined as the C++17 @cpp [[fallthrough]] @ce attribute on GCC >= 7, Clang has
+its own specific macro as it complains about use of a C++17 feature when
+compiling as C++11 or C++14. On MSVC there's no pre-C++17 alternative so it's
+non-empty only on 2019 16.6+ and only if compiling under C++17, as it warns
+otherwise as well. Defined as empty on older GCC and MSVC --- these versions
+don't warn about the fallthrough, so there's no need to suppress anything.
 */
-#if defined(CORRADE_TARGET_GCC) && __GNUC__ >= 7
-#define CORRADE_FALLTHROUGH __attribute__((fallthrough));
+#if (defined(CORRADE_TARGET_MSVC) && _MSC_VER >= 1926 && CORRADE_CXX_STANDARD >= 201703) || (defined(CORRADE_TARGET_GCC) && __GNUC__ >= 7)
+#define CORRADE_FALLTHROUGH [[fallthrough]];
+/* Clang unfortunately warns that [[fallthrough]] is a C++17 extension, so we
+   use this instead of attempting to suppress the warning like we had to do
+   with CORRADE_DEPRECATED_NAMESPACE() */
 #elif defined(CORRADE_TARGET_CLANG)
 #define CORRADE_FALLTHROUGH [[clang::fallthrough]];
 #else
 #define CORRADE_FALLTHROUGH
 #endif
 
+#ifdef CORRADE_BUILD_DEPRECATED
 /** @hideinitializer
 @brief Type alignment specifier
-
-Expands to C++11 @cpp alignas() @ce specifier on supported compilers, otherwise
-falls back to compiler-specific attribute. Example usage:
-
-@snippet Utility.cpp CORRADE_ALIGNAS
+@m_deprecated_since_latest Use `alignas()` directly, as it's available on all
+    supported compilers.
 */
-#if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ < 408
-#define CORRADE_ALIGNAS(alignment) __attribute__((aligned(alignment)))
-#else
-#define CORRADE_ALIGNAS(alignment) alignas(alignment)
-#endif
+#define CORRADE_ALIGNAS(alignment) \
+    CORRADE_DEPRECATED_MACRO(CORRADE_ALIGNAS(),"use alignas() directly") alignas(alignment)
 
 /** @hideinitializer
 @brief Noreturn fuction attribute
-
-Expands to C++11 @cpp [[noreturn]] @ce attribute on supported compilers,
-otherwise falls back to compiler-specific attribute. Example usage:
-
-@snippet Utility.cpp CORRADE_NORETURN
+@m_deprecated_since_latest Use `[[noreturn]]` directly, as it's available on
+    all supported compilers.
 */
-#if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ < 408
-#define CORRADE_NORETURN __attribute__((noreturn))
-#else
-#define CORRADE_NORETURN [[noreturn]]
+#define CORRADE_NORETURN \
+    CORRADE_DEPRECATED_MACRO(CORRADE_NORETURN(),"use [[noreturn]] directly") [[noreturn]]
 #endif
 
 /** @hideinitializer
@@ -396,11 +402,11 @@ always suppresses all inlining. Example usage:
 
 @snippet Utility.cpp CORRADE_ALWAYS_INLINE
 
-@see @ref CORRADE_NEVER_INLINE
+@see @ref CORRADE_NEVER_INLINE, @ref CORRADE_LIKELY(), @ref CORRADE_UNLIKELY()
 */
-#ifdef __GNUC__
+#ifdef CORRADE_TARGET_GCC
 #define CORRADE_ALWAYS_INLINE __attribute__((always_inline)) inline
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_ALWAYS_INLINE __forceinline
 #else
 #define CORRADE_ALWAYS_INLINE inline
@@ -419,14 +425,81 @@ elsewhere. Example usage:
 
 @snippet Utility.cpp CORRADE_NEVER_INLINE
 
-@see @ref CORRADE_ALWAYS_INLINE
+@see @ref CORRADE_ALWAYS_INLINE, @ref CORRADE_LIKELY(), @ref CORRADE_UNLIKELY()
 */
-#ifdef __GNUC__
+#ifdef CORRADE_TARGET_GCC
 #define CORRADE_NEVER_INLINE __attribute__((noinline))
-#elif defined(_MSC_VER)
+#elif defined(CORRADE_TARGET_MSVC)
 #define CORRADE_NEVER_INLINE __declspec(noinline)
 #else
 #define CORRADE_NEVER_INLINE
+#endif
+
+/** @hideinitializer
+@brief Mark an if condition as likely to happen
+@m_since_latest
+
+Since branch predictors of contemporary CPUs do a good enough job already, the
+main purpose of this macro is to affect assembly generation and instruction
+cache use in hot loops --- for example, when a certain condition is likely to
+happen each iteration, the compiler may put code of the @cpp else @ce branch in
+a "cold" section of the code, ensuring the more probable code path stays in the
+cache:
+
+@snippet Utility.cpp CORRADE_LIKELY
+
+Defined as the C++20 @cpp [[likely]] @ce attribute on GCC >= 9 (and on Clang 12
+and MSVC 2019 16.6+ if compiling under C++20). On older versions of GCC and on
+Clang in C++11/14/17 mode the macro expands to @cpp __builtin_expect() @ce; on
+older MSVC the macro is a pass-through.
+
+@attention
+@parblock
+Since the C++20 @cpp [[likely]] @ce attribute is expected to be put *after* the
+@cpp if() @ce parentheses while @cpp __builtin_expect() @ce is meant to be
+* *inside*, the macro has to be written as above. Doing
+@cpp if(CORRADE_LIKELY(condition)) @ce would work on compilers that don't
+understand the @cpp [[likely]] @ce attribute, but breaks in C++20 mode.
+@endparblock
+
+It's recommended to use this macro only if profiling shows its advantage. While
+it may have no visible effect in most cases,
+[wrong suggestion can lead to suboptimal performance](https://stackoverflow.com/a/35940041).
+Similar effect can be potentially achieved by
+[reordering the branches in a certain way](https://stackoverflow.com/q/46833310),
+but the behavior is highly dependent on compiler-specific heuristics.
+@see @ref CORRADE_UNLIKELY(), @ref CORRADE_ASSUME(),
+    @ref CORRADE_ALWAYS_INLINE, @ref CORRADE_NEVER_INLINE
+*/
+/* Using > 201703 because MSVC 16.6 reports 201705 when compiling as C++20 */
+#if (defined(CORRADE_TARGET_GCC) && __GNUC__ >= 9) || (CORRADE_CXX_STANDARD > 201703 && ((defined(CORRADE_TARGET_CLANG) && !defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ >= 12) || (defined(CORRADE_TARGET_MSVC) && _MSC_VER >= 1926)))
+#define CORRADE_LIKELY(...) (__VA_ARGS__) [[likely]]
+#elif defined(CORRADE_TARGET_GCC)
+#define CORRADE_LIKELY(...) (__builtin_expect((__VA_ARGS__), 1))
+#else
+#define CORRADE_LIKELY(...) (__VA_ARGS__)
+#endif
+
+/** @hideinitializer
+@brief Mark an if condition as unlikely to happen
+@m_since_latest
+
+An inverse to @ref CORRADE_LIKELY(), see its documentation for more
+information about suggested use and expected impact on performance. Useful to
+mark boundary conditions in tight loops, for example:
+
+@snippet Utility.cpp CORRADE_UNLIKELY
+
+@see @ref CORRADE_ASSUME(), @ref CORRADE_ALWAYS_INLINE,
+    @ref CORRADE_NEVER_INLINE
+*/
+/* Using > 201703 because MSVC 16.6 reports 201705 when compiling as C++20 */
+#if (defined(CORRADE_TARGET_GCC) && __GNUC__ >= 9) || (CORRADE_CXX_STANDARD > 201703 && ((defined(CORRADE_TARGET_CLANG) && !defined(CORRADE_TARGET_APPLE_CLANG) && __clang_major__ >= 12) || (defined(CORRADE_TARGET_MSVC) && _MSC_VER >= 1926)))
+#define CORRADE_UNLIKELY(...) (__VA_ARGS__) [[unlikely]]
+#elif defined(CORRADE_TARGET_GCC)
+#define CORRADE_UNLIKELY(...) (__builtin_expect((__VA_ARGS__), 0))
+#else
+#define CORRADE_UNLIKELY(...) (__VA_ARGS__)
 #endif
 
 /** @hideinitializer

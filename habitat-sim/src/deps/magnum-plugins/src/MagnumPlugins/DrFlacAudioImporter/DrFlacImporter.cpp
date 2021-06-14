@@ -42,22 +42,22 @@ namespace Magnum { namespace Audio {
 namespace {
 
 #define _v(value) BufferFormat::value
-/* number of channels = 1-8, number of bytes = 1-4 */
-const BufferFormat flacFormatTable[8][4] = {
-    {_v(Mono8),   _v(Mono16),   _v(MonoFloat),   _v(MonoDouble)}, /* Mono */
-    {_v(Stereo8), _v(Stereo16), _v(StereoFloat), _v(StereoDouble)}, /* Stereo */
-    {BufferFormat{}, BufferFormat{}, BufferFormat{}, BufferFormat{}}, /* Not a thing */
-    {_v(Quad8), _v(Quad16), _v(Quad32), _v(Quad32)},    /* Quad */
-    {BufferFormat{}, BufferFormat{}, BufferFormat{}, BufferFormat{}}, /* Also not a thing */
-    {_v(Surround51Channel8), _v(Surround51Channel16), _v(Surround51Channel32), _v(Surround51Channel32)}, /* 5.1 */
-    {_v(Surround61Channel8), _v(Surround61Channel16), _v(Surround61Channel32), _v(Surround61Channel32)}, /* 6.1 */
-    {_v(Surround71Channel8), _v(Surround71Channel16), _v(Surround71Channel32), _v(Surround71Channel32)}  /* 7.1 */
+/* number of channels = 1-8, number of bytes = 1-3 */
+const BufferFormat flacFormatTable[8][3] = {
+    {_v(Mono8),   _v(Mono16),   _v(MonoFloat)}, /* Mono */
+    {_v(Stereo8), _v(Stereo16), _v(StereoFloat)}, /* Stereo */
+    {BufferFormat{}, BufferFormat{}, BufferFormat{}}, /* Not a thing */
+    {_v(Quad8), _v(Quad16), _v(Quad32)},    /* Quad */
+    {BufferFormat{}, BufferFormat{}, BufferFormat{}}, /* Also not a thing */
+    {_v(Surround51Channel8), _v(Surround51Channel16), _v(Surround51Channel32)}, /* 5.1 */
+    {_v(Surround61Channel8), _v(Surround61Channel16), _v(Surround61Channel32)}, /* 6.1 */
+    {_v(Surround71Channel8), _v(Surround71Channel16), _v(Surround71Channel32)}  /* 7.1 */
 };
 #undef _v
 
 /* Converts 32-bit PCM into lower bit levels by skipping bytes */
 Containers::Array<char> convert32PCM(const Containers::Array<char>& container, const UnsignedInt samples, const UnsignedInt size) {
-    Containers::Array<char> convertData(samples*size);
+    Containers::Array<char> convertData{NoInit, samples*size};
 
     UnsignedInt skip = -1, index = 0;
     for(char item: container) {
@@ -100,9 +100,17 @@ void DrFlacImporter::doOpenData(Containers::ArrayView<const char> data) {
        up. */
     const UnsignedInt normalizedBytesPerSample = (bitsPerSample + 7)/8;
 
+    /* This fails for 32-bit samples as well as those are not supported even
+       by the reference encoder:
+        https://xiph.org/flac/format.html#metadata_block_streaminfo
+       and any attempt to produce those fails, for example the following (using
+       the DrWavAudioImporter test case) will take and re-encode the 32-bit
+       samples as 24 again:
+        ffmpeg -i stereo32.wav -c:a flac -sample_fmt s32 stereo32.wav
+    */
     if(numChannels == 0 || numChannels == 3 || numChannels == 5 || numChannels > 8 ||
-       normalizedBytesPerSample == 0 || normalizedBytesPerSample > 8) {
-        Error() << "Audio::DrFlacImporter::openData(): unsupported channel count"
+       normalizedBytesPerSample == 0 || normalizedBytesPerSample > 3) {
+        Error{} << "Audio::DrFlacImporter::openData(): unsupported channel count"
                 << numChannels << "with" << bitsPerSample
                 << "bits per sample";
         return;
@@ -112,44 +120,7 @@ void DrFlacImporter::doOpenData(Containers::ArrayView<const char> data) {
     _format = flacFormatTable[numChannels-1][normalizedBytesPerSample-1];
     CORRADE_INTERNAL_ASSERT(_format != BufferFormat{});
 
-    /* 32-bit integers need to be normalized to Double (with a 32 bit mantissa) */
-    if(normalizedBytesPerSample == 4) {
-        Containers::Array<Int> tempData(samples);
-        drflac_read_s32(handle, samples, reinterpret_cast<Int*>(tempData.begin()));
-
-        /* If the channel is mono/stereo, we can use double samples */
-        if(numChannels < 3) {
-            Containers::Array<Double> doubleData(samples);
-
-            for(std::size_t i = 0; i < samples; ++i) {
-                doubleData[i] = Math::unpack<Double>(tempData[i]);
-            }
-
-            const char* doubleBegin = reinterpret_cast<const char*>(doubleData.begin());
-            const char* doubleEnd = reinterpret_cast<const char*>(doubleData.end());
-
-            _data = Containers::Array<char>(samples*sizeof(Double));
-            std::copy(doubleBegin, doubleEnd, _data->begin());
-
-        /* Otherwise, convert to float */
-        } else {
-            Containers::Array<Float> floatData(samples);
-
-            for(std::size_t i = 0; i < samples; ++i) {
-                floatData[i] = Math::unpack<Float>(tempData[i]);
-            }
-
-            const char* floatBegin = reinterpret_cast<const char*>(floatData.begin());
-            const char* floatEnd = reinterpret_cast<const char*>(floatData.end());
-
-            _data = Containers::Array<char>(samples*sizeof(Float));
-            std::copy(floatBegin, floatEnd, _data->begin());
-        }
-
-        return;
-    }
-
-    Containers::Array<char> tempData(samples*sizeof(Int));
+    Containers::Array<char> tempData{NoInit, std::size_t(samples*sizeof(Int))};
     drflac_read_s32(handle, samples, reinterpret_cast<Int*>(tempData.begin()));
 
     _data = convert32PCM(tempData, samples, normalizedBytesPerSample);
@@ -160,22 +131,19 @@ void DrFlacImporter::doOpenData(Containers::ArrayView<const char> data) {
 
     /* 24-bit needs to become float */
     } else if(normalizedBytesPerSample == 3) {
-        Containers::Array<Float> floatData(samples);
+        Containers::Array<char> floatData{NoInit, std::size_t(samples*sizeof(Float))};
 
+        const Containers::ArrayView<Float> floats = Containers::arrayCast<Float>(floatData);
         for(std::size_t i = 0; i != samples; ++i) {
             const UnsignedInt s0 = (*_data)[i*3 + 0];
             const UnsignedInt s1 = (*_data)[i*3 + 1];
             const UnsignedInt s2 = (*_data)[i*3 + 2];
 
             const Int intData = Int((s0 << 8) | (s1 << 16) | (s2 << 24));
-            floatData[i] = Math::unpack<Float>(intData);
+            floats[i] = Math::unpack<Float>(intData);
         }
 
-        const char* const floatBegin = reinterpret_cast<const char*>(floatData.begin());
-        const char* const floatEnd = reinterpret_cast<const char*>(floatData.end());
-
-        _data = Containers::Array<char>(samples*sizeof(Float));
-        std::copy(floatBegin, floatEnd, _data->begin());
+        _data = std::move(floatData);
     }
 }
 
@@ -186,7 +154,7 @@ BufferFormat DrFlacImporter::doFormat() const { return _format; }
 UnsignedInt DrFlacImporter::doFrequency() const { return _frequency; }
 
 Containers::Array<char> DrFlacImporter::doData() {
-    Containers::Array<char> copy(_data->size());
+    Containers::Array<char> copy{NoInit, _data->size()};
     std::copy(_data->begin(), _data->end(), copy.begin());
     return copy;
 }

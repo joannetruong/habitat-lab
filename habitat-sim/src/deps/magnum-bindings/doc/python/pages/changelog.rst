@@ -35,6 +35,8 @@ Changelog
 `Changes since 2020.06`_
 ========================
 
+-   Exposed missing :ref:`Vector4` constructor from a :ref:`Vector3` and a
+    W component and :ref:`Vector3` from :ref:`Vector2` and a Z component
 -   Renamed :py:`Matrix3.from()` / :py:`Matrix4.from()` to :ref:`Matrix3.from_()`
     / :ref:`Matrix4.from_()` because :py:`from` is a Python keyword and it
     would be silly to have to write :py:`getattr(Matrix4, 'from')` just to use
@@ -44,7 +46,7 @@ Changelog
 -   Exposed :ref:`gl.Renderer.Feature.CLIP_DISTANCEn <gl.Renderer.Feature.CLIP_DISTANCE0>`
     values that are new since 2020.06
 -   Exposed new instancing, normal-mapping-related and lighting features in
-    :ref:`shaders.Phong`
+    :ref:`shaders.PhongGL`
 -   Renamed all helper ``Python.h`` headers to ``PythonBindings.h`` to avoid
     issues with shitty IDE indexers such as Eclipse, confusing these with
     Python's ``<Python.h>``
@@ -55,6 +57,9 @@ Changelog
 -   The Homebrew package now uses `std_cmake_args` instead of hardcoded build
     type and install prefix, which resolves certain build issues (see
     :gh:`mosra/homebrew-magnum#6`)
+-   Added a caster for :dox:`Containers::Optional`, allowing it to be used
+    directly in function signatures and showing up on the Python side as either
+    :py:`None` or the actual value
 
 `2020.06`_
 ==========

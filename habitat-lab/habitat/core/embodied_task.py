@@ -278,7 +278,6 @@ class EmbodiedTask:
 
     def reset(self, episode: Episode):
         observations = self._sim.reset()
-        print('TASK RESETTING')
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations, episode=episode, task=self
@@ -287,6 +286,7 @@ class EmbodiedTask:
 
         for action_instance in self.actions.values():
             action_instance.reset(episode=episode, task=self)
+
         return observations
 
     def step(self, action: Dict[str, Any], episode: Episode):

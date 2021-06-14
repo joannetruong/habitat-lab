@@ -27,6 +27,7 @@
 
 #include "StbVorbisImporter.h"
 
+#include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/Assert.h>
 #include <Corrade/Utility/Debug.h>
 #include <Corrade/Utility/Endianness.h>
@@ -92,8 +93,8 @@ BufferFormat StbVorbisImporter::doFormat() const { return _format; }
 UnsignedInt StbVorbisImporter::doFrequency() const { return _frequency; }
 
 Containers::Array<char> StbVorbisImporter::doData() {
-    Containers::Array<char> copy(_data.size());
-    std::copy(_data.begin(), _data.end(), copy.begin());
+    Containers::Array<char> copy{NoInit, _data.size()};
+    Utility::copy(_data, copy);
     return copy;
 }
 

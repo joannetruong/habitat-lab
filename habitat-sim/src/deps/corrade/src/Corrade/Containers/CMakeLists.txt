@@ -25,6 +25,7 @@
 #
 
 set(CorradeContainers_HEADERS
+    AnyReference.h
     Array.h
     ArrayTuple.h
     ArrayView.h
@@ -37,7 +38,9 @@ set(CorradeContainers_HEADERS
     EnumSet.h
     EnumSet.hpp
     GrowableArray.h
+    initializeHelpers.h
     LinkedList.h
+    MoveReference.h
     Optional.h
     OptionalStl.h
     Pointer.h
@@ -49,11 +52,14 @@ set(CorradeContainers_HEADERS
     StridedArrayView.h
     String.h
     StringStl.h
-    StringView.h
-    Tags.h)
+    StringView.h)
 
 set(CorradeContainers_PRIVATE_HEADERS
     Implementation/RawForwardList.h)
+
+if(CORRADE_BUILD_DEPRECATED)
+    list(APPEND CorradeContainers_HEADERS Tags.h)
+endif()
 
 # Sources are compiled as part of Utility
 

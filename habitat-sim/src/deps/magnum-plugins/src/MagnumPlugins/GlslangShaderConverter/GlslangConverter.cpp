@@ -36,6 +36,7 @@
 #include <Corrade/Utility/Directory.h>
 #include <Corrade/Utility/FormatStl.h>
 #include <Magnum/FileCallback.h>
+#include <Magnum/ShaderTools/Stage.h>
 
 #include <glslang/Public/ShaderLang.h> /* Haha what the fuck this name */
 /* This can't be <glslang/SPIRV/GlslangToSpv.h> because such path doesn't exist
@@ -91,7 +92,7 @@ void GlslangConverter::finalize() {
     glslang::FinalizeProcess();
 }
 
-GlslangConverter::GlslangConverter(PluginManager::AbstractManager& manager, const std::string& plugin): AbstractConverter{manager, plugin}, _state{Containers::InPlaceInit} {}
+GlslangConverter::GlslangConverter(PluginManager::AbstractManager& manager, const std::string& plugin): AbstractConverter{manager, plugin}, _state{InPlaceInit} {}
 
 ConverterFeatures GlslangConverter::doFeatures() const {
     return ConverterFeature::ConvertData|ConverterFeature::ValidateData|ConverterFeature::Preprocess|ConverterFeature::DebugInfo|
@@ -136,7 +137,7 @@ using namespace Containers::Literals;
 
 Stage stageFromFilename(Containers::StringView filename) {
     if(filename.hasSuffix(".glsl"_s))
-        return stageFromFilename(filename.stripSuffix(".glsl"_s));
+        return stageFromFilename(filename.exceptSuffix(".glsl"_s));
 
     /* LCOV_EXCL_START */
     if(filename.hasSuffix(".vert"_s)) return Stage::Vertex;
@@ -181,6 +182,10 @@ EShLanguage translateStage(const Stage stage) {
         /* LCOV_EXCL_STOP */
 
         case Stage::Unspecified: return EShLangVertex;
+
+        /* OpenCL kernels can't be written in GLSL. Asserts below, this is just
+           to suppress compiler warning about an unhandled value. */
+        case Stage::Kernel: break; /* LCOV_EXCL_LINE */
     }
 
     /* Testing this would mean having a separate "graceful assert" build of the
@@ -782,36 +787,24 @@ std::pair<bool, Containers::String> GlslangConverter::doValidateData(const Stage
 
     /* Trim excessive newlines and spaces from the output. What the fuck, did
        nobody ever verify what mess it spits out?! */
-    /** @todo clean up once StringView::trimmed() exist */
+    const auto shaderLog = Containers::StringView{shader.getInfoLog()}.trimmedSuffix();
     /** @todo clean up also trailing newlines inside, ffs */
-    Containers::StringView shaderLog = shader.getInfoLog();
-    while(!shaderLog.isEmpty() && (shaderLog.back() == '\n' || shaderLog.back() == ' '))
-        shaderLog = shaderLog.except(1);
     if(!success.first) return {false, shaderLog};
 
     /* Trim excessive newlines and spaces here as well */
-    /** @todo clean up once StringView::trimmed() exist */
-    Containers::StringView programLog = program.getInfoLog();
-    while(!programLog.isEmpty() && (programLog.back() == '\n' || programLog.back() == ' '))
-        programLog = programLog.except(1);
-
-    /** @todo use Containers::String once it can concatenate */
-    std::string out = shaderLog;
-    if(!shaderLog.isEmpty() && !programLog.isEmpty())
-        out += '\n';
-    out += programLog;
-    return {success.second, out};
+    const auto programLog = Containers::StringView{program.getInfoLog()}.trimmedSuffix();
+    return {success.second, "\n"_s.joinWithoutEmptyParts({shaderLog, programLog})};
 }
 
-Containers::Array<char> GlslangConverter::doConvertFileToData(const Stage stage, const Containers::StringView from) {
+Containers::Array<char> GlslangConverter::doConvertFileToData(const Stage stage, const Containers::StringView filename) {
     /* Save input filename for nicer error messages */
-    _state->inputFilename = Containers::String::nullTerminatedGlobalView(from);
+    _state->inputFilename = Containers::String::nullTerminatedGlobalView(filename);
 
     /* If stage is not specified, detect it from filename and then delegate
        into the default implementation */
     return AbstractConverter::doConvertFileToData(
-        stage == Stage::Unspecified ? stageFromFilename(from) : stage,
-        from);
+        stage == Stage::Unspecified ? stageFromFilename(filename) : stage,
+        filename);
 }
 
 bool GlslangConverter::doConvertFileToFile(const Stage stage, const Containers::StringView from, const Containers::StringView to) {
@@ -960,11 +953,8 @@ Containers::Array<char> GlslangConverter::doConvertDataToData(const Stage stage,
 
     /* Trim excessive newlines and spaces from the output. What the fuck, did
        nobody ever verify what mess it spits out?! */
-    /** @todo clean up once StringView::trimmed() exist */
     /** @todo clean up also trailing newlines inside, ffs */
-    Containers::StringView shaderLog = shader.getInfoLog();
-    while(!shaderLog.isEmpty() && (shaderLog.back() == '\n' || shaderLog.back() == ' '))
-        shaderLog = shaderLog.except(1);
+    const auto shaderLog = Containers::StringView{shader.getInfoLog()}.trimmedSuffix();
     if(!success.first) {
         Error{} << "ShaderTools::GlslangConverter::convertDataToData(): compilation failed:" << Debug::newline << shaderLog;
         return {};
@@ -976,11 +966,7 @@ Containers::Array<char> GlslangConverter::doConvertDataToData(const Stage stage,
         Warning{} << "ShaderTools::GlslangConverter::convertDataToData(): compilation succeeded with the following message:" << Debug::newline << shaderLog;
 
     /* Trim excessive newlines and spaces here as well */
-    /** @todo clean up once StringView::trimmed() exist */
-    Containers::StringView programLog = program.getInfoLog();
-    while(!programLog.isEmpty() && (programLog.back() == '\n' || programLog.back() == ' '))
-        programLog = programLog.except(1);
-
+    const auto programLog =  Containers::StringView{program.getInfoLog()}.trimmedSuffix();
     if(!success.second) {
         Error{} << "ShaderTools::GlslangConverter::convertDataToData(): linking failed:" << Debug::newline << programLog;
         return {};
@@ -1005,7 +991,7 @@ Containers::Array<char> GlslangConverter::doConvertDataToData(const Stage stage,
 
     /* Copy the vector into something sane */
     Containers::ArrayView<const char> spirvBytes = Containers::arrayCast<const char>(Containers::arrayView(spirv));
-    Containers::Array<char> out{Containers::NoInit, spirvBytes.size()};
+    Containers::Array<char> out{NoInit, spirvBytes.size()};
     Utility::copy(spirvBytes, out);
     return out;
 }

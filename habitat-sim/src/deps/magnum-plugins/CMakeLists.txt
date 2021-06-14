@@ -25,6 +25,20 @@
 
 cmake_minimum_required(VERSION 3.4)
 
+# Don't restrict INTERPROCEDURAL_OPTIMIZATION only for icc on Linux
+if(POLICY CMP0069)
+    cmake_policy(SET CMP0069 NEW)
+endif()
+# If CMAKE_AUTOMOC is set, all uses of corrade_add_resource() would otherwise
+# complain on 3.10 that AUTOMOC is not processing GENERATED files
+if(POLICY CMP0071)
+    cmake_policy(SET CMP0071 NEW)
+endif()
+# Superprojects can use just set(WITH_BLAH ON) without FORCE CACHE on 3.13+
+if(POLICY CMP0077)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
 project(MagnumPlugins CXX)
 
 # Use folders for nice tree in Visual Studio and XCode
@@ -54,6 +68,8 @@ option(WITH_JPEGIMPORTER "Build JpegImporter plugin" OFF)
 option(WITH_MESHOPTIMIZERSCENECONVERTER "Build MeshOptimizerSceneConverter plugin" OFF)
 option(WITH_MINIEXRIMAGECONVERTER "Build MiniExrImageConverter plugin" OFF)
 cmake_dependent_option(WITH_OPENDDL "Build OpenDdl library" OFF "NOT WITH_OPENGEXIMPORTER" ON)
+option(WITH_OPENEXRIMAGECONVERTER "Build OpenExrImageConverter plugin" OFF)
+option(WITH_OPENEXRIMPORTER "Build OpenExrImporter plugin" OFF)
 option(WITH_OPENGEXIMPORTER "Build OpenGexImporter plugin" OFF)
 option(WITH_PNGIMAGECONVERTER "Build PngImageConverter plugin" OFF)
 option(WITH_PNGIMPORTER "Build PngImporter plugin" OFF)

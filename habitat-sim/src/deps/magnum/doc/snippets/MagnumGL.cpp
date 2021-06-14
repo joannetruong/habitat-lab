@@ -52,7 +52,7 @@
 #include "Magnum/MeshTools/CompressIndices.h"
 #include "Magnum/Primitives/Cube.h"
 #include "Magnum/Primitives/Plane.h"
-#include "Magnum/Shaders/Phong.h"
+#include "Magnum/Shaders/PhongGL.h"
 #include "Magnum/Trade/MeshData.h"
 
 #if !(defined(MAGNUM_TARGET_GLES2) && defined(MAGNUM_TARGET_WEBGL))
@@ -269,11 +269,32 @@ enum: UnsignedInt {
 /* [AbstractShaderProgram-output-attributes] */
 
 #if !defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_WEBGL)
-/* [AbstractShaderProgram-hide-irrelevant] */
+/* [AbstractShaderProgram-return-hide-irrelevant] */
+public:
+    MyShader& draw(GL::Mesh& mesh) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(mesh));
+    }
+    MyShader& draw(GL::Mesh&& mesh) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(mesh));
+    }
+    MyShader& draw(GL::MeshView& mesh) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(mesh));
+    }
+    MyShader& draw(GL::MeshView&& mesh) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(mesh));
+    }
+    /* Omit these if the shader is not ready for multidraw */
+    MyShader& draw(Containers::ArrayView<const Containers::Reference<GL::MeshView>> meshes) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(meshes));
+    }
+    MyShader& draw(std::initializer_list<Containers::Reference<GL::MeshView>> meshes) {
+        return static_cast<MyShader&>(GL::AbstractShaderProgram::draw(meshes));
+    }
+
 private:
     using GL::AbstractShaderProgram::drawTransformFeedback;
     using GL::AbstractShaderProgram::dispatchCompute;
-/* [AbstractShaderProgram-hide-irrelevant] */
+/* [AbstractShaderProgram-return-hide-irrelevant] */
 public:
 #endif
 
@@ -1039,7 +1060,7 @@ buffer.setData(MeshTools::interleave(plane.positions3DAsArray(),
 GL::Mesh mesh;
 mesh.setPrimitive(plane.primitive())
     .setCount(plane.vertexCount())
-    .addVertexBuffer(buffer, 0, Shaders::Phong::Position{}, Shaders::Phong::Normal{});
+    .addVertexBuffer(buffer, 0, Shaders::PhongGL::Position{}, Shaders::PhongGL::Normal{});
 /* [Mesh-interleaved] */
 }
 
@@ -1099,7 +1120,7 @@ indexBuffer.setData(indexData);
 GL::Mesh mesh;
 mesh.setPrimitive(cube.primitive())
     .setCount(cube.indexCount())
-    .addVertexBuffer(vertexBuffer, 0, Shaders::Phong::Position{}, Shaders::Phong::Normal{})
+    .addVertexBuffer(vertexBuffer, 0, Shaders::PhongGL::Position{}, Shaders::PhongGL::Normal{})
     .setIndexBuffer(indexBuffer, 0, indexType);
 /* [Mesh-indexed-tools] */
 }
@@ -1169,14 +1190,14 @@ GL::Mesh mesh;
 GL::Buffer vertices, indices;
 // ...
 mesh.addVertexBuffer(std::move(vertices), 0,
-        Shaders::Phong::Position{},
-        Shaders::Phong::Normal{})
+        Shaders::PhongGL::Position{},
+        Shaders::PhongGL::Normal{})
     .setIndexBuffer(std::move(indices), 0, MeshIndexType::UnsignedInt);
 /* [Mesh-buffer-ownership] */
 
 /* [Mesh-buffer-ownership-multiple] */
-mesh.addVertexBuffer(vertices, 0, Shaders::Phong::Position{}, 20)
-    .addVertexBuffer(std::move(vertices), 0, 20, Shaders::Phong::Normal{});
+mesh.addVertexBuffer(vertices, 0, Shaders::PhongGL::Position{}, 20)
+    .addVertexBuffer(std::move(vertices), 0, 20, Shaders::PhongGL::Normal{});
 /* [Mesh-buffer-ownership-multiple] */
 }
 
@@ -1186,20 +1207,20 @@ GL::Buffer buffer;
 GL::Mesh mesh;
 mesh.addVertexBuffer(buffer, 76,    /* initial array offset */
     4,                              /* skip vertex weight (Float) */
-    Shaders::Phong::Position(),     /* vertex position */
+    Shaders::PhongGL::Position(),   /* vertex position */
     8,                              /* skip texture coordinates (Vector2) */
-    Shaders::Phong::Normal());      /* vertex normal */
+    Shaders::PhongGL::Normal());    /* vertex normal */
 /* [Mesh-addVertexBuffer1] */
 
 /* [Mesh-addVertexBuffer2] */
-mesh.addVertexBuffer(buffer, 76, 4, Shaders::Phong::Position{}, 20)
-    .addVertexBuffer(buffer, 76, 24, Shaders::Phong::Normal{}, 0);
+mesh.addVertexBuffer(buffer, 76, 4, Shaders::PhongGL::Position{}, 20)
+    .addVertexBuffer(buffer, 76, 24, Shaders::PhongGL::Normal{}, 0);
 /* [Mesh-addVertexBuffer2] */
 
 /* [Mesh-addVertexBuffer3] */
 Int vertexCount = 352;
-mesh.addVertexBuffer(buffer, 76 + 4*vertexCount, Shaders::Phong::Position{})
-    .addVertexBuffer(buffer, 76 + 24*vertexCount, Shaders::Phong::Normal{});
+mesh.addVertexBuffer(buffer, 76 + 4*vertexCount, Shaders::PhongGL::Position{})
+    .addVertexBuffer(buffer, 76 + 24*vertexCount, Shaders::PhongGL::Normal{});
 /* [Mesh-addVertexBuffer3] */
 }
 

@@ -1,6 +1,7 @@
 #include "esp/bindings/bindings.h"
 #include "esp/physics/PhysicsManager.h"
-#include "esp/physics/RigidObject.h"
+
+#include "python/corrade/EnumOperators.h"
 
 namespace py = pybind11;
 using py::literals::operator""_a;
@@ -12,8 +13,8 @@ void initPhysicsBindings(py::module& m) {
   // ==== enum object PhysicsSimulationLibrary ====
   py::enum_<PhysicsManager::PhysicsSimulationLibrary>(
       m, "PhysicsSimulationLibrary")
-      .value("NONE", PhysicsManager::PhysicsSimulationLibrary::NONE)
-      .value("BULLET", PhysicsManager::PhysicsSimulationLibrary::BULLET);
+      .value("NoPhysics", PhysicsManager::PhysicsSimulationLibrary::NoPhysics)
+      .value("Bullet", PhysicsManager::PhysicsSimulationLibrary::Bullet);
 
   // ==== enum object MotionType ====
   py::enum_<MotionType>(m, "MotionType")
@@ -34,6 +35,20 @@ void initPhysicsBindings(py::module& m) {
       .def("integrate_transform", &VelocityControl::integrateTransform, "dt"_a,
            "rigid_state"_a);
 
+  // ==== enum articulated JointType ====
+  py::enum_<JointType>(m, "JointType")
+      .value("Revolute", JointType::Revolute)
+      .value("Prismatic", JointType::Prismatic)
+      .value("Spherical", JointType::Spherical)
+      .value("Planar", JointType::Planar)
+      .value("Fixed", JointType::Fixed)
+      .value("Invalid", JointType::Invalid);
+
+  // ==== enum object JointMotorType ====
+  py::enum_<JointMotorType>(m, "JointMotorType")
+      .value("SingleDof", JointMotorType::SingleDof)
+      .value("Spherical", JointMotorType::Spherical);
+
   // ==== struct object JointMotorSettings ====
   py::class_<JointMotorSettings, JointMotorSettings::ptr>(m,
                                                           "JointMotorSettings")
@@ -41,10 +56,15 @@ void initPhysicsBindings(py::module& m) {
       .def(py::init(
           &JointMotorSettings::create<double, double, double, double, double>))
       .def_readwrite("position_target", &JointMotorSettings::positionTarget)
+      .def_readwrite("spherical_position_target",
+                     &JointMotorSettings::sphericalPositionTarget)
       .def_readwrite("position_gain", &JointMotorSettings::positionGain)
       .def_readwrite("velocity_target", &JointMotorSettings::velocityTarget)
+      .def_readwrite("spherical_velocity_target",
+                     &JointMotorSettings::sphericalVelocityTarget)
       .def_readwrite("velocity_gain", &JointMotorSettings::velocityGain)
-      .def_readwrite("max_impulse", &JointMotorSettings::maxImpulse);
+      .def_readwrite("max_impulse", &JointMotorSettings::maxImpulse)
+      .def_readwrite("motor_type", &JointMotorSettings::motorType);
 
   // ==== struct object RayHitInfo ====
   py::class_<RayHitInfo, RayHitInfo::ptr>(m, "RayHitInfo")
@@ -61,6 +81,7 @@ void initPhysicsBindings(py::module& m) {
       .def_readonly("ray", &RaycastResults::ray)
       .def("has_hits", &RaycastResults::hasHits);
 
+  // ==== struct object ContactPointData ====
   py::class_<ContactPointData, ContactPointData::ptr>(m, "ContactPointData")
       .def(py::init(&ContactPointData::create<>))
       .def_readwrite("object_id_a", &ContactPointData::objectIdA)
@@ -82,6 +103,69 @@ void initPhysicsBindings(py::module& m) {
       .def_readwrite("linear_friction_direction2",
                      &ContactPointData::linearFrictionDirection2)
       .def_readwrite("is_active", &ContactPointData::isActive);
+
+  // ==== enum object CollisionGroup ====
+  py::enum_<CollisionGroup> collisionGroups{m, "CollisionGroups",
+                                            "CollisionGroups"};
+  collisionGroups.value("Default", CollisionGroup::Default)
+      .value("Static", CollisionGroup::Static)
+      .value("Kinematic", CollisionGroup::Kinematic)
+      .value("Dynamic", CollisionGroup::Dynamic)
+      .value("Robot", CollisionGroup::Robot)
+      .value("Noncollidable", CollisionGroup::Noncollidable)
+      .value("UserGroup0", CollisionGroup::UserGroup0)
+      .value("UserGroup1", CollisionGroup::UserGroup1)
+      .value("UserGroup2", CollisionGroup::UserGroup2)
+      .value("UserGroup3", CollisionGroup::UserGroup3)
+      .value("UserGroup4", CollisionGroup::UserGroup4)
+      .value("UserGroup5", CollisionGroup::UserGroup5)
+      .value("UserGroup6", CollisionGroup::UserGroup6)
+      .value("UserGroup7", CollisionGroup::UserGroup7)
+      .value("UserGroup8", CollisionGroup::UserGroup8)
+      .value("UserGroup9", CollisionGroup::UserGroup9)
+      .value("None", CollisionGroup{});
+  corrade::enumOperators(collisionGroups);
+
+  // ==== class object CollisionGroupHelper ====
+  py::class_<CollisionGroupHelper, std::shared_ptr<CollisionGroupHelper>>(
+      m, "CollisionGroupHelper")
+      .def_static("get_group", &CollisionGroupHelper::getGroup, "name"_a,
+                  R"(Get a group by assigned name.)")
+      .def_static("get_group_name", &CollisionGroupHelper::getGroupName,
+                  "group"_a, R"(Get the name assigned to a CollisionGroup.)")
+      .def_static("set_group_name", &CollisionGroupHelper::setGroupName,
+                  "group"_a, "name"_a, R"(Assign a name to a CollisionGroup.)")
+      .def_static(
+          "get_mask_for_group",
+          [](CollisionGroup group) {
+            return CollisionGroup(
+                uint32_t(CollisionGroupHelper::getMaskForGroup(group)));
+          },
+          "group"_a,
+          R"(Get the mask for a collision group describing its interaction with other groups.)")
+      .def_static(
+          "get_mask_for_group",
+          [](const std::string& group_name) {
+            return CollisionGroup(
+                uint32_t(CollisionGroupHelper::getMaskForGroup(group_name)));
+          },
+          "group"_a,
+          R"(Get the mask for a collision group describing its interaction with other groups.)")
+      .def_static(
+          "set_mask_for_group",
+          [](CollisionGroup group, CollisionGroup mask) {
+            CollisionGroupHelper::setMaskForGroup(group, CollisionGroups(mask));
+          },
+          "group"_a, "mask"_a,
+          R"(Set the mask for a collision group describing its interaction with other groups. It is not recommended to modify the mask for default, non-user groups.)")
+      .def_static(
+          "set_group_interacts_with",
+          &CollisionGroupHelper::setGroupInteractsWith, "group_a"_a,
+          "group_b"_a, "interact"_a,
+          R"(Set groupA's collision mask to a specific interaction state with respect to groupB.)")
+      .def_static("get_all_group_names",
+                  &CollisionGroupHelper::getAllGroupNames,
+                  R"(Get a list of all configured collision group names.)");
 }
 
 }  // namespace physics

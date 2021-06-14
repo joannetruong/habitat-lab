@@ -118,7 +118,7 @@ void EnumSetTest::construct() {
        either */
     /** @todo this should be for all the operators as well, sigh */
     CORRADE_VERIFY(std::is_nothrow_default_constructible<Features>::value);
-    CORRADE_VERIFY((std::is_nothrow_constructible<Features, Feature>::value));
+    CORRADE_VERIFY(std::is_nothrow_constructible<Features, Feature>::value);
 }
 
 void EnumSetTest::constructNoInit() {
@@ -128,7 +128,7 @@ void EnumSetTest::constructNoInit() {
         CORRADE_COMPARE(int(features), 0);
     } {
         Features features{Feature::Tested};
-        new(&features)Features{NoInit};
+        new(&features)Features{Corrade::NoInit};
         #if defined(__GNUC__) && __GNUC__*100 + __GNUC_MINOR__ >= 601 && __OPTIMIZE__
         CORRADE_EXPECT_FAIL("GCC 6.1+ misoptimizes and overwrites the value.");
         #pragma GCC diagnostic push

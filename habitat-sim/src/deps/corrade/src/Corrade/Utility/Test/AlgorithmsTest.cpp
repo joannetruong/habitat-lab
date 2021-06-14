@@ -34,7 +34,7 @@
 #include "Corrade/Utility/Algorithms.h"
 #include "Corrade/Utility/DebugStl.h"
 
-namespace Corrade { namespace Utility { namespace Test {
+namespace Corrade { namespace Utility { namespace Test { namespace {
 
 struct AlgorithmsTest: TestSuite::Tester {
     explicit AlgorithmsTest();
@@ -252,10 +252,8 @@ template<class T> void AlgorithmsTest::copyStrided1D() {
     setTestCaseTemplateName(TypeName<T>::name());
 
     /* Enough so even sparse variants fit */
-    Containers::Array<T> srcData{Containers::NoInit,
-        std::size_t(data.srcStride*5*2)};
-    Containers::Array<T> dstData{Containers::NoInit,
-        std::size_t(data.dstStride*5*2)};
+    Containers::Array<T> srcData{NoInit, std::size_t(data.srcStride*5*2)};
+    Containers::Array<T> dstData{NoInit, std::size_t(data.dstStride*5*2)};
 
     Containers::StridedArrayView1D<T> src{srcData, 5, std::ptrdiff_t(data.srcStride*sizeof(T))};
     Containers::StridedArrayView1D<T> dst{dstData, 5, std::ptrdiff_t(data.dstStride*sizeof(T))};
@@ -278,10 +276,8 @@ template<class T> void AlgorithmsTest::copyStrided2D() {
     setTestCaseTemplateName(TypeName<T>::name());
 
     /* Enough so even sparse variants fit */
-    Containers::Array<T> srcData{Containers::NoInit,
-        std::size_t(data.srcStride[0]*3*2)};
-    Containers::Array<T> dstData{Containers::NoInit,
-        std::size_t(data.dstStride[0]*3*2)};
+    Containers::Array<T> srcData{NoInit, std::size_t(data.srcStride[0]*3*2)};
+    Containers::Array<T> dstData{NoInit, std::size_t(data.dstStride[0]*3*2)};
 
     auto srcStride = data.srcStride;
     for(auto& i: srcStride) i *= sizeof(T);
@@ -316,10 +312,8 @@ template<class T> void AlgorithmsTest::copyStrided3D() {
     setTestCaseTemplateName(TypeName<T>::name());
 
     /* Enough so even sparse variants fit */
-    Containers::Array<T> srcData{Containers::NoInit,
-        std::size_t(data.srcStride[0]*7*2)};
-    Containers::Array<T> dstData{Containers::NoInit,
-        std::size_t(data.dstStride[0]*7*2)};
+    Containers::Array<T> srcData{NoInit, std::size_t(data.srcStride[0]*7*2)};
+    Containers::Array<T> dstData{NoInit, std::size_t(data.dstStride[0]*7*2)};
 
     auto srcStride = data.srcStride;
     for(auto& i: srcStride) i *= sizeof(T);
@@ -356,10 +350,8 @@ template<class T> void AlgorithmsTest::copyStrided4D() {
     setTestCaseTemplateName(TypeName<T>::name());
 
     /* Enough so even sparse variants fit */
-    Containers::Array<T> srcData{Containers::NoInit,
-        std::size_t(data.srcStride[0]*2*2)};
-    Containers::Array<T> dstData{Containers::NoInit,
-        std::size_t(data.dstStride[0]*2*2)};
+    Containers::Array<T> srcData{NoInit, std::size_t(data.srcStride[0]*2*2)};
+    Containers::Array<T> dstData{NoInit, std::size_t(data.dstStride[0]*2*2)};
 
     auto srcStride = data.srcStride;
     for(auto& i: srcStride) i *= sizeof(T);
@@ -784,6 +776,6 @@ template<class T> void AlgorithmsTest::copyBenchmark3DNonContiguous() {
     CORRADE_COMPARE(dstData[Size*Size*Size*4/sizeof(T) - 2].data[0], (Size*Size*Size*4/sizeof(T) + 10 - 2)%256);
 }
 
-}}}
+}}}}
 
 CORRADE_TEST_MAIN(Corrade::Utility::Test::AlgorithmsTest)

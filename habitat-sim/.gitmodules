@@ -1,0 +1,57 @@
+[submodule "src/deps/googletest"]
+	path = src/deps/googletest
+	url = https://github.com/google/googletest
+[submodule "src/deps/rapidjson"]
+	path = src/deps/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
+[submodule "src/deps/magnum"]
+	path = src/deps/magnum
+	url = https://github.com/mosra/magnum.git
+[submodule "src/deps/corrade"]
+	path = src/deps/corrade
+	url = https://github.com/mosra/corrade.git
+[submodule "src/deps/magnum-plugins"]
+	path = src/deps/magnum-plugins
+	url = https://github.com/mosra/magnum-plugins.git
+[submodule "src/deps/glog"]
+	path = src/deps/glog
+	url = https://github.com/google/glog.git
+[submodule "src/deps/pybind11"]
+	path = src/deps/pybind11
+	url = https://github.com/pybind/pybind11.git
+[submodule "src/deps/eigen"]
+	path = src/deps/eigen
+	url = https://gitlab.com/libeigen/eigen.git
+[submodule "src/deps/assimp"]
+	path = src/deps/assimp
+	url = https://github.com/assimp/assimp
+[submodule "src/deps/glfw"]
+	path = src/deps/glfw
+	url = https://github.com/glfw/glfw
+[submodule "src/deps/Sophus"]
+	path = src/deps/Sophus
+	url = https://github.com/strasdat/Sophus
+[submodule "src/deps/recastnavigation"]
+	path = src/deps/recastnavigation
+	url = https://github.com/erikwijmans/recastnavigation.git
+[submodule "src/deps/magnum-integration"]
+	path = src/deps/magnum-integration
+	url = https://github.com/mosra/magnum-integration.git
+[submodule "src/deps/magnum-bindings"]
+	path = src/deps/magnum-bindings
+	url = https://github.com/mosra/magnum-bindings.git
+[submodule "docs/m.css"]
+	path = docs/m.css
+	url = https://github.com/mosra/m.css
+[submodule "src/deps/imgui"]
+	path = src/deps/imgui
+	url = https://github.com/ocornut/imgui.git
+[submodule "src/deps/tinyobjloader"]
+	path = src/deps/tinyobjloader
+	url = https://github.com/syoyo/tinyobjloader.git
+[submodule "src/deps/bullet3"]
+	path = src/deps/bullet3
+	url = https://github.com/bulletphysics/bullet3
+[submodule "src/deps/v-hacd"]
+	path = src/deps/v-hacd
+	url = https://github.com/ScottCSteinhauser/v-hacd.git

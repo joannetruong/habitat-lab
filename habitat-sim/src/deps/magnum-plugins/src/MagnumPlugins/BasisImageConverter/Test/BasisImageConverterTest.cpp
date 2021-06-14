@@ -115,8 +115,8 @@ void BasisImageConverterTest::wrongFormat() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    CORRADE_VERIFY(!converter->exportToData(image));
-    CORRADE_COMPARE(out.str(), "Trade::BasisImageConverter::exportToData(): unsupported format PixelFormat::RG32F\n");
+    CORRADE_VERIFY(!converter->convertToData(image));
+    CORRADE_COMPARE(out.str(), "Trade::BasisImageConverter::convertToData(): unsupported format PixelFormat::RG32F\n");
 }
 
 void BasisImageConverterTest::zeroSize() {
@@ -125,9 +125,9 @@ void BasisImageConverterTest::zeroSize() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    CORRADE_VERIFY(!converter->exportToData(ImageView2D{PixelFormat::RGB8Unorm, {}, nullptr}));
+    CORRADE_VERIFY(!converter->convertToData(ImageView2D{PixelFormat::RGB8Unorm, {}, nullptr}));
     CORRADE_COMPARE(out.str(),
-        "Trade::BasisImageConverter::exportToData(): source image is empty\n");
+        "Trade::BasisImageConverter::convertToData(): source image is empty\n");
 }
 
 void BasisImageConverterTest::emptyData() {
@@ -136,9 +136,9 @@ void BasisImageConverterTest::emptyData() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    CORRADE_VERIFY(!converter->exportToData(ImageView2D{PixelFormat::RGB8Unorm, {9192, 8192}}));
+    CORRADE_VERIFY(!converter->convertToData(ImageView2D{PixelFormat::RGB8Unorm, {9192, 8192}}));
     CORRADE_COMPARE(out.str(),
-        "Trade::BasisImageConverter::exportToData(): source image data is nullptr\n");
+        "Trade::BasisImageConverter::convertToData(): source image data is nullptr\n");
 }
 
 void BasisImageConverterTest::processError() {
@@ -148,13 +148,13 @@ void BasisImageConverterTest::processError() {
         16128 /* basisu_frontend::cMaxEndpointClusters */ + 1);
 
     Image2D imageWithSkip{PixelFormat::RGBA8Unorm, Vector2i{16},
-        Containers::Array<char>{Containers::ValueInit, 16*16*4}};
+        Containers::Array<char>{ValueInit, 16*16*4}};
 
     std::ostringstream out;
     Error redirectError{&out};
-    CORRADE_VERIFY(!converter->exportToData(imageWithSkip));
+    CORRADE_VERIFY(!converter->convertToData(imageWithSkip));
     CORRADE_COMPARE(out.str(),
-        "Trade::BasisImageConverter::exportToData(): frontend processing failed\n");
+        "Trade::BasisImageConverter::convertToData(): frontend processing failed\n");
 }
 
 void BasisImageConverterTest::r() {
@@ -172,12 +172,12 @@ void BasisImageConverterTest::r() {
        to 4 bytes. During copy, we only use R channel to retrieve a R8 image */
     const UnsignedInt dataSize = (63 + 7 + 2)*(27 + 8);
     Image2D imageWithSkip{PixelStorage{}.setSkip({7, 8, 0}),
-        PixelFormat::R8Unorm, originalImage->size(), Containers::Array<char>{Containers::ValueInit, dataSize}};
+        PixelFormat::R8Unorm, originalImage->size(), Containers::Array<char>{ValueInit, dataSize}};
     Utility::copy(Containers::arrayCast<const UnsignedByte>(
         originalImage->pixels<Color3ub>()),
         imageWithSkip.pixels<UnsignedByte>());
 
-    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->exportToData(imageWithSkip);
+    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->convertToData(imageWithSkip);
     CORRADE_VERIFY(compressedData);
 
     if(_manager.loadState("BasisImporter") == PluginManager::LoadState::NotFound)
@@ -216,12 +216,12 @@ void BasisImageConverterTest::rg() {
        image. */
     const UnsignedInt dataSize = ((63 + 8)*2 + 2)*(27 + 7);
     Image2D imageWithSkip{PixelStorage{}.setSkip({7, 8, 0}),
-        PixelFormat::RG8Unorm, originalImage->size(), Containers::Array<char>{Containers::ValueInit, dataSize}};
+        PixelFormat::RG8Unorm, originalImage->size(), Containers::Array<char>{ValueInit, dataSize}};
     Utility::copy(Containers::arrayCast<const Vector2ub>(
         originalImage->pixels<Color3ub>()),
         imageWithSkip.pixels<Vector2ub>());
 
-    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->exportToData(imageWithSkip);
+    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->convertToData(imageWithSkip);
     CORRADE_VERIFY(compressedData);
 
     if(_manager.loadState("BasisImporter") == PluginManager::LoadState::NotFound)
@@ -259,11 +259,11 @@ void BasisImageConverterTest::rgb() {
     const UnsignedInt dataSize = ((63 + 7)*3 + 3)*(27 + 8);
     Image2D imageWithSkip{PixelStorage{}.setSkip({7, 8, 0}),
         PixelFormat::RGB8Unorm, originalImage->size(),
-        Containers::Array<char>{Containers::ValueInit, dataSize}};
+        Containers::Array<char>{ValueInit, dataSize}};
     Utility::copy(originalImage->pixels<Color3ub>(),
         imageWithSkip.pixels<Color3ub>());
 
-    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->exportToData(imageWithSkip);
+    const auto compressedData = _converterManager.instantiate("BasisImageConverter")->convertToData(imageWithSkip);
     CORRADE_VERIFY(compressedData);
 
     if(_manager.loadState("BasisImporter") == PluginManager::LoadState::NotFound)
@@ -299,13 +299,13 @@ void BasisImageConverterTest::rgba() {
     const UnsignedInt dataSize = ((63 + 7)*4)*(27 + 7);
     Image2D imageWithSkip{PixelStorage{}.setSkip({7, 8, 0}),
         PixelFormat::RGBA8Unorm, originalImage->size(),
-        Containers::Array<char>{Containers::ValueInit, dataSize}};
+        Containers::Array<char>{ValueInit, dataSize}};
     Utility::copy(originalImage->pixels<Color4ub>(),
         imageWithSkip.pixels<Color4ub>());
 
     Containers::Pointer<AbstractImageConverter> converter = _converterManager.instantiate("BasisImageConverter");
     if(data.threads) converter->configuration().setValue("threads", data.threads);
-    const auto compressedData = converter->exportToData(imageWithSkip);
+    const auto compressedData = converter->convertToData(imageWithSkip);
     CORRADE_VERIFY(compressedData);
 
     if(_manager.loadState("BasisImporter") == PluginManager::LoadState::NotFound)

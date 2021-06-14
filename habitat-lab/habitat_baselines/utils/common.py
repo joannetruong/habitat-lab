@@ -266,10 +266,19 @@ def poll_checkpoint_folder(
     models_paths = list(
         filter(os.path.isfile, glob.glob(checkpoint_folder + "/*"))
     )
-    models_paths.sort(key=os.path.getmtime)
-    ind = previous_ckpt_ind + 1
-    if ind < len(models_paths):
-        return models_paths[ind]
+    # models_paths.sort(key=os.path.getmtime)
+    # ind = previous_ckpt_ind + 1
+    # if ind < len(models_paths):
+    #     return models_paths[ind]
+    # return None
+    models_paths = list(
+        filter(lambda x: not os.path.isfile(x+'.done') and not x.endswith('.done'), glob.glob(checkpoint_folder + "/*"))
+    )
+    models_paths = sorted(models_paths, key=lambda x: int(x.split('.')[-2]))
+    if len(models_paths) > 0:
+        with open(models_paths[0]+'.done','w') as f:
+            pass
+        return models_paths[0]
     return None
 
 

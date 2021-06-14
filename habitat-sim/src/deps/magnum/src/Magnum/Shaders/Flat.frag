@@ -33,15 +33,15 @@
 #define in varying
 #endif
 
-#ifdef TEXTURED
-#ifdef EXPLICIT_TEXTURE_LAYER
-layout(binding = 0)
-#endif
-uniform lowp sampler2D textureData;
+#ifndef RUNTIME_CONST
+#define const
 #endif
 
+/* Uniforms */
+
+#ifndef UNIFORM_BUFFERS
 #ifdef EXPLICIT_UNIFORM_LOCATION
-layout(location = 2)
+layout(location = 3)
 #endif
 uniform lowp vec4 color
     #ifndef GL_ES
@@ -51,7 +51,7 @@ uniform lowp vec4 color
 
 #ifdef ALPHA_MASK
 #ifdef EXPLICIT_UNIFORM_LOCATION
-layout(location = 3)
+layout(location = 4)
 #endif
 uniform lowp float alphaMask
     #ifndef GL_ES
@@ -62,14 +62,85 @@ uniform lowp float alphaMask
 
 #ifdef OBJECT_ID
 #ifdef EXPLICIT_UNIFORM_LOCATION
-layout(location = 4)
+layout(location = 5)
 #endif
 /* mediump is just 2^10, which might not be enough, this is 2^16 */
 uniform highp uint objectId; /* defaults to zero */
 #endif
 
+/* Uniform buffers */
+
+#else
+#ifndef MULTI_DRAW
+#if DRAW_COUNT > 1
+#ifdef EXPLICIT_UNIFORM_LOCATION
+layout(location = 0)
+#endif
+uniform highp uint drawOffset
+    #ifndef GL_ES
+    = 0u
+    #endif
+    ;
+#else
+#define drawOffset 0u
+#endif
+#define drawId drawOffset
+#endif
+
+struct DrawUniform {
+    highp uvec4 materialIdReservedObjectIdReservedReserved;
+    #define draw_materialIdReserved materialIdReservedObjectIdReservedReserved.x
+    #define draw_objectId materialIdReservedObjectIdReservedReserved.y
+};
+
+layout(std140
+    #ifdef EXPLICIT_BINDING
+    , binding = 2
+    #endif
+) uniform Draw {
+    DrawUniform draws[DRAW_COUNT];
+};
+
+struct MaterialUniform {
+    lowp vec4 color;
+    highp vec4 alphaMaskReservedReservedReserved;
+    #define material_alphaMask alphaMaskReservedReservedReserved.x
+};
+
+layout(std140
+    #ifdef EXPLICIT_BINDING
+    , binding = 4
+    #endif
+) uniform Material {
+    MaterialUniform materials[MATERIAL_COUNT];
+};
+#endif
+
+/* Textures */
+
 #ifdef TEXTURED
-in mediump vec2 interpolatedTextureCoordinates;
+#ifdef EXPLICIT_BINDING
+layout(binding = 0)
+#endif
+uniform lowp
+    #ifndef TEXTURE_ARRAYS
+    sampler2D
+    #else
+    sampler2DArray
+    #endif
+    textureData;
+#endif
+
+/* Inputs */
+
+#ifdef TEXTURED
+in mediump
+    #ifndef TEXTURE_ARRAYS
+    vec2
+    #else
+    vec3
+    #endif
+    interpolatedTextureCoordinates;
 #endif
 
 #ifdef VERTEX_COLOR
@@ -79,6 +150,8 @@ in lowp vec4 interpolatedVertexColor;
 #ifdef INSTANCED_OBJECT_ID
 flat in highp uint interpolatedInstanceObjectId;
 #endif
+
+/* Outputs */
 
 #ifdef NEW_GLSL
 #ifdef EXPLICIT_ATTRIB_LOCATION
@@ -94,7 +167,26 @@ layout(location = OBJECT_ID_OUTPUT_ATTRIBUTE_LOCATION)
 out highp uint fragmentObjectId;
 #endif
 
+#ifdef MULTI_DRAW
+flat in highp uint drawId;
+#endif
+
 void main() {
+    #ifdef UNIFORM_BUFFERS
+    #ifdef OBJECT_ID
+    highp const uint objectId = draws[drawId].draw_objectId;
+    #endif
+    #if MATERIAL_COUNT > 1
+    mediump const uint materialId = draws[drawId].draw_materialIdReserved & 0xffffu;
+    #else
+    #define materialId 0u
+    #endif
+    lowp const vec4 color = materials[materialId].color;
+    #ifdef ALPHA_MASK
+    lowp const float alphaMask = materials[materialId].material_alphaMask;
+    #endif
+    #endif
+
     fragmentColor =
         #ifdef TEXTURED
         texture(textureData, interpolatedTextureCoordinates)*

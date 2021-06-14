@@ -32,16 +32,16 @@ from . import GLTestCase, setUpModule
 from magnum import *
 from magnum import gl, shaders
 
-class Flat(GLTestCase):
+class FlatGL(GLTestCase):
     def test_init(self):
-        a = shaders.Flat3D()
-        self.assertEqual(a.flags, shaders.Flat3D.Flags.NONE)
+        a = shaders.FlatGL3D()
+        self.assertEqual(a.flags, shaders.FlatGL3D.Flags.NONE)
 
-        b = shaders.Flat3D(shaders.Flat3D.Flags.TEXTURED|shaders.Flat3D.Flags.ALPHA_MASK)
-        self.assertEqual(b.flags, shaders.Flat3D.Flags.TEXTURED|shaders.Flat3D.Flags.ALPHA_MASK)
+        b = shaders.FlatGL3D(shaders.FlatGL3D.Flags.TEXTURED|shaders.FlatGL3D.Flags.ALPHA_MASK)
+        self.assertEqual(b.flags, shaders.FlatGL3D.Flags.TEXTURED|shaders.FlatGL3D.Flags.ALPHA_MASK)
 
     def test_uniforms_bindings(self):
-        a = shaders.Flat3D(shaders.Flat3D.Flags.TEXTURED|shaders.Flat3D.Flags.ALPHA_MASK)
+        a = shaders.FlatGL3D(shaders.FlatGL3D.Flags.TEXTURED|shaders.FlatGL3D.Flags.ALPHA_MASK)
         a.color = (0.5, 1.0, 0.9)
         a.transformation_projection_matrix = Matrix4.translation(Vector3.x_axis())
         a.alpha_mask = 0.3
@@ -51,7 +51,7 @@ class Flat(GLTestCase):
         a.bind_texture(texture)
 
     def test_uniforms_bindings_errors(self):
-        a = shaders.Flat2D()
+        a = shaders.FlatGL2D()
         with self.assertRaisesRegex(AttributeError, "the shader was not created with alpha mask enabled"):
             a.alpha_mask = 0.3
 
@@ -59,33 +59,33 @@ class Flat(GLTestCase):
         with self.assertRaisesRegex(AttributeError, "the shader was not created with texturing enabled"):
             a.bind_texture(texture)
 
-class VertexColor(GLTestCase):
+class VertexColorGL(GLTestCase):
     def test_init(self):
-        a = shaders.VertexColor2D()
-        b = shaders.VertexColor3D()
+        a = shaders.VertexColorGL2D()
+        b = shaders.VertexColorGL3D()
 
     def test_uniforms(self):
-        a = shaders.VertexColor2D()
+        a = shaders.VertexColorGL2D()
         a.transformation_projection_matrix = (
             Matrix3.translation(Vector2.x_axis())@
             Matrix3.rotation(Deg(35.0)))
 
-class Phong(GLTestCase):
+class PhongGL(GLTestCase):
     def test_init(self):
-        a = shaders.Phong()
-        self.assertEqual(a.flags, shaders.Phong.Flags.NONE)
+        a = shaders.PhongGL()
+        self.assertEqual(a.flags, shaders.PhongGL.Flags.NONE)
         self.assertEqual(a.light_count, 1)
 
-        b = shaders.Phong(shaders.Phong.Flags.DIFFUSE_TEXTURE|shaders.Phong.Flags.ALPHA_MASK)
-        self.assertEqual(b.flags, shaders.Phong.Flags.DIFFUSE_TEXTURE|shaders.Phong.Flags.ALPHA_MASK)
+        b = shaders.PhongGL(shaders.PhongGL.Flags.DIFFUSE_TEXTURE|shaders.PhongGL.Flags.ALPHA_MASK)
+        self.assertEqual(b.flags, shaders.PhongGL.Flags.DIFFUSE_TEXTURE|shaders.PhongGL.Flags.ALPHA_MASK)
         self.assertEqual(b.light_count, 1)
 
-        c = shaders.Phong(shaders.Phong.Flags.NONE, 3)
-        self.assertEqual(c.flags, shaders.Phong.Flags.NONE)
+        c = shaders.PhongGL(shaders.PhongGL.Flags.NONE, 3)
+        self.assertEqual(c.flags, shaders.PhongGL.Flags.NONE)
         self.assertEqual(c.light_count, 3)
 
     def test_uniforms_bindings(self):
-        a = shaders.Phong(shaders.Phong.Flags.ALPHA_MASK|shaders.Phong.Flags.AMBIENT_TEXTURE|shaders.Phong.Flags.DIFFUSE_TEXTURE|shaders.Phong.Flags.SPECULAR_TEXTURE|shaders.Phong.Flags.NORMAL_TEXTURE|shaders.Phong.Flags.TEXTURE_TRANSFORMATION, 2)
+        a = shaders.PhongGL(shaders.PhongGL.Flags.ALPHA_MASK|shaders.PhongGL.Flags.AMBIENT_TEXTURE|shaders.PhongGL.Flags.DIFFUSE_TEXTURE|shaders.PhongGL.Flags.SPECULAR_TEXTURE|shaders.PhongGL.Flags.NORMAL_TEXTURE|shaders.PhongGL.Flags.TEXTURE_TRANSFORMATION, 2)
         a.diffuse_color = (0.5, 1.0, 0.9)
         a.transformation_matrix = Matrix4.translation(Vector3.x_axis())
         a.projection_matrix = Matrix4.zero_init()
@@ -106,7 +106,7 @@ class Phong(GLTestCase):
         a.bind_textures(ambient=texture, diffuse=texture, specular=texture, normal=texture)
 
     def test_uniforms_bindings_errors(self):
-        a = shaders.Phong()
+        a = shaders.PhongGL()
         with self.assertRaisesRegex(AttributeError, "the shader was not created with normal texture enabled"):
             a.normal_texture_scale = 0.3
         with self.assertRaisesRegex(AttributeError, "the shader was not created with alpha mask enabled"):

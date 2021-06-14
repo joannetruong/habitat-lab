@@ -17,46 +17,33 @@ void BulletBase::constructConvexShapesFromMeshes(
     const Magnum::Matrix4& transformFromParentToWorld,
     const std::vector<assets::CollisionMeshData>& meshGroup,
     const assets::MeshTransformNode& node,
-    bool join,
-    btCompoundShape* bObjectShape) {
+    btCompoundShape* bObjectShape,
+    std::vector<std::unique_ptr<btConvexHullShape>>& bObjectConvexShapes) {
   Magnum::Matrix4 transformFromLocalToWorld =
       transformFromParentToWorld * node.transformFromLocalToParent;
   if (node.meshIDLocal != ID_UNDEFINED) {
     // This node has a mesh, so add it to the compound
-
     const assets::CollisionMeshData& mesh = meshGroup[node.meshIDLocal];
 
-    if (join) {
-      // add all points to a single convex instead of compounding (more
-      // stable)
-      if (bObjectConvexShapes_.empty()) {
-        // create the convex if it does not exist
-        bObjectConvexShapes_.emplace_back(
-            std::make_unique<btConvexHullShape>());
-      }
-
-      // add points
-      for (auto& v : mesh.positions) {
-        bObjectConvexShapes_.back()->addPoint(
-            btVector3(transformFromLocalToWorld.transformPoint(v)), false);
-      }
-    } else {
-      bObjectConvexShapes_.emplace_back(std::make_unique<btConvexHullShape>(
-          static_cast<const btScalar*>(mesh.positions.data()->data()),
-          mesh.positions.size(), sizeof(Magnum::Vector3)));
-      bObjectConvexShapes_.back()->setMargin(0.0);
-      bObjectConvexShapes_.back()->recalcLocalAabb();
-      //! Add to compound shape stucture
-      if (bObjectShape != nullptr) {
-        bObjectShape->addChildShape(btTransform{transformFromLocalToWorld},
-                                    bObjectConvexShapes_.back().get());
-      }
+    bObjectConvexShapes.emplace_back(std::make_unique<btConvexHullShape>());
+    // transform points into world space, including any scale/shear in
+    // transformFromLocalToWorld.
+    for (auto& v : mesh.positions) {
+      bObjectConvexShapes.back()->addPoint(
+          btVector3(transformFromLocalToWorld.transformPoint(v)), false);
+    }
+    bObjectConvexShapes.back()->setMargin(0.0);
+    bObjectConvexShapes.back()->recalcLocalAabb();
+    //! Add to compound shape stucture
+    if (bObjectShape != nullptr) {
+      bObjectShape->addChildShape(btTransform::getIdentity(),
+                                  bObjectConvexShapes.back().get());
     }
   }
 
-  for (auto& child : node.children) {
+  for (const auto& child : node.children) {
     constructConvexShapesFromMeshes(transformFromLocalToWorld, meshGroup, child,
-                                    join, bObjectShape);
+                                    bObjectShape, bObjectConvexShapes);
   }
 }  // constructConvexShapesFromMeshes
 
@@ -68,11 +55,8 @@ void BulletBase::constructJoinedConvexShapeFromMeshes(
   Magnum::Matrix4 transformFromLocalToWorld =
       transformFromParentToWorld * node.transformFromLocalToParent;
 
-  if (bConvexShape == nullptr) {
-    Cr::Utility::Debug()
-        << "constructJoinedConvexShapeFromMeshes : E - passed in null shape...";
-    return;
-  }
+  assert(bConvexShape != nullptr);
+
   if (node.meshIDLocal != ID_UNDEFINED) {
     const assets::CollisionMeshData& mesh = meshGroup[node.meshIDLocal];
 
@@ -82,7 +66,7 @@ void BulletBase::constructJoinedConvexShapeFromMeshes(
           btVector3(transformFromLocalToWorld.transformPoint(v)), false);
     }
   }
-  for (auto& child : node.children) {
+  for (const auto& child : node.children) {
     constructJoinedConvexShapeFromMeshes(transformFromLocalToWorld, meshGroup,
                                          child, bConvexShape);
   }

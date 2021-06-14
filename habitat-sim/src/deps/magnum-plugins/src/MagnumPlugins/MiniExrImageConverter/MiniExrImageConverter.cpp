@@ -45,15 +45,15 @@ MiniExrImageConverter::MiniExrImageConverter() = default;
 
 MiniExrImageConverter::MiniExrImageConverter(PluginManager::AbstractManager& manager, const std::string& plugin): AbstractImageConverter{manager, plugin} {}
 
-ImageConverterFeatures MiniExrImageConverter::doFeatures() const { return ImageConverterFeature::ConvertData; }
+ImageConverterFeatures MiniExrImageConverter::doFeatures() const { return ImageConverterFeature::Convert2DToData; }
 
-Containers::Array<char> MiniExrImageConverter::doExportToData(const ImageView2D& image) {
+Containers::Array<char> MiniExrImageConverter::doConvertToData(const ImageView2D& image) {
     Int components;
     switch(image.format()) {
         case PixelFormat::RGB16F: components = 3; break;
         case PixelFormat::RGBA16F: components = 4; break;
         default:
-            Error() << "Trade::MiniExrImageConverter::exportToData(): unsupported pixel format" << image.format();
+            Error() << "Trade::MiniExrImageConverter::convertToData(): unsupported pixel format" << image.format();
             return nullptr;
     }
 
@@ -66,7 +66,7 @@ Containers::Array<char> MiniExrImageConverter::doExportToData(const ImageView2D&
     const std::size_t rowSize = image.size().x()*image.pixelSize();
     const std::size_t rowStride = dataProperties.second.x();
     const std::size_t packedDataSize = rowSize*image.size().y();
-    Containers::Array<char> reversedPackedData{packedDataSize};
+    Containers::Array<char> reversedPackedData{NoInit, packedDataSize};
     for(std::int_fast32_t y = 0; y != image.size().y(); ++y)
         std::copy_n(inputData.suffix((image.size().y() - y - 1)*rowStride).data(), rowSize, reversedPackedData + y*rowSize);
 
@@ -76,7 +76,7 @@ Containers::Array<char> MiniExrImageConverter::doExportToData(const ImageView2D&
 
     /* miniexr uses malloc to allocate and since we can't use custom deleters,
        copy the result into a new-allocated array instead */
-    Containers::Array<char> fileData{size};
+    Containers::Array<char> fileData{NoInit, size};
     std::copy_n(data, size, fileData.begin());
     std::free(data);
 
@@ -86,4 +86,4 @@ Containers::Array<char> MiniExrImageConverter::doExportToData(const ImageView2D&
 }}
 
 CORRADE_PLUGIN_REGISTER(MiniExrImageConverter, Magnum::Trade::MiniExrImageConverter,
-    "cz.mosra.magnum.Trade.AbstractImageConverter/0.2.1")
+    "cz.mosra.magnum.Trade.AbstractImageConverter/0.3")

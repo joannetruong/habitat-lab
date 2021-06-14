@@ -30,9 +30,10 @@ parser.add_argument('-pe','--use_pretrained_encoder', default=False, action='sto
 parser.add_argument('-mc','--max_collisions', type=int, default=-1)
 parser.add_argument('-b','--allow_backwards', default=False, action='store_true')
 parser.add_argument('-sf','--use_strafe', default=False, action='store_true')
+parser.add_argument('-o','--use_oblong_robot', default=False, action='store_true')
 parser.add_argument('-as','--auto_stop', default=False, action='store_true')
 parser.add_argument('-l','--max_linear', type=float, default=0.35)
-parser.add_argument('-ms','--max_strafe', type=float, default=0.15)
+parser.add_argument('-ms','--max_strafe', type=float, default=0.35)
 parser.add_argument('-g','--max_angular', type=int, default=10)
 parser.add_argument('-p','--partition', type=str, default='long')
 # Evaluation
@@ -99,6 +100,11 @@ if not args.eval:
                 task_yaml_data[idx] = "      AUTO_STOP: False"
         elif i.startswith('      MAX_COLLISIONS:'):
             task_yaml_data[idx] = "      MAX_COLLISIONS: {}".format(args.max_collisions)
+        elif i.startswith('      USE_OBLONG_ROBOT:'):
+            if args.use_oblong_robot:
+                task_yaml_data[idx] = "      USE_OBLONG_ROBOT: True"
+            else:
+                task_yaml_data[idx] = "      USE_OBLONG_ROBOT: False"
 
     with open(new_task_yaml_path,'w') as f:
         f.write('\n'.join(task_yaml_data))

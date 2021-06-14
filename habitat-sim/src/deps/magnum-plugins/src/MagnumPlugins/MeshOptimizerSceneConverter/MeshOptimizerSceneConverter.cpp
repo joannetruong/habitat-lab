@@ -311,7 +311,7 @@ Containers::Optional<MeshData> MeshOptimizerSceneConverter::doConvert(const Mesh
         }
 
         Containers::Array<UnsignedInt> outputIndices;
-        Containers::arrayResize<Trade::ArrayAllocator>(outputIndices, Containers::NoInit, mesh.indexCount());
+        Containers::arrayResize<Trade::ArrayAllocator>(outputIndices, NoInit, mesh.indexCount());
 
         UnsignedInt vertexCount;
         if(configuration().value<bool>("simplifySloppy"))
@@ -349,4 +349,4 @@ Containers::Optional<MeshData> MeshOptimizerSceneConverter::doConvert(const Mesh
 }}
 
 CORRADE_PLUGIN_REGISTER(MeshOptimizerSceneConverter, Magnum::Trade::MeshOptimizerSceneConverter,
-    "cz.mosra.magnum.Trade.AbstractSceneConverter/0.1")
+    "cz.mosra.magnum.Trade.AbstractSceneConverter/0.1.1")

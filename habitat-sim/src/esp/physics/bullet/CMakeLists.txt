@@ -17,6 +17,8 @@ add_library(
   BulletRigidStage.h
   BulletURDFImporter.cpp
   BulletURDFImporter.h
+  objectWrappers/ManagedBulletArticulatedObject.h
+  objectWrappers/ManagedBulletRigidObject.h
 )
 
 target_link_libraries(

@@ -173,7 +173,9 @@ class Workspace(object):
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
         print(robot_file)
-        self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+        art_obj_mgr = self.sim.get_articulated_object_manager()
+        self.robot_id = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+        #self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
 
         jms = []
 

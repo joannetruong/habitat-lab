@@ -218,14 +218,11 @@ class Env:
 
         self._current_episode = next(self._episode_iterator)
         self.reconfigure(self._config)
-        print('HABITAT RESETTING 1')
 
         observations = self.task.reset(episode=self.current_episode)
-        print('HABITAT RESETTING 2 ')
         self._task.measurements.reset_measures(
             episode=self.current_episode, task=self.task
         )
-        print('HABITAT RESETTING 3')
 
         return observations
 

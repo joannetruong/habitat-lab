@@ -26,6 +26,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h> /* for Mesh.buffers */
 #include <Corrade/Containers/ArrayView.h>
+#include <Corrade/Containers/StringStl.h>
 #include <Magnum/Image.h>
 #include <Magnum/ImageView.h>
 #include <Magnum/GL/AbstractShaderProgram.h>
@@ -384,12 +385,27 @@ void gl(py::module_& m) {
             /** @todo context switching (needs additions to the "who owns
                 current context instance" variable -- a map?) */
             .def_property_readonly("version", &GL::Context::version, "OpenGL version")
-            .def_property_readonly("vendor_string", &GL::Context::vendorString, "Vendor string")
-            .def_property_readonly("renderer_string", &GL::Context::rendererString, "Renderer string")
-            .def_property_readonly("version_string", &GL::Context::versionString, "Version string")
-            .def_property_readonly("shading_language_version_string", &GL::Context::shadingLanguageVersionString, "Shading language version string")
-            .def_property_readonly("shading_language_version_strings", &GL::Context::shadingLanguageVersionStrings, "Shading language version strings")
-            .def_property_readonly("extension_strings", &GL::Context::extensionStrings, "Extension strings")
+            /** @todo find a way to go directly to python's str */
+            .def_property_readonly("vendor_string", [](GL::Context& self) {
+                return std::string{self.vendorString()};
+            }, "Vendor string")
+            .def_property_readonly("renderer_string", [](GL::Context& self) {
+                return std::string{self.rendererString()};
+            }, "Renderer string")
+            .def_property_readonly("version_string", [](GL::Context& self) {
+                return std::string{self.versionString()};
+            }, "Version string")
+            .def_property_readonly("shading_language_version_string", [](GL::Context& self) {
+                return std::string{self.shadingLanguageVersionString()};
+            }, "Shading language version string")
+            .def_property_readonly("shading_language_version_strings", [](GL::Context& self) {
+                const Containers::Array<Containers::StringView> strings = self.shadingLanguageVersionStrings();
+                return std::vector<std::string>{strings.begin(), strings.end()};
+            }, "Shading language version strings")
+            .def_property_readonly("extension_strings", [](GL::Context& self) {
+                Containers::Array<Containers::StringView> strings = self.extensionStrings();
+                return std::vector<std::string>{strings.begin(), strings.end()};
+            }, "Extension strings")
             #ifndef MAGNUM_TARGET_WEBGL
             .def_property_readonly("flags", &GL::Context::flags, "Context flags")
             #endif
@@ -479,7 +495,9 @@ void gl(py::module_& m) {
             /* Public interface */
             .def_property_readonly("id", &GL::AbstractShaderProgram::id, "OpenGL program ID")
             .def("validate", &GL::AbstractShaderProgram::validate, "Validate program")
-            .def("draw", static_cast<void(GL::AbstractShaderProgram::*)(GL::Mesh&)>(&GL::AbstractShaderProgram::draw), "Draw a mesh")
+            .def("draw", [](GL::AbstractShaderProgram& self, GL::Mesh& mesh) {
+                self.draw(mesh);
+            }, "Draw a mesh")
             #if !defined(MAGNUM_TARGET_GLES2) && !defined(MAGNUM_TARGET_WEBGL)
             .def("dispatch_compute", &GL::AbstractShaderProgram::dispatchCompute, "Dispatch compute")
             #endif
@@ -1170,8 +1188,10 @@ void gl(py::module_& m) {
         .value("RGBA8", GL::TextureFormat::RGBA8)
         #endif
         #ifndef MAGNUM_TARGET_WEBGL
+        #ifndef MAGNUM_TARGET_GLES2
         .value("SR8", GL::TextureFormat::SR8)
-        #ifdef MAGNUM_TARGET_GLES
+        #endif
+        #if defined(MAGNUM_TARGET_GLES) && !defined(MAGNUM_TARGET_GLES2)
         /** @todo how to expose this one in the docs? */
         .value("SRG8", GL::TextureFormat::SRG8)
         #endif

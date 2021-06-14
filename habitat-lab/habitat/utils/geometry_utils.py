@@ -8,6 +8,7 @@ from typing import List, Tuple, Union
 
 import numpy as np
 import quaternion
+import squaternion
 
 EPSILON = 1e-8
 
@@ -109,3 +110,9 @@ def agent_state_target2ref(
     )
 
     return (rotation_in_ref_coordinate, position_in_ref_coordinate)
+
+def get_rpy(rotation):
+    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
+    roll, yaw, pitch = obs_quat.to_euler()
+    return np.array([roll, pitch, yaw])
+

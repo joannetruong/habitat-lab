@@ -192,25 +192,6 @@ public:
 					  const dtQueryFilter* filter,
 					  dtPolyRef* path, int* pathCount, const int maxPath) const;
 
-	/// Finds a path from the start polygon to the closest (by geodesic distance) to any of the goals.
-	/// Only traverse bidirectional edges.  Therefore it is not gaurenteed to find the shortest path 
-	/// or closest goal in meshes with directed offmesh connections.
-	///  @param[in] 	numGoals    The number of goals
-	///  @param[in]		startRef	The refrence id of the start polygon.
-	///  @param[in]		endRefs		List of the reference ids of the end polygons. [id * @p numGoals]
-	///  @param[in]		startPos	A position within the start polygon. [(x, y, z)]
-	///  @param[in]		endPoses	List of end positions within position within the end polygons. [(x, y, z) * @p numGoals]
-	///  @param[in]		filter		The polygon filter to apply to the query.
-	///  @param[out]	path		An ordered list of polygon references representing the path. (Start to end.) 
-	///  							[(polyRef) * @p pathCount]
-	///  @param[out]	pathCount	The number of polygons returned in the @p path array.
-	///  @param[in]		maxPath		The maximum number of polygons the @p path array can hold. [Limit: >= 1]
-	///  @param[out] 	foundGoalIdx Index into the list of goals specifying which goal was found. [opt]
-	dtStatus findBidirPathToAny(const int numGoals, dtPolyRef startRef, const dtPolyRef* endRefs,
-					  const float* startPos, const float* endPoses,
-					  const dtQueryFilter* filter,
-					  dtPolyRef* path, int* pathCount, const int maxPath, int* foundGoalIdx) const;
-
 	/// Finds the straight path from the start to the end position within the polygon corridor.
 	///  @param[in]		startPos			Path start position. [(x, y, z)]
 	///  @param[in]		endPos				Path end position. [(x, y, z)]
@@ -332,15 +313,31 @@ public:
 	///@{
 
 	/// Finds the polygon nearest to the specified center point.
+	/// [opt] means the specified parameter can be a null pointer, in that case the output parameter will not be set.
+	///
 	///  @param[in]		center		The center of the search box. [(x, y, z)]
-	///  @param[in]		halfExtents		The search distance along each axis. [(x, y, z)]
+	///  @param[in]		halfExtents	The search distance along each axis. [(x, y, z)]
 	///  @param[in]		filter		The polygon filter to apply to the query.
-	///  @param[out]	nearestRef	The reference id of the nearest polygon.
-	///  @param[out]	nearestPt	The nearest point on the polygon. [opt] [(x, y, z)]
+	///  @param[out]	nearestRef	The reference id of the nearest polygon. Will be set to 0 if no polygon is found.
+	///  @param[out]	nearestPt	The nearest point on the polygon. Unchanged if no polygon is found. [opt] [(x, y, z)]
 	/// @returns The status flags for the query.
 	dtStatus findNearestPoly(const float* center, const float* halfExtents,
 							 const dtQueryFilter* filter,
 							 dtPolyRef* nearestRef, float* nearestPt) const;
+
+	/// Finds the polygon nearest to the specified center point.
+	/// [opt] means the specified parameter can be a null pointer, in that case the output parameter will not be set.
+	/// 
+	///  @param[in]		center		The center of the search box. [(x, y, z)]
+	///  @param[in]		halfExtents	The search distance along each axis. [(x, y, z)]
+	///  @param[in]		filter		The polygon filter to apply to the query.
+	///  @param[out]	nearestRef	The reference id of the nearest polygon. Will be set to 0 if no polygon is found.
+	///  @param[out]	nearestPt	The nearest point on the polygon. Unchanged if no polygon is found. [opt] [(x, y, z)]
+	///  @param[out]	isOverPoly 	Set to true if the point's X/Z coordinate lies inside the polygon, false otherwise. Unchanged if no polygon is found. [opt]
+	/// @returns The status flags for the query.
+	dtStatus findNearestPoly(const float* center, const float* halfExtents,
+							 const dtQueryFilter* filter,
+							 dtPolyRef* nearestRef, float* nearestPt, bool* isOverPoly) const;
 	
 	/// Finds polygons that overlap the search box.
 	///  @param[in]		center		The center of the search box. [(x, y, z)]
@@ -557,15 +554,8 @@ private:
 						   int* straightPathCount, const int maxStraightPath, const int options) const;
 
 	// Gets the path leading to the specified end node.
-	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, int* pathCount, int maxPath, int* startIdx) const;
+	dtStatus getPathToNode(struct dtNode* endNode, dtPolyRef* path, int* pathCount, int maxPath) const;
 
-	// Internal implementation of multi-start A*
-	dtStatus findPathFromAny(const int numStars, const dtPolyRef* startRefs, dtPolyRef endRef,
-					  const float* startPoses, const float* endPos,
-					  const dtQueryFilter* filter,
-					  dtPolyRef* path, int* pathCount, const int maxPath,
-					  const bool reversedSearch, int* startIdx) const;
-	
 	const dtNavMesh* m_nav;				///< Pointer to navmesh data.
 
 	struct dtQueryData

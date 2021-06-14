@@ -38,6 +38,10 @@ namespace Magnum {
     plugin for SPIR-V shader (dis)assembly and validation
 -   New @ref ShaderTools::GlslangConverter "GlslangShaderConverter" plugin for
     GLSL shader validation and GLSL->SPIR-V compilation
+-   New @ref Trade::OpenExrImporter "OpenExrImporter" and
+    @ref Trade::OpenExrImageConverter "OpenExrImageConverter" plugins for
+    reading and writing OpenEXR files, including cube map, custom channel,
+    multi-part and deep image support
 -   @ref Trade::TinyGltfImporter "TinyGltfImporter" material import was
     reworked for the new @ref Trade::MaterialData API, supporting all core
     properties as well as everything from the
@@ -72,6 +76,9 @@ namespace Magnum {
     PSD files as 16-bit instead of converting to 8 bit
 -   @ref Trade::StbImageImporter "StbImageImporter" now makes it possible to
     override imported image channel count using @cb{.ini} forceChannelCount @ce
+-   @ref Audio::DrFlacImporter "DrFlacAudioImporter" no longer advertises
+    support for 32-bit-per-channel FLAC files, as there's no known way to
+    produce them and thus the case is impossible to test for.
 
 @subsection changelog-plugins-latest-buildsystem Build system
 
@@ -93,8 +100,10 @@ namespace Magnum {
 
 @subsection changelog-plugins-latest-bugfixes Bug fixes
 
--   @ref Trade::JpegImageConverter was mistakenly using the `BUILD_STATIC`
-    CMake option instead of `BUILD_PLUGINS_STATIC`
+-   @ref Trade::JpegImageConverter "JpegImageConverter" was mistakenly using
+    the `BUILD_STATIC` CMake option instead of `BUILD_PLUGINS_STATIC`
+-   Fixed @ref Trade::BasisImporter "BasisImporter" to work with direct
+    instantiation without a plugin manager (see [mosra/magnum-plugins#96](https://github.com/mosra/magnum-plugins/pull/96))
 
 @subsection changelog-plugins-latest-deprecated Deprecated APIs
 

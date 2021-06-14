@@ -28,6 +28,8 @@ import sys
 import unittest
 
 from corrade import containers
+import test_stridedarrayview
+import test_optional
 
 class ArrayView(unittest.TestCase):
     def test_init(self):
@@ -852,3 +854,63 @@ class StridedArrayView4D(unittest.TestCase):
         self.assertEqual(f.size, (2, 1, 3, 5))
         self.assertEqual(f.stride, (24, 24, 8, 0))
         self.assertEqual(bytes(f), b'000004444488888ccccc0000044444')
+
+class StridedArrayViewCustomType(unittest.TestCase):
+    def test_short(self):
+        a = test_stridedarrayview.get_containers()
+        self.assertEqual(type(a.view), containers.StridedArrayView2D)
+        self.assertEqual(a.view.size, (2, 3))
+        self.assertEqual(a.view.stride, (3*2, 2))
+        self.assertEqual(a.view.format, 'h')
+        self.assertEqual(a.list, [3, -17565, 5, 3, -17565, 5])
+        self.assertEqual(a.view[0][0], 3)
+        self.assertEqual(a.view[0][1], -17565)
+        self.assertEqual(a.view[0][2], 5)
+        self.assertEqual(a.view[1][0], 3)
+        self.assertEqual(a.view[1][1], -17565)
+        self.assertEqual(a.view[1][2], 5)
+
+        with self.assertRaisesRegex(TypeError, "object does not support item assignment"):
+            a.view[1][1] = 15
+
+        # Test that memoryview understands the type
+        av = memoryview(a.view[0])
+        self.assertEqual(av[0], 3)
+        self.assertEqual(av[1], -17565)
+        self.assertEqual(av[2], 5)
+
+    def test_mutable_int(self):
+        a = test_stridedarrayview.MutableContaineri()
+        self.assertEqual(type(a.view), containers.MutableStridedArrayView2D)
+        self.assertEqual(a.view.format, 'i')
+        self.assertEqual(a.list, [0, 0, 0, 0, 0, 0])
+        a.view[0][1] = -7656581
+        a.view[1][2] = 4666
+        self.assertEqual(a.list, [0, -7656581, 0, 0, 0, 4666])
+
+        # Test that memoryview understands the type and has changes reflected
+        av = memoryview(a.view[1])
+        a.view[1][0] = -333
+        self.assertEqual(av[0], -333)
+        self.assertEqual(av[1], 0)
+        self.assertEqual(av[2], 4666)
+
+        # And the other way around as well
+        av[1] = 11111
+        self.assertEqual(a.list, [0, -7656581, 0, -333, 11111, 4666])
+
+    # mutable_vector3d and mutable_long_float tested in test_containers_numpy
+    # as memoryview can't handle their types
+
+class TestOptional(unittest.TestCase):
+    def test_simple(self):
+        self.assertIsNone(test_optional.simple_type(False))
+        self.assertEqual(test_optional.simple_type(True), 5)
+        self.assertEqual(test_optional.acquire_simple_type(None), -1)
+        self.assertEqual(test_optional.acquire_simple_type(15), 15)
+
+    def test_nested(self):
+        self.assertIsNone(test_optional.nested_type(False))
+        self.assertEqual(test_optional.nested_type(True).a, 15)
+        self.assertEqual(test_optional.acquire_nested_type(None), -1)
+        self.assertEqual(test_optional.acquire_nested_type(test_optional.Foo(25)), 25)

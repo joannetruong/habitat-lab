@@ -1086,6 +1086,41 @@ class PPOTrainer(BaseRLTrainer):
                         )
                     ] = episode_stats
 
+                    txt_dir = getattr(self.config, "TXT_DIR", '')
+                    if txt_dir != '':
+                        if not os.path.isdir(txt_dir):
+                            os.makedirs(txt_dir)
+                        episode_steps_filename = '{}.csv'.format(
+                            os.path.basename(checkpoint_path[:-4]).replace('.','_')
+                        )
+                        episode_steps_filename = os.path.join(
+                            txt_dir, episode_steps_filename
+                        )
+                        if not os.path.isfile(episode_steps_filename):
+                            episode_steps_data = (
+                                'id,reward,distance_to_goal,success,spl,steps,collisions,soft_spl,episode_distance,num_actions\n'
+                            )
+                        else:    
+                            with open(episode_steps_filename) as f:
+                                episode_steps_data = f.read()
+                        episode_steps_data += ','.join([
+                            str(d) for d in
+                            [
+                                current_episodes[i].episode_id,
+                                episode_stats['reward'],
+                                episode_stats['distance_to_goal'],
+                                episode_stats['success'],
+                                episode_stats['spl'],
+                                len(rgb_frames[i]), # number of steps taken
+                                episode_stats['collisions.count'],
+                                episode_stats['softspl'],
+                                episode_stats['episode_distance'],
+                                episode_stats['num_actions'],
+                            ]
+                        ]) + '\n'
+                        with open(episode_steps_filename,'w') as f:
+                            f.write(episode_steps_data)
+                    
                     if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,

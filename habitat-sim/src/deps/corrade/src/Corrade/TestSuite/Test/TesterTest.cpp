@@ -126,12 +126,14 @@ namespace Test { namespace {
 struct Test: Tester {
     Test(std::ostream* out, const TesterConfiguration& configuration = TesterConfiguration{});
 
-    void noChecks();
+    void noMacros();
     void trueExpression();
     void falseExpression();
     void equal();
     void nonEqual();
     void expectFail();
+    void expectFailNoChecks();
+    void expectFailIfNoChecks();
     void unexpectedPassExpression();
     void unexpectedPassEqual();
 
@@ -144,9 +146,17 @@ struct Test: Tester {
     void compareMessage();
     void compareSaveDiagnostic();
 
+    void info();
+    void warn();
+    void infoWarnNoChecks();
+    void fail();
+    void failNot();
+    void failExpected();
+    void failUnexpectedlyNot();
     void skip();
     void iteration();
     void iterationScope();
+    void iterationNoChecks();
 
     void exception();
     void exceptionNoTestCaseLine();
@@ -192,17 +202,24 @@ struct Test: Tester {
 
     void benchmarkSkip();
 
+    void macrosInALambda();
+    void benchmarkMacrosInALambda();
+    void macrosInASingleExpressionBlock();
+    /* CORRADE_BENCHMARK() doesn't work in a single expression block */
+
     std::ostream* _out;
     int _i = 0;
 };
 
 Test::Test(std::ostream* const out, const TesterConfiguration& configuration): Tester{configuration}, _out{out} {
-    addTests({&Test::noChecks,
+    addTests({&Test::noMacros,
               &Test::trueExpression,
               &Test::falseExpression,
               &Test::equal,
               &Test::nonEqual,
               &Test::expectFail,
+              &Test::expectFailNoChecks,
+              &Test::expectFailIfNoChecks,
               &Test::unexpectedPassExpression,
               &Test::unexpectedPassEqual,
 
@@ -215,9 +232,17 @@ Test::Test(std::ostream* const out, const TesterConfiguration& configuration): T
               &Test::compareMessage,
               &Test::compareSaveDiagnostic,
 
+              &Test::info,
+              &Test::warn,
+              &Test::infoWarnNoChecks,
+              &Test::fail,
+              &Test::failNot,
+              &Test::failExpected,
+              &Test::failUnexpectedlyNot,
               &Test::skip,
               &Test::iteration,
               &Test::iterationScope,
+              &Test::iterationNoChecks,
 
               &Test::exception,
               &Test::exceptionNoTestCaseLine,
@@ -265,11 +290,18 @@ Test::Test(std::ostream* const out, const TesterConfiguration& configuration): T
                          BenchmarkUnits::Bytes);
 
     addBenchmarks({&Test::benchmarkSkip}, 10);
+
+    addTests({&Test::macrosInALambda});
+
+    addCustomBenchmarks({&Test::benchmarkMacrosInALambda}, 1,
+                         &Test::benchmarkOnceBegin,
+                         &Test::benchmarkOnceEnd,
+                         BenchmarkUnits::Bytes);
+
+    addTests({&Test::macrosInASingleExpressionBlock});
 }
 
-void Test::noChecks() {
-    return;
-}
+void Test::noMacros() {}
 
 void Test::trueExpression() {
     CORRADE_VERIFY(true);
@@ -291,7 +323,8 @@ void Test::nonEqual() {
 
 void Test::expectFail() {
     {
-        CORRADE_EXPECT_FAIL("The world is not mad yet.");
+        const char* world = "world"; /* should behave like Debug */
+        CORRADE_EXPECT_FAIL("The" << world << "is not mad yet.");
         CORRADE_COMPARE(2 + 2, 5);
         CORRADE_VERIFY(false == true);
     }
@@ -299,9 +332,25 @@ void Test::expectFail() {
     CORRADE_VERIFY(true);
 
     {
-        CORRADE_EXPECT_FAIL_IF(6*7 == 49, "This is not our universe");
+        const char* our = "our"; /* should behave like Debug */
+        CORRADE_EXPECT_FAIL_IF(6*7 == 49, "This is not" << our << "universe");
         CORRADE_VERIFY(true);
     }
+
+    CORRADE_EXPECT_FAIL("This shouldn't affect the output in any way.");
+    CORRADE_EXPECT_FAIL_IF(true, "Neither this.");
+}
+
+void Test::expectFailNoChecks() {
+    /* Should still be reported as the test case having no checks, but the name
+       should be recorded */
+    CORRADE_EXPECT_FAIL("Does nothing.");
+}
+
+void Test::expectFailIfNoChecks() {
+    /* Should still be reported as the test case having no checks, but the name
+       should be recorded */
+    CORRADE_EXPECT_FAIL("Does nothing.");
 }
 
 void Test::unexpectedPassExpression() {
@@ -353,19 +402,68 @@ void Test::compareSaveDiagnostic() {
     CORRADE_COMPARE_WITH("a.txt", "b.txt", MessageDiagnostic(MessageDiagnostic::flags ? MessageDiagnostic::flags : ComparisonStatusFlag::Diagnostic));
 }
 
+void Test::info() {
+    int value = 7;
+    CORRADE_INFO("The value is" << value);
+    CORRADE_VERIFY(value != 5);
+}
+
+void Test::warn() {
+    int value = 7;
+    if(value > 5)
+        CORRADE_WARN("The value" << value << "is higher than 5");
+    CORRADE_VERIFY(value != 5);
+}
+
+void Test::infoWarnNoChecks() {
+    /* For a lack of better way, this manifests in output as an INFO line,
+       followed by a WARN line and finally a ? line, indicating that there are
+       no actual checks. */
+    CORRADE_INFO("This test talks");
+    CORRADE_WARN("Instead of testing!!!");
+}
+
+void Test::fail() {
+    int value = 7;
+    CORRADE_FAIL_IF(value > 5, "The value" << value << "is higher than 5");
+}
+
+
+void Test::failNot() {
+    int value = 5;
+    CORRADE_FAIL_IF(value > 5, "The value" << value << "is higher than 5");
+}
+
+void Test::failExpected() {
+    int value = 7;
+
+    CORRADE_EXPECT_FAIL("Our values are high.");
+    CORRADE_FAIL_IF(value > 5, "The value" << value << "is higher than 5");
+}
+
+void Test::failUnexpectedlyNot() {
+    int value = 5;
+
+    CORRADE_EXPECT_FAIL("Our values are high.");
+    CORRADE_FAIL_IF(value > 5, "The value" << value << "is higher than 5");
+}
+
 void Test::skip() {
-    CORRADE_SKIP("This testcase is skipped.");
+    const char* is = "is"; /* should behave like Debug */
+    CORRADE_SKIP("This testcase" << is << "skipped.");
     CORRADE_VERIFY(false);
 }
 
 void Test::iteration() {
     for(std::string name: {"Lucy", "JOHN", "Ed"}) {
-        CORRADE_ITERATION(name);
+        CORRADE_ITERATION(name << "is the name"); /* should behave like Debug */
         for(std::size_t i = 1; i != name.size(); ++i) {
             CORRADE_ITERATION(i);
             CORRADE_VERIFY(!std::isupper(name[i]));
         }
     }
+
+    CORRADE_ITERATION("This shouldn't affect the output in any way.");
 }
 
 void Test::iterationScope() {
@@ -381,6 +479,12 @@ void Test::iterationScope() {
 
     /* Shouldn't print any iteration info */
     CORRADE_COMPARE(2 + 2, 5);
+}
+
+void Test::iterationNoChecks() {
+    /* Should still be reported as the test case having no checks, but the name
+       should be recorded */
+    CORRADE_ITERATION(3);
 }
 
 void Test::exception() {
@@ -542,6 +646,83 @@ void Test::benchmarkSkip() {
     CORRADE_SKIP("Can't verify the measurements anyway.");
 }
 
+void Test::macrosInALambda() {
+    setTestCaseName(CORRADE_FUNCTION);
+
+    []() {
+        CORRADE_COMPARE_AS(3, 3, float);
+        CORRADE_COMPARE_WITH("You rather GTFO", "hello", StringLength(10));
+        {
+            CORRADE_EXPECT_FAIL_IF(false, "");
+            CORRADE_COMPARE(3, 3);
+        }
+        {
+            CORRADE_ITERATION("37");
+            CORRADE_EXPECT_FAIL("Expected here to test CORRADE_EXPECT_FAIL().");
+            CORRADE_VERIFY(false);
+        }
+        CORRADE_INFO("Expected here to test CORRADE_INFO().");
+        CORRADE_WARN("Expected here to test CORRADE_WARN().");
+        {
+            /* Cannot fail, otherwise the SKIP wouldn't be tested */
+            CORRADE_EXPECT_FAIL("Expected here to test CORRADE_FAIL_IF().");
+            CORRADE_FAIL_IF(true, "Yes.");
+        }
+
+        /* Has to be last! */
+        CORRADE_SKIP("Expected here to test CORRADE_SKIP().");
+    }();
+}
+
+void Test::benchmarkMacrosInALambda() {
+    setTestCaseName(CORRADE_FUNCTION);
+
+    []() {
+        CORRADE_BENCHMARK(1) {}
+    }();
+}
+
+void Test::macrosInASingleExpressionBlock() {
+    /* All this should compile fine even though the ITERATION and EXPECT_FAIL
+       variants make no sense this way and are basically no-ops */
+
+    if(true)
+        CORRADE_VERIFY(true);
+
+    if(true)
+        CORRADE_COMPARE(true, true);
+
+    if(true)
+        CORRADE_COMPARE_AS(true, true, bool);
+
+    if(true)
+        CORRADE_COMPARE_WITH("You rather GTFO", "hello", StringLength(10));
+
+    if(true)
+        CORRADE_EXPECT_FAIL("This makes no sense.");
+
+    if(true)
+        CORRADE_EXPECT_FAIL_IF(true, "This makes no sense either.");
+
+    if(true)
+        CORRADE_ITERATION("This is a no-op.");
+
+    if(true)
+        CORRADE_INFO("Expected here to test CORRADE_INFO().");
+    if(true)
+        CORRADE_WARN("Expected here to test CORRADE_WARN().");
+    {
+        /* Cannot fail, otherwise the SKIP wouldn't be tested */
+        CORRADE_EXPECT_FAIL("Expected here to test CORRADE_FAIL_IF().");
+        if(true)
+            CORRADE_FAIL_IF(true, "Yes.");
+    }
+
+    /* Has to be last! */
+    if(true)
+        CORRADE_SKIP("Expected here to test CORRADE_SKIP().");
+}
+
 struct TesterTest: Tester {
     explicit TesterTest();
 
@@ -599,15 +780,16 @@ struct TesterTest: Tester {
 
     void testName();
 
+    void verifyVarargs();
+    void verifyExplicitBool();
+
     void compareNoCommonType();
     void compareAsOverload();
     void compareAsVarargs();
     void compareWithDereference();
     void compareNonCopyable();
-    void verifyExplicitBool();
     void expectFailIfExplicitBool();
-
-    void macrosInALambda();
+    void failIfExplicitBool();
 };
 
 class EmptyTest: public Tester {};
@@ -666,15 +848,16 @@ TesterTest::TesterTest() {
 
               &TesterTest::testName,
 
+              &TesterTest::verifyVarargs,
+              &TesterTest::verifyExplicitBool,
+
               &TesterTest::compareNoCommonType,
               &TesterTest::compareAsOverload,
               &TesterTest::compareAsVarargs,
               &TesterTest::compareWithDereference,
               &TesterTest::compareNonCopyable,
-              &TesterTest::verifyExplicitBool,
               &TesterTest::expectFailIfExplicitBool,
-
-              &TesterTest::macrosInALambda});
+              &TesterTest::failIfExplicitBool});
 }
 
 void TesterTest::configurationCopy() {
@@ -778,7 +961,7 @@ void TesterTest::emptyTest() {
 void TesterTest::skipOnly() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "11 17 4 9", "--skip", "17" };
+    const char* argv[] = { "", "--color", "off", "--only", "13 26 4 11", "--skip", "26" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -795,7 +978,7 @@ void TesterTest::skipOnly() {
 void TesterTest::skipAll() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "15", "--skip", "15" };
+    const char* argv[] = { "", "--color", "off", "--only", "26", "--skip", "26" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -810,7 +993,7 @@ void TesterTest::skipAll() {
 void TesterTest::skipTests() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "11 47 9", "--skip-tests" };
+    const char* argv[] = { "", "--color", "off", "--only", "13 57 11", "--skip-tests" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -831,7 +1014,7 @@ void TesterTest::skipTests() {
 void TesterTest::skipBenchmarks() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "11 46 9", "--skip-benchmarks" };
+    const char* argv[] = { "", "--color", "off", "--only", "13 57 11", "--skip-benchmarks" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -848,7 +1031,7 @@ void TesterTest::skipBenchmarks() {
 void TesterTest::skipTestsNothingElse() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "11 9", "--skip-tests" };
+    const char* argv[] = { "", "--color", "off", "--only", "13 11", "--skip-tests" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -863,7 +1046,7 @@ void TesterTest::skipTestsNothingElse() {
 void TesterTest::skipBenchmarksNothingElse() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "46", "--skip-benchmarks" };
+    const char* argv[] = { "", "--color", "off", "--only", "57", "--skip-benchmarks" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -912,7 +1095,7 @@ void TesterTest::shuffleOne() {
 void TesterTest::repeatEvery() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "37 4", "--repeat-every", "2" };
+    const char* argv[] = { "", "--color", "off", "--only", "47 4", "--repeat-every", "2" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -929,7 +1112,7 @@ void TesterTest::repeatEvery() {
 void TesterTest::repeatAll() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "37 4", "--repeat-all", "2" };
+    const char* argv[] = { "", "--color", "off", "--only", "47 4", "--repeat-all", "2" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -963,7 +1146,7 @@ void TesterTest::abortOnFail() {
 void TesterTest::abortOnFailSkip() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "17 2 3 4", "--abort-on-fail" };
+    const char* argv[] = { "", "--color", "off", "--only", "26 2 3 4", "--abort-on-fail" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -980,7 +1163,7 @@ void TesterTest::abortOnFailSkip() {
 void TesterTest::noXfail() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "6", "--no-xfail" };
+    const char* argv[] = { "", "--color", "off", "--only", "6 24", "--no-xfail" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -997,7 +1180,7 @@ void TesterTest::noXfail() {
 void TesterTest::noCatch() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "20", "--no-catch" };
+    const char* argv[] = { "", "--color", "off", "--only", "30", "--no-catch" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1023,7 +1206,7 @@ void TesterTest::compareMessageVerboseDisabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Verbose;
-    const char* argv[] = { "", "--color", "off", "--only", "15" };
+    const char* argv[] = { "", "--color", "off", "--only", "17" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1043,7 +1226,7 @@ void TesterTest::compareMessageVerboseEnabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Verbose;
-    const char* argv[] = { "", "--color", "off", "--only", "15", "--verbose" };
+    const char* argv[] = { "", "--color", "off", "--only", "17", "--verbose" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1063,7 +1246,7 @@ void TesterTest::compareMessageFailed() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Message;
-    const char* argv[] = { "", "--color", "off", "--only", "15", "--verbose" };
+    const char* argv[] = { "", "--color", "off", "--only", "17", "--verbose" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1083,7 +1266,7 @@ void TesterTest::compareMessageXfail() {
 
     MessageDiagnostic::xfail = true;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Message;
-    const char* argv[] = { "", "--color", "off", "--only", "15", "--verbose" };
+    const char* argv[] = { "", "--color", "off", "--only", "17", "--verbose" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1103,7 +1286,7 @@ void TesterTest::saveDiagnosticVerboseDisabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::VerboseDiagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1123,7 +1306,7 @@ void TesterTest::saveDiagnosticVerboseEnabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::VerboseDiagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path", "--verbose" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path", "--verbose" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1143,7 +1326,7 @@ void TesterTest::saveDiagnosticFailedDisabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16" };
+    const char* argv[] = { "", "--color", "off", "--only", "18" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1163,7 +1346,7 @@ void TesterTest::saveDiagnosticFailedEnabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1183,7 +1366,7 @@ void TesterTest::saveDiagnosticXfailDisabled() {
 
     MessageDiagnostic::xfail = true;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16" };
+    const char* argv[] = { "", "--color", "off", "--only", "18" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1204,7 +1387,7 @@ void TesterTest::saveDiagnosticXfailEnabled() {
 
     MessageDiagnostic::xfail = true;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1225,7 +1408,7 @@ void TesterTest::saveDiagnosticXpassDisabled() {
 
     MessageDiagnostic::xfail = true;
     MessageDiagnostic::flags = ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16" };
+    const char* argv[] = { "", "--color", "off", "--only", "18" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1246,7 +1429,7 @@ void TesterTest::saveDiagnosticXpassEnabled() {
 
     MessageDiagnostic::xfail = true;
     MessageDiagnostic::flags = ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1266,7 +1449,7 @@ void TesterTest::saveDiagnosticSucceededDisabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16" };
+    const char* argv[] = { "", "--color", "off", "--only", "18" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1287,7 +1470,7 @@ void TesterTest::saveDiagnosticSucceededEnabled() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "16", "--save-diagnostic", "/some/path" };
+    const char* argv[] = { "", "--color", "off", "--only", "18", "--save-diagnostic", "/some/path" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1307,7 +1490,7 @@ void TesterTest::saveDiagnosticAbortOnFail() {
 
     MessageDiagnostic::xfail = false;
     MessageDiagnostic::flags = ComparisonStatusFlag::Failed|ComparisonStatusFlag::Diagnostic;
-    const char* argv[] = { "", "--color", "off", "--only", "1 16 1", "--save-diagnostic", "/some/path", "--abort-on-fail" };
+    const char* argv[] = { "", "--color", "off", "--only", "1 18 1", "--save-diagnostic", "/some/path", "--abort-on-fail" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1324,7 +1507,7 @@ void TesterTest::saveDiagnosticAbortOnFail() {
 void TesterTest::benchmarkWallClock() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "--benchmark", "wall-time" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "--benchmark", "wall-time" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1345,7 +1528,7 @@ void TesterTest::benchmarkWallClock() {
 void TesterTest::benchmarkCpuClock() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "--benchmark", "cpu-time" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "--benchmark", "cpu-time" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1366,7 +1549,7 @@ void TesterTest::benchmarkCpuClock() {
 void TesterTest::benchmarkCpuCycles() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "--benchmark", "cpu-cycles" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "--benchmark", "cpu-cycles" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1387,7 +1570,7 @@ void TesterTest::benchmarkCpuCycles() {
 void TesterTest::benchmarkDiscardAll() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "--benchmark-discard", "100" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "--benchmark-discard", "100" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1408,7 +1591,7 @@ void TesterTest::benchmarkDiscardAll() {
 void TesterTest::benchmarkDebugBuildNote() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "-v" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "-v" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1431,7 +1614,7 @@ void TesterTest::benchmarkDebugBuildNote() {
 void TesterTest::benchmarkCpuScalingNoWarning() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1451,7 +1634,7 @@ void TesterTest::benchmarkCpuScalingNoWarning() {
 void TesterTest::benchmarkCpuScalingWarning() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1471,7 +1654,7 @@ void TesterTest::benchmarkCpuScalingWarning() {
 void TesterTest::benchmarkCpuScalingWarningVerbose() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "45 47", "-v" };
+    const char* argv[] = { "", "--color", "off", "--only", "55 57", "-v" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1492,7 +1675,7 @@ void TesterTest::benchmarkCpuScalingWarningVerbose() {
 void TesterTest::testName() {
     std::stringstream out;
 
-    const char* argv[] = { "", "--color", "off", "--only", "11" };
+    const char* argv[] = { "", "--color", "off", "--only", "13" };
     int argc = Containers::arraySize(argv);
     Tester::registerArguments(argc, argv);
 
@@ -1506,6 +1689,27 @@ void TesterTest::testName() {
     CORRADE_COMPARE_AS(out.str(),
         Utility::Directory::join(TESTER_TEST_DIR, "testName.txt"),
         Compare::StringToFile);
+}
+
+void TesterTest::verifyVarargs() {
+    /* Shouldn't need to have braces around */
+    CORRADE_VERIFY(std::is_constructible<Containers::StringView, const char*>::value);
+}
+
+void TesterTest::verifyExplicitBool() {
+    struct ExplicitTrue { explicit operator bool() const { return true; } };
+    ExplicitTrue t;
+    CORRADE_VERIFY(t);
+    CORRADE_VERIFY(ExplicitTrue());
+
+    struct ExplicitTrueNonConst { explicit operator bool() { return true; } };
+    ExplicitTrueNonConst tc;
+    CORRADE_VERIFY(tc);
+    CORRADE_VERIFY(ExplicitTrueNonConst());
+
+    struct ExplicitFalse { explicit operator bool() const { return false; } };
+    ExplicitFalse f;
+    CORRADE_VERIFY(!f);
 }
 
 void TesterTest::compareNoCommonType() {
@@ -1533,7 +1737,7 @@ void TesterTest::compareAsVarargs() {
 }
 
 void TesterTest::compareWithDereference() {
-    Containers::Optional<StringLength> comparator{Containers::InPlaceInit};
+    Containers::Optional<StringLength> comparator{InPlaceInit};
 
     CORRADE_COMPARE_WITH("hello", "olleh", *comparator);
 }
@@ -1555,22 +1759,6 @@ void TesterTest::compareNonCopyable() {
     /* Just to verify that there is no need to copy anything anywhere */
     NonCopyable a, b;
     CORRADE_COMPARE(a, b);
-}
-
-void TesterTest::verifyExplicitBool() {
-    struct ExplicitTrue { explicit operator bool() const { return true; } };
-    ExplicitTrue t;
-    CORRADE_VERIFY(t);
-    CORRADE_VERIFY(ExplicitTrue());
-
-    struct ExplicitTrueNonConst { explicit operator bool() { return true; } };
-    ExplicitTrueNonConst tc;
-    CORRADE_VERIFY(tc);
-    CORRADE_VERIFY(ExplicitTrueNonConst());
-
-    struct ExplicitFalse { explicit operator bool() const { return false; } };
-    ExplicitFalse f;
-    CORRADE_VERIFY(!f);
 }
 
 void TesterTest::expectFailIfExplicitBool() {
@@ -1597,24 +1785,26 @@ void TesterTest::expectFailIfExplicitBool() {
     }
 }
 
-void TesterTest::macrosInALambda() {
-    setTestCaseName(CORRADE_FUNCTION);
+void TesterTest::failIfExplicitBool() {
+    struct ExplicitFalse { explicit operator bool() const { return false; } };
+    {
+        ExplicitFalse t;
+        CORRADE_FAIL_IF(t, "");
+        CORRADE_FAIL_IF(ExplicitFalse{}, "");
+    }
 
-    []() {
-        CORRADE_COMPARE_AS(3, 3, float);
-        CORRADE_COMPARE_WITH("You rather GTFO", "hello", StringLength(10));
-        {
-            CORRADE_EXPECT_FAIL_IF(false, "");
-            CORRADE_COMPARE(3, 3);
-        }
-        {
-            CORRADE_ITERATION("37");
-            CORRADE_EXPECT_FAIL("Expected here to test CORRADE_EXPECT_FAIL().");
-            CORRADE_VERIFY(false);
-        }
-        CORRADE_SKIP("Expected here to test CORRADE_SKIP().");
-        CORRADE_BENCHMARK(3) std::puts("a");
-    }();
+    struct ExplicitFalseNonConst { explicit operator bool() { return false; } };
+    {
+        ExplicitFalseNonConst t;
+        CORRADE_FAIL_IF(t, "");
+        CORRADE_FAIL_IF(ExplicitFalseNonConst{}, "");
+    }
+
+    struct ExplicitTrue { explicit operator bool() const { return true; } };
+    {
+        CORRADE_EXPECT_FAIL("");
+        CORRADE_FAIL_IF(ExplicitTrue{}, "");
+    }
 }
 
 }}}}

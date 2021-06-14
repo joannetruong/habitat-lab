@@ -36,7 +36,7 @@ class SpotWorkspace(Workspace):
         # weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_xyt_21.pth'
         # weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_xyt_backwards_23.pth'
         weights_dir = 'ddppo_policies/spot_collision_0.1_nosliding_visual_encoder_nccl_11.pth'
-        self.episode_pth = 'spot_waypoints_coda_hard.yaml'
+        self.episode_pth = 'config/spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
         self.allow_backwards = False
         if self.allow_backwards:

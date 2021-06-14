@@ -19,7 +19,7 @@ bool URDFImporter::loadURDF(const std::string& filename,
                             float globalScale,
                             float massScale,
                             bool forceReload) {
-  if (!modelCache_.count(filename) || forceReload) {
+  if ((modelCache_.count(filename) == 0u) || forceReload) {
     if (!Corrade::Utility::Directory::exists(filename) ||
         Corrade::Utility::Directory::isDirectory(filename)) {
       Mn::Debug{} << "File does not exist: " << filename
@@ -29,7 +29,8 @@ bool URDFImporter::loadURDF(const std::string& filename,
 
     // parse the URDF from file
     urdfParser_.logMessages = logMessages;
-    bool success = urdfParser_.parseURDF(filename);
+    std::shared_ptr<io::URDF::Model> urdfModel;
+    bool success = urdfParser_.parseURDF(urdfModel, filename);
     if (!success) {
       Mn::Debug{} << "Failed to parse URDF: " << filename << ", aborting.";
       return false;
@@ -37,11 +38,16 @@ bool URDFImporter::loadURDF(const std::string& filename,
 
     if (logMessages) {
       Mn::Debug{} << "Done parsing URDF model: ";
-      urdfParser_.getModel()->printKinematicChain();
+      urdfModel->printKinematicChain();
+    }
+
+    // if reloading, clear the old model
+    if (modelCache_.count(filename) != 0u) {
+      modelCache_.erase(filename);
     }
 
     // register the new model
-    modelCache_.emplace(filename, urdfParser_.getModel());
+    modelCache_.emplace(filename, urdfModel);
   }
   activeModel_ = modelCache_.at(filename);
 
@@ -93,7 +99,7 @@ bool URDFImporter::getJointInfo2(int linkIndex,
 
   auto link = activeModel_->getLink(linkIndex);
   if (link != nullptr) {
-    linkTransformInWorld = link->m_linkTransformInWorld;
+    linkTransformInWorld = Mn::Matrix4(Mn::Math::IdentityInit);
 
     if (auto pj = link->m_parentJoint.lock()) {
       parent2joint = pj->m_parentLinkToJointTransform;
@@ -137,7 +143,7 @@ void URDFImporter::getMassAndInertia2(int linkIndex,
                                       Mn::Vector3& localInertiaDiagonal,
                                       Mn::Matrix4& inertialFrame,
                                       int flags) const {
-  if (flags & CUF_USE_URDF_INERTIA) {
+  if ((flags & CUF_USE_URDF_INERTIA) != 0) {
     getMassAndInertia(linkIndex, mass, localInertiaDiagonal, inertialFrame);
   } else {
     // the link->m_inertia is NOT necessarily aligned with the inertial frame

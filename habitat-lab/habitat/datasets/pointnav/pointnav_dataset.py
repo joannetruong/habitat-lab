@@ -44,6 +44,7 @@ class PointNavDatasetV1(Dataset):
         dataset_dir = os.path.dirname(
             config.DATA_PATH.format(split=config.SPLIT)
         )
+
         cfg = config.clone()
         cfg.defrost()
         cfg.CONTENT_SCENES = []

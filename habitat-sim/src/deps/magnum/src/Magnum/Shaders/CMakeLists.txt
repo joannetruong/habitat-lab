@@ -27,34 +27,42 @@ if(NOT WITH_GL)
     message(SEND_ERROR "Shaders are available only if WITH_GL is enabled")
 endif()
 
-corrade_add_resource(MagnumShaders_RCS resources.conf)
-set_target_properties(MagnumShaders_RCS-dependencies PROPERTIES FOLDER "Magnum/Shaders")
+corrade_add_resource(MagnumShaders_RESOURCES_GL resources-gl.conf)
+set_target_properties(MagnumShaders_RESOURCES_GL-dependencies PROPERTIES FOLDER "Magnum/Shaders")
 
 set(MagnumShaders_SRCS
-    AbstractVector.cpp
-    VertexColor.cpp
-
-    ${MagnumShaders_RCS})
+    ${MagnumShaders_RESOURCES_GL})
 
 set(MagnumShaders_GracefulAssert_SRCS
-    DistanceFieldVector.cpp
-    Flat.cpp
-    MeshVisualizer.cpp
-    Phong.cpp
-    Vector.cpp)
+    DistanceFieldVectorGL.cpp
+    FlatGL.cpp
+    MeshVisualizerGL.cpp
+    PhongGL.cpp
+    VectorGL.cpp
+    VertexColorGL.cpp)
 
 set(MagnumShaders_HEADERS
     DistanceFieldVector.h
-    AbstractVector.h
+    DistanceFieldVectorGL.h
     Flat.h
+    FlatGL.h
     Generic.h
+    GenericGL.h
     MeshVisualizer.h
+    MeshVisualizerGL.h
     Phong.h
+    PhongGL.h
     Shaders.h
     Vector.h
-    VertexColor.h
+    VectorGL.h
+    VertexColorGL.h
 
     visibility.h)
+
+if(MAGNUM_BUILD_DEPRECATED)
+    list(APPEND MagnumShaders_HEADERS
+        VertexColor.h)
+endif()
 
 # Header files to display in project view of IDEs only
 set(MagnumShaders_PRIVATE_HEADERS Implementation/CreateCompatibilityShader.h)

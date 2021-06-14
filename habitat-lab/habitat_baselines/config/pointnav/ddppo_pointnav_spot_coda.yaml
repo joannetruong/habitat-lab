@@ -6,7 +6,7 @@ SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: ['disk']
 TENSORBOARD_DIR:    '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/tb'
-VIDEO_DIR:          '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/video_dir'
+VIDEO_DIR:          '/coc/testnvme/jtruong33/habitat-cont-v2/habitat-lab/spot_coda_vids'
 EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'

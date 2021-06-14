@@ -2334,6 +2334,7 @@ def postprocess_state(state: State):
     # Resolve navbar links that are just an ID
     def resolve_link(html, title, url, id):
         if not html and not title and not url:
+            assert id in state.compounds, "Navbar references {} which wasn't found".format(id)
             found = state.compounds[id]
             title, url = found.name, found.url
         return html, title, url, id
@@ -3354,7 +3355,10 @@ def parse_index_xml(state: State, xml):
     return parsed
 
 def parse_doxyfile(state: State, doxyfile, values = None):
-    state.basedir = os.path.dirname(doxyfile)
+    # Use top-level Doxyfile path as base, don't let it get overriden by
+    # subsequently @INCLUDE'd Doxyfile
+    if not state.basedir:
+        state.basedir = os.path.dirname(doxyfile)
 
     logging.debug("Parsing configuration from {}".format(doxyfile))
 
@@ -3843,8 +3847,10 @@ if __name__ == '__main__': # pragma: no cover
     parse_doxyfile(state, doxyfile)
 
     # Doxygen is stupid and can't create nested directories, create the input
-    # directory for it
-    os.makedirs(state.doxyfile['OUTPUT_DIRECTORY'], exist_ok=True)
+    # directory for it. Don't do it when the argument is empty, because
+    # apparently makedirs() is also stupid.
+    if state.doxyfile['OUTPUT_DIRECTORY']:
+        os.makedirs(state.doxyfile['OUTPUT_DIRECTORY'], exist_ok=True)
 
     if not args.no_doxygen:
         logging.debug("running Doxygen on {}".format(doxyfile))

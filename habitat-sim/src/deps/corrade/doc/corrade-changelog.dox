@@ -34,30 +34,57 @@ namespace Corrade {
 
 @subsection corrade-changelog-latest-new New features
 
+-   New @ref CORRADE_TARGET_WASM preprocessor variable for any (even
+    non-Emscripten) WebAssembly target, as a complement to
+    @ref CORRADE_TARGET_X86, @ref CORRADE_TARGET_ARM and
+    @ref CORRADE_TARGET_POWERPC
+-   New @ref CORRADE_TARGET_SSE3, @ref CORRADE_TARGET_SSSE3,
+    @ref CORRADE_TARGET_SSE41, @ref CORRADE_TARGET_SSE42,
+    @ref CORRADE_TARGET_AVX, @ref CORRADE_TARGET_AVX_F16C,
+    @ref CORRADE_TARGET_AVX_FMA, @ref CORRADE_TARGET_AVX2,
+    @ref CORRADE_TARGET_AVX512F, @ref CORRADE_TARGET_NEON,
+    @ref CORRADE_TARGET_NEON_FP16, @ref CORRADE_TARGET_NEON_FMA and
+    @ref CORRADE_TARGET_SIMD128 preprocessor variables added to the already
+    existing @ref CORRADE_TARGET_SSE2 for detecting enabled instruction sets on
+    x86, ARM and WebAssembly
+
 @subsubsection corrade-changelog-latest-new-containers Containers library
 
 -   New @ref Containers::ArrayTuple class for coalescing arrays of homogeneous
-    types and varying lengths into a single allocation.
+    types and varying lengths into a single allocation. See also
+    [mosra/magnum#505](https://github.com/mosra/magnum/issues/505),
+    [mosra/corrade#116](https://github.com/mosra/corrade/issues/116) and
+    [mosra/corrade#117](https://github.com/mosra/corrade/pull/117).
 -   New @ref Containers::BigEnumSet class for storing enum sets with more than
     64 values
 -   New @ref Containers::String class as a lightweight but more flexible
     alternative to @ref std::string
 -   New @ref Containers::BasicStringView "Containers::StringView" class as a
     lightweight but more flexible alternative to C++17 @ref std::string_view
+-   New @ref Containers::MoveReference and @ref Containers::AnyReference
+    counterparts to @ref Containers::Reference for exclusively r-value
+    references and both l-value and r-value references
 -   Added a @ref Containers::StridedArrayView::slice() overload for slicing
     into @cpp struct @ce members
 -   New @ref Containers::Array2, @ref Containers::Array3 and
     @ref Containers::Array4 convenience aliases for
     @ref Containers::StaticArray, together with @ref Containers::Array1 that's
-    useful in case you want to take advantage of the @ref Containers::NoInit
-    tag on an arbitrary type and @ref Containers::Optional doesn't suit the use
-    case.
+    useful in case you want to take advantage of the @ref NoInit tag on an
+    arbitrary type and @ref Containers::Optional doesn't suit the use case.
 -   New @ref Containers::ArrayView2, @ref Containers::ArrayView3 and
     @ref Containers::ArrayView4 convenience aliases for
     @ref Containers::StaticArrayView
 
+@subsubsection corrade-changelog-latest-new-testsuite TestSuite library
+
+-   New @ref CORRADE_INFO(), @ref CORRADE_WARN() and @ref CORRADE_FAIL_IF()
+    macros for printing formatted information to the output and explicitly
+    failing a test
+
 @subsubsection corrade-changelog-latest-new-utility Utility library
 
+-   @ref Utility::allocateAligned() family of functions for overaligned
+    allocations, suitable for efficient SIMD operations
 -   Added @ref Utility::Arguments::addArrayArgument() as a positional
     counterpart to @ref Utility::Arguments::addArrayOption()
 -   @ref Utility::Configuration and @ref Utility::Arguments can now read and
@@ -66,6 +93,8 @@ namespace Corrade {
     @ref std::string as well
 -   New @ref CORRADE_INTERNAL_ASSERT_EXPRESSION() macro for assertions that can
     be evaluated directly inside larger expressions
+-   New @ref CORRADE_LIKELY() and @ref CORRADE_UNLIKELY() macros for
+    instruction cache microoptimizations in tight loops
 
 @subsection corrade-changelog-latest-changes Changes and improvements
 
@@ -80,8 +109,8 @@ namespace Corrade {
 -   @ref Containers::Array::Array(InPlaceInitT, std::initializer_list<T>)
     constructor is no longer @cpp explicit @ce to allow for easier use in
     initializer lists
--   @ref Containers::ScopeGuard now has a @ref Containers::NoCreate constructor
-    and is movable in order to support deferred creation
+-   @ref Containers::ScopeGuard now has a @ref NoCreate constructor and is
+    movable in order to support deferred creation
 -   @ref Containers::LinkedList destruction was changed in a way that makes
     @ref Containers::LinkedListItem::list() still accessible in a destructor
     of @ref Containers::LinkedListItem subclasses
@@ -92,6 +121,12 @@ namespace Corrade {
     tests to provide application name for each executable
 -   New @ref TestSuite::Tester::setTestCaseTemplateName() overload taking a
     list of strings for test cases templated by more than one parameter
+-   The @ref CORRADE_VERIFY() macro now now accepts varargs, meaning that you
+    no longer need to wrap expressions containing commas in extra parentheses
+-   The @ref CORRADE_SKIP(), @ref CORRADE_EXPECT_FAIL() and
+    @ref CORRADE_EXPECT_FAIL_IF() macros now accept messages in the same form
+    as @ref CORRADE_ASSERT(), that is anything that can be printed with
+    @ref Utility::Debug as well as chaining the pieces with @cpp << @ce.
 
 @subsubsection corrade-changelog-latest-changes-utility Utility library
 
@@ -101,6 +136,19 @@ namespace Corrade {
 -   @cpp !Debug{} @ce or @ref Utility-Debug-source-location "source location output in Debug"
     is now enabled on MSVC 2019 16.6+ as well, making it available across all
     compilers
+-   @ref Utility::Directory::isDirectory() now follows symlinks on Unix
+    platforms
+-   @ref Utility::Directory::Flag::SkipFiles and
+    @ref Utility::Directory::Flag::SkipDirectories passed to
+    @ref Utility::Directory::list() now affects symlinks as well --- previously
+    they were treated as neither, now they get correctly skipped based on
+    whether the target is a file or a directory
+-   @ref Utility::Directory::Flag::SkipSpecial passed to
+    @ref Utility::Directory::list() now has no effect on Emscripten, the same
+    as on Windows, as those two platforms have no notion of a special file.
+    Previously this behaved equivalently to
+    @ref Utility::Directory::Flag::SkipFiles on Emscripten but that made no
+    sense from a portability point of view.
 -   @ref Utility::String::split() and
     @ref Utility::String::splitWithoutEmptyParts() now have
     @ref Containers::StringView overloads that allocate much less
@@ -112,6 +160,8 @@ namespace Corrade {
     Emscripten always, because even if it's @cpp long double @ce is 80-bit
     sometimes, it doesn't actually have the precision of a 80-bit
     representation
+-   The @ref CORRADE_FALLTHROUGH macro is implemented on MSVC 2019 16.6 if
+    compiling as C++17.
 
 @subsection corrade-changelog-latest-buildsystem Build system
 
@@ -140,6 +190,14 @@ namespace Corrade {
     [mosra/homebrew-magnum#6](https://github.com/mosra/homebrew-magnum/pull/6))
 -   @ref CORRADE_DEPRECATED_ENUM() is now a no-op for Qt's Meta Object Compiler
     as it caused parse errors on older Qt versions
+-   With CMake 3.20 and newer it's possible to compile for Android NDK r19+
+    without explicitly supplying various system paths. Additionally, when `CMAKE_INSTALL_PREFIX` points to Android NDK sysroot, the `LIB_SUFFIX`
+    gets autodetected to a correct triplet + API level version subdirectory,
+    making the installed project discoverable by both vanilla CMake and Gradle.
+    On CMake 3.16 to 3.19 it's required to set two extra variables for the
+    same effect. See @ref building-corrade-cross-android and
+    [mosra/magnum#310](https://github.com/mosra/magnum/issues/310) for more
+    information.
 
 @subsection corrade-changelog-latest-bugfixes Bug fixes
 
@@ -167,6 +225,13 @@ namespace Corrade {
 -   @ref Corrade/Utility/StlForwardTuple.h was fixed to do a full
     @cpp #include <tuple> @ce on libstdc++ before version 7 as there a forward
     declaration is not available
+-   Tests ran using CTest under Emscripten used to have
+    `--stack-trace-limit=0` set, preventing Node.js from printing a backtrace
+    on exception. This was originally needed because historically Emscripten
+    applications didn't correctly propagate @cpp main() @ce return codes, which
+    had to be worked around by throwing an exception instead. This workaround
+    became obsolete and got removed in 2017, but this option was left there by
+    accident. Now it's removed as well.
 
 @subsection corrade-changelog-latest-deprecated Deprecated APIs
 
@@ -182,6 +247,24 @@ namespace Corrade {
     deprecated in favor of @ref Containers::BasicStringView::hasPrefix() and
     @ref Containers::BasicStringView::hasSuffix(); the overloads taking
     @ref std::string are still kept
+-   @cpp CORRADE_ALIGNAS() @ce and @cpp CORRADE_NORETURN @ce macros are
+    deprecated as they were originally introduced for compatibility with GCC
+    4.7 and older and aren't needed anymore. Use the standard C++11
+    @cpp alignas() @ce and @cpp [[noreturn]] @ce attributes instead.
+-   The `CORRADE_INCLUDE_INSTALL_PREFIX` variable, needed for installations
+    into older Android NDKs, is obsolete and no longer needed for NDK r19+. It
+    still does what's expected on builds with `BUILD_DEPRECATED` enabled,
+    however you'll get a deprecation notice. Since the variable got saved to
+    CMake cache, to get rid of the message, you may need to either recreate
+    your build directory or explicitly delete it from the cache.
+-   The @cpp Corrade/Containers/Tags.h @ce header,
+    @cpp Containers::DefaultInit @ce, @cpp Containers::ValueInit @ce,
+    @cpp Containers::NoInit @ce, @cpp Containers::NoCreate @ce,
+    @cpp Containers::DirectInit @ce, @cpp Containers::InPlaceInit @ce and
+    related tag types were moved to @ref Corrade/Tags.h and the root
+    @ref Corrade namespace, available  as @ref DefaultInit, @ref ValueInit,
+    @ref NoInit, @ref NoCreate, @ref DirectInit, @ref InPlaceInit and related
+    tag types
 
 @subsection corrade-changelog-latest-compatibility Potential compatibility breakages, removed APIs
 
@@ -205,6 +288,10 @@ namespace Corrade {
     of @ref Containers::LinkedListItem subclasses. This behavior didn't make
     sense and so it's not assumed any existing code relied on it, nevertheless
     it's a subtle change in behavior that is worth mentioning.
+-   Due to changes to @ref CORRADE_SKIP() internals, passing a @ref std::string
+    to it now requires an explicit @cpp #include <Corrade/Utility/DebugStl.h> @ce.
+    Alternatively, if string concatenation was used, you can compose the
+    message by chaining @ref Utility::Debug output operators instead.
 
 @subsection corrade-changelog-latest-documentation Documentation
 
@@ -466,12 +553,12 @@ Released 2020-06-27, tagged as
     compile when used with an empty argument list. The original functionality
     is provided by @ref CORRADE_INTERNAL_ASSERT_UNREACHABLE() instead.
 -   @ref Containers::Array and @ref Containers::StaticArray was switched to
-    do the @ref Containers::ValueInit construction by default instead of
-    @ref Containers::DefaultInit, i.e. zero-initializing trivial types instead
-    of keeping them uninitialized. Apart from introducing potential slowdowns
-    due to the additional zero-ininitialization this isn't really breaking,
-    just makes the default safer; and you still have the option to choose a
-    different initialization.
+    do the @cpp Containers::ValueInit @ce construction by default instead of
+    @cpp Containers::DefaultInit @ce, i.e. zero-initializing trivial types
+    instead of keeping them uninitialized. Apart from introducing potential
+    slowdowns due to the additional zero-ininitialization this isn't really
+    breaking, just makes the default safer; and you still have the option to
+    choose a different initialization.
 -   @ref Utility::Debug and @ref Utility::format() now prints @cpp long double @ce
     with 15 significant digits instead of 18 on platforms where it is 64-bit
     instead of 80-bit
@@ -939,7 +1026,7 @@ Released 2019-02-04, tagged as
     @ref std::unique_ptr
 -   New @ref Containers::Reference class, a lightweight equivalent to
     @ref std::reference_wrapper
--   New @ref Containers::NoCreate tag for constructing instances
+-   New @cpp Containers::NoCreate @ce tag for constructing instances
     equivalent to a moved-from state. This tag was used in Magnum already,
     moving it here to make it available to a wider set of APIs.
 -   New @ref Containers::optional(Args&&... args) overload for in-place

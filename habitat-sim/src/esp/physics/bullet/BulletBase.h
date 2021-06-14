@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "BulletDynamics/Featherstone/btMultiBodyDynamicsWorld.h"
+#include "BulletDynamics/Featherstone/btMultiBodyLinkCollider.h"
 #include "esp/assets/Asset.h"
 #include "esp/assets/BaseMesh.h"
 #include "esp/assets/MeshMetaData.h"
@@ -31,12 +32,12 @@ struct SimulationContactResultCallback
   /**
    * @brief Set when a contact is detected.
    */
-  bool bCollision;
+  bool bCollision{false};
 
   /**
    * @brief Constructor.
    */
-  SimulationContactResultCallback() { bCollision = false; }
+  SimulationContactResultCallback() = default;
 
   /**
    * @brief Called when a contact is detected.
@@ -80,7 +81,7 @@ class BulletBase {
    * RigidObjectType::SCENE. See @ref btCompoundShape::getMargin.
    * @return The scalar collision margin of the object.
    */
-  virtual double getMargin() const { return 0.0; };
+  virtual double getMargin() const { return 0.0; }
 
   /** @brief Set the scalar collision margin of an object. Does not affect @ref
    * RigidObjectType::SCENE. See @ref btCompoundShape::setMargin.
@@ -93,7 +94,7 @@ class BulletBase {
    * the rigid body in its local space. See @ref btCompoundShape::getAabb.
    * @return The Aabb.
    */
-  virtual const Magnum::Range3D getCollisionShapeAabb() const = 0;
+  virtual Magnum::Range3D getCollisionShapeAabb() const = 0;
 
   /**
    * @brief Recursively construct a @ref btConvexHullShape for collision by
@@ -112,7 +113,6 @@ class BulletBase {
       const assets::MeshTransformNode& node,
       btConvexHullShape* bConvexShape);
 
- protected:
   /**
    * @brief Recursively construct a @ref btCompoundShape for collision from
    * loaded mesh assets. A @ref btConvexHullShape is constructed for each
@@ -123,16 +123,17 @@ class BulletBase {
    * MeshTransformNode tree to the current node.
    * @param meshGroup Access structure for collision mesh data.
    * @param node The current @ref MeshTransformNode in the recursion.
-   * @param join Whether or not to join sub-meshes into a single con convex
-   * shape, rather than creating individual convexes under the compound.
+   * @param bObjectShape The compound shape parent for all generated convexes
+   * @param bObjectConvexShapes Datastructure to cache generated convex shapes
    */
-  void constructConvexShapesFromMeshes(
+  static void constructConvexShapesFromMeshes(
       const Magnum::Matrix4& transformFromParentToWorld,
       const std::vector<assets::CollisionMeshData>& meshGroup,
       const assets::MeshTransformNode& node,
-      bool join,
-      btCompoundShape* bObjectShape = nullptr);
+      btCompoundShape* bObjectShape,
+      std::vector<std::unique_ptr<btConvexHullShape>>& bObjectConvexShapes);
 
+ protected:
   /** @brief A pointer to the Bullet world to which this object belongs. See
    * @ref btMultiBodyDynamicsWorld.*/
   std::shared_ptr<btMultiBodyDynamicsWorld> bWorld_;

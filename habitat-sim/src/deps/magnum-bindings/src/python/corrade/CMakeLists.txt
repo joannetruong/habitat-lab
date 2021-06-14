@@ -96,3 +96,7 @@ set_target_properties(corrade PROPERTIES
 
 file(GENERATE OUTPUT ${output_dir}/corrade/__init__.py
     INPUT ${CMAKE_CURRENT_SOURCE_DIR}/__init__.py)
+
+if(BUILD_TESTS)
+    add_subdirectory(test)
+endif()

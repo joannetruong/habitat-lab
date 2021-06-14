@@ -4,7 +4,8 @@
 
 // Code adapted from Bullet3/examples/Importers/ImportURDFDemo ...
 
-#pragma once
+#ifndef ESP_PHYSICS_URDFIMPORTER_H_
+#define ESP_PHYSICS_URDFIMPORTER_H_
 
 #include "esp/assets/ResourceManager.h"
 
@@ -65,7 +66,7 @@ class URDFImporter {
                 bool forceReload = false);
 
   // NOTE: all of these getter/setters act on the current "activeModel_"
-  virtual const std::shared_ptr<io::URDF::Model> getModel() const {
+  virtual std::shared_ptr<io::URDF::Model> getModel() const {
     return activeModel_;
   };
 
@@ -154,3 +155,5 @@ class URDFImporter {
 
 }  // namespace physics
 }  // namespace esp
+
+#endif  // ESP_PHYSICS_URDFIMPORTER_H_

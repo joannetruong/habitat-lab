@@ -11,6 +11,9 @@
 #include "BulletRigidObject.h"
 #include "BulletURDFImporter.h"
 #include "esp/assets/ResourceManager.h"
+#include "esp/physics/objectManagers/ArticulatedObjectManager.h"
+#include "esp/physics/objectManagers/RigidObjectManager.h"
+#include "esp/sim/Simulator.h"
 
 namespace esp {
 namespace physics {
@@ -23,18 +26,43 @@ BulletPhysicsManager::BulletPhysicsManager(
   collisionObjToObjIds_ =
       std::make_shared<std::map<const btCollisionObject*, int>>();
   urdfImporter_ = std::make_unique<BulletURDFImporter>(_resourceManager);
-};
+}
 
 BulletPhysicsManager::~BulletPhysicsManager() {
   LOG(INFO) << "Deconstructing BulletPhysicsManager";
 
   existingObjects_.clear();
   existingArticulatedObjects_.clear();
-  staticStageObject_.reset(nullptr);
+  staticStageObject_.reset();
+}
+
+void BulletPhysicsManager::removeObject(const int physObjectID,
+                                        bool deleteObjectNode,
+                                        bool deleteVisualNode) {
+  // remove constraints referencing this object
+  if (objectConstraints_.count(physObjectID) > 0) {
+    for (auto c_id : objectConstraints_.at(physObjectID)) {
+      removeConstraint(c_id);
+    }
+    objectConstraints_.erase(physObjectID);
+  }
+  PhysicsManager::removeObject(physObjectID, deleteObjectNode,
+                               deleteVisualNode);
+}
+
+void BulletPhysicsManager::removeArticulatedObject(int id) {
+  // remove constraints referencing this object
+  if (objectConstraints_.count(id) > 0) {
+    for (auto c_id : objectConstraints_.at(id)) {
+      removeConstraint(c_id);
+    }
+    objectConstraints_.erase(id);
+  }
+  PhysicsManager::removeArticulatedObject(id);
 }
 
 bool BulletPhysicsManager::initPhysicsFinalize() {
-  activePhysSimLib_ = BULLET;
+  activePhysSimLib_ = PhysicsSimulationLibrary::Bullet;
 
   //! We can potentially use other collision checking algorithms, by
   //! uncommenting the line below
@@ -51,35 +79,47 @@ bool BulletPhysicsManager::initPhysicsFinalize() {
   bWorld_->setGravity(btVector3(physicsManagerAttributes_->getVec3("gravity")));
 
   //! Create new scene node
-  staticStageObject_ = physics::BulletRigidStage::create_unique(
+  staticStageObject_ = physics::BulletRigidStage::create(
       &physicsNode_->createChild(), resourceManager_, bWorld_,
       collisionObjToObjIds_);
 
-  m_recentNumSubStepsTaken = -1;
-
+  recentNumSubStepsTaken_ = -1;
   return true;
 }
 
 // Bullet Mesh conversion adapted from:
 // https://github.com/mosra/magnum-integration/issues/20
-bool BulletPhysicsManager::addStageFinalize(const std::string& handle) {
+bool BulletPhysicsManager::addStageFinalize(
+    const metadata::attributes::StageAttributes::ptr& initAttributes) {
   //! Initialize scene
-  bool sceneSuccess = staticStageObject_->initialize(handle);
+  bool sceneSuccess = staticStageObject_->initialize(initAttributes);
 
   return sceneSuccess;
 }
 
-bool BulletPhysicsManager::makeAndAddRigidObject(int newObjectID,
-                                                 const std::string& handle,
-                                                 scene::SceneNode* objectNode) {
-  auto ptr = physics::BulletRigidObject::create_unique(
-      objectNode, newObjectID, resourceManager_, bWorld_,
-      collisionObjToObjIds_);
-  bool objSuccess = ptr->initialize(handle);
+bool BulletPhysicsManager::makeAndAddRigidObject(
+    int newObjectID,
+    const esp::metadata::attributes::ObjectAttributes::ptr& objectAttributes,
+    scene::SceneNode* objectNode) {
+  auto ptr = physics::BulletRigidObject::create(objectNode, newObjectID,
+                                                resourceManager_, bWorld_,
+                                                collisionObjToObjIds_);
+  bool objSuccess = ptr->initialize(objectAttributes);
   if (objSuccess) {
     existingObjects_.emplace(newObjectID, std::move(ptr));
   }
   return objSuccess;
+}
+
+int BulletPhysicsManager::addArticulatedObjectFromURDF(
+    const std::string& filepath,
+    bool fixedBase,
+    float globalScale,
+    float massScale,
+    bool forceReload) {
+  auto& drawables = simulator_->getDrawableGroup();
+  return addArticulatedObjectFromURDF(filepath, &drawables, fixedBase,
+                                      globalScale, massScale, forceReload);
 }
 
 int BulletPhysicsManager::addArticulatedObjectFromURDF(
@@ -94,21 +134,26 @@ int BulletPhysicsManager::addArticulatedObjectFromURDF(
     return ID_UNDEFINED;
   }
 
-  int articulatedObjectID_ = allocateObjectID();
+  int articulatedObjectID = allocateObjectID();
 
   // parse succeeded, attempt to create the articulated object
   scene::SceneNode* objectNode = &staticStageObject_->node().createChild();
-  BulletArticulatedObject::uptr articulatedObject =
-      BulletArticulatedObject::create_unique(objectNode, resourceManager_,
-                                             articulatedObjectID_, bWorld_,
-                                             collisionObjToObjIds_);
+  BulletArticulatedObject::ptr articulatedObject =
+      BulletArticulatedObject::create(objectNode, resourceManager_,
+                                      articulatedObjectID, bWorld_,
+                                      collisionObjToObjIds_);
+
+  // before initializing the URDF, import all necessary assets in advance
+  resourceManager_.importURDFAssets(*urdfImporter_->getModel());
 
   bool objectSuccess = articulatedObject->initializeFromURDF(
-      *urdfImporter_.get(), {}, drawables, physicsNode_, fixedBase);
+      *urdfImporter_, {}, drawables, physicsNode_, fixedBase);
 
   if (!objectSuccess) {
     delete objectNode;
-    deallocateObjectID(articulatedObjectID_);
+    deallocateObjectID(articulatedObjectID);
+    Magnum::Debug{} << "BulletPhysicsManager::addArticulatedObjectFromURDF: "
+                       "initialization failed, aborting.";
     return ID_UNDEFINED;
   }
 
@@ -125,12 +170,57 @@ int BulletPhysicsManager::addArticulatedObjectFromURDF(
   }
   // base collider refers to the articulated object's id
   collisionObjToObjIds_->emplace(
-      articulatedObject->btMultiBody_->getBaseCollider(), articulatedObjectID_);
+      articulatedObject->btMultiBody_->getBaseCollider(), articulatedObjectID);
 
-  existingArticulatedObjects_.emplace(articulatedObjectID_,
+  existingArticulatedObjects_.emplace(articulatedObjectID,
                                       std::move(articulatedObject));
 
-  return articulatedObjectID_;
+  // get a simplified name of the handle for the object
+  std::string simpleArtObjHandle =
+      Corrade::Utility::Directory::splitExtension(
+          Corrade::Utility::Directory::splitExtension(
+              Corrade::Utility::Directory::filename(filepath))
+              .first)
+          .first;
+
+  Magnum::Debug{} << "BulletPhysicsManager::addArticulatedObjectFromURDF: "
+                     "simpleObjectHandle : "
+                  << simpleArtObjHandle;
+
+  std::string newArtObjectHandle =
+      articulatedObjectManager_->getUniqueHandleFromCandidate(
+          simpleArtObjHandle);
+  Magnum::Debug{} << "BulletPhysicsManager::addArticulatedObjectFromURDF: "
+                     "newArtObjectHandle : "
+                  << newArtObjectHandle;
+
+  existingArticulatedObjects_.at(articulatedObjectID)
+      ->setObjectName(newArtObjectHandle);
+
+  // 2.0 Get wrapper - name is irrelevant, do not register on create.
+  ManagedArticulatedObject::ptr AObjWrapper = getArticulatedObjectWrapper();
+
+  // 3.0 Put articulated object in wrapper
+  AObjWrapper->setObjectRef(
+      existingArticulatedObjects_.at(articulatedObjectID));
+
+  // 4.0 register wrapper in manager
+  articulatedObjectManager_->registerObject(AObjWrapper, newArtObjectHandle);
+
+  return articulatedObjectID;
+}  // BulletPhysicsManager::addArticulatedObjectFromURDF
+
+esp::physics::ManagedRigidObject::ptr
+BulletPhysicsManager::getRigidObjectWrapper() {
+  // TODO make sure this is appropriately cast
+  return rigidObjectManager_->createObject("ManagedBulletRigidObject");
+}
+
+esp::physics::ManagedArticulatedObject::ptr
+BulletPhysicsManager::getArticulatedObjectWrapper() {
+  // TODO make sure this is appropriately cast
+  return articulatedObjectManager_->createObject(
+      "ManagedBulletArticulatedObject");
 }
 
 //! Check if mesh primitive is compatible with physics
@@ -170,10 +260,15 @@ bool BulletPhysicsManager::isMeshPrimitiveValid(
 void BulletPhysicsManager::setGravity(const Magnum::Vector3& gravity) {
   bWorld_->setGravity(btVector3(gravity));
   // After gravity change, need to reactive all bullet objects
-  for (std::map<int, physics::RigidObject::uptr>::iterator it =
+  for (std::map<int, physics::RigidObject::ptr>::iterator it =
            existingObjects_.begin();
        it != existingObjects_.end(); ++it) {
-    it->second->setSleep(false);
+    it->second->setActive(true);
+  }
+  for (std::map<int, physics::ArticulatedObject::ptr>::iterator it =
+           existingArticulatedObjects_.begin();
+       it != existingArticulatedObjects_.end(); ++it) {
+    it->second->setActive(true);
   }
 }
 
@@ -198,28 +293,35 @@ void BulletPhysicsManager::stepPhysics(double dt) {
       if (velControl->controllingAngVel || velControl->controllingLinVel) {
         objectItr.second->setRigidState(velControl->integrateTransform(
             dt, objectItr.second->getRigidState()));
-        objectItr.second->setSleep(false);
+        objectItr.second->setActive(true);
       }
     } else if (objectItr.second->getMotionType() == MotionType::DYNAMIC) {
       if (velControl->controllingLinVel) {
         if (velControl->linVelIsLocal) {
-          setLinearVelocity(objectItr.first,
-                            objectItr.second->node().rotation().transformVector(
-                                velControl->linVel));
+          objectItr.second->setLinearVelocity(
+              objectItr.second->node().rotation().transformVector(
+                  velControl->linVel));
         } else {
-          setLinearVelocity(objectItr.first, velControl->linVel);
+          objectItr.second->setLinearVelocity(velControl->linVel);
         }
       }
       if (velControl->controllingAngVel) {
         if (velControl->angVelIsLocal) {
-          setAngularVelocity(
-              objectItr.first,
+          objectItr.second->setAngularVelocity(
               objectItr.second->node().rotation().transformVector(
                   velControl->angVel));
         } else {
-          setAngularVelocity(objectItr.first, velControl->angVel);
+          objectItr.second->setAngularVelocity(velControl->angVel);
         }
       }
+    }
+  }
+
+  // extra step to validate joint states against limits for corrective clamping
+  for (auto& objectItr : existingArticulatedObjects_) {
+    if (objectItr.second->getAutoClampJointLimits()) {
+      static_cast<BulletArticulatedObject*>(objectItr.second.get())
+          ->clampJointLimits();
     }
   }
 
@@ -228,38 +330,8 @@ void BulletPhysicsManager::stepPhysics(double dt) {
   int numSubStepsTaken =
       bWorld_->stepSimulation(dt, /*maxSubSteps*/ 10000, fixedTimeStep_);
   worldTime_ += numSubStepsTaken * fixedTimeStep_;
-  m_recentNumSubStepsTaken = numSubStepsTaken;
-
-#if 0  // print collision debug info periodically?
-  {
-    // Beware getCollisionFilteringSummary is currently only safe to use if your program never removes physics objects. Otherwise it will crash.
-    // However, getStepCollisionSummary is always safe to use.
-#if 0
-    static bool isFirstRun = true;
-    if (isFirstRun) {
-      constexpr bool doVerbose = false;
-      LOG(WARNING) << BulletDebugManager::get().getCollisionFilteringSummary(doVerbose) << std::endl;
-      isFirstRun = false;
-    }
-#endif
-    static int counter = 0;
-    counter++;
-    if (counter == 100) {
-      //LOG(WARNING) << BulletDebugManager::get().getCollisionFilteringSummary(false) << std::endl;
-      //LOG(WARNING) << "---";
-      LOG(WARNING) << getStepCollisionSummary();
-      LOG(WARNING) << "---";
-      counter = 0;
-    }
-  }
-#endif
-}
-
-void BulletPhysicsManager::setMargin(const int physObjectID,
-                                     const double margin) {
-  assertIDValidity(physObjectID);
-  static_cast<BulletRigidObject*>(existingObjects_.at(physObjectID).get())
-      ->setMargin(margin);
+  recentNumSubStepsTaken_ = numSubStepsTaken;
+  recentTimeStep_ = fixedTimeStep_;
 }
 
 void BulletPhysicsManager::setStageFrictionCoefficient(
@@ -272,13 +344,6 @@ void BulletPhysicsManager::setStageRestitutionCoefficient(
   staticStageObject_->setRestitutionCoefficient(restitutionCoefficient);
 }
 
-double BulletPhysicsManager::getMargin(const int physObjectID) const {
-  assertIDValidity(physObjectID);
-  return static_cast<BulletRigidObject*>(
-             existingObjects_.at(physObjectID).get())
-      ->getMargin();
-}
-
 double BulletPhysicsManager::getStageFrictionCoefficient() const {
   return staticStageObject_->getFrictionCoefficient();
 }
@@ -287,15 +352,15 @@ double BulletPhysicsManager::getStageRestitutionCoefficient() const {
   return staticStageObject_->getRestitutionCoefficient();
 }
 
-const Magnum::Range3D BulletPhysicsManager::getCollisionShapeAabb(
+Magnum::Range3D BulletPhysicsManager::getCollisionShapeAabb(
     const int physObjectID) const {
-  assertIDValidity(physObjectID);
+  assertRigidIdValidity(physObjectID);
   return static_cast<BulletRigidObject*>(
              existingObjects_.at(physObjectID).get())
       ->getCollisionShapeAabb();
 }
 
-const Magnum::Range3D BulletPhysicsManager::getStageCollisionShapeAabb() const {
+Magnum::Range3D BulletPhysicsManager::getStageCollisionShapeAabb() const {
   return static_cast<BulletRigidStage*>(staticStageObject_.get())
       ->getCollisionShapeAabb();
 }
@@ -305,21 +370,7 @@ void BulletPhysicsManager::debugDraw(const Magnum::Matrix4& projTrans) const {
   bWorld_->debugDrawWorld();
 }
 
-bool BulletPhysicsManager::contactTest(const int physObjectID) {
-  assertIDValidity(physObjectID);
-  bWorld_->getCollisionWorld()->performDiscreteCollisionDetection();
-  return static_cast<BulletRigidObject*>(
-             existingObjects_.at(physObjectID).get())
-      ->contactTest();
-}
-
-void BulletPhysicsManager::overrideCollisionGroup(const int physObjectID,
-                                                  CollisionGroup group) const {
-  assertIDValidity(physObjectID);
-  static_cast<BulletRigidObject*>(existingObjects_.at(physObjectID).get())
-      ->overrideCollisionGroup(group);
-}
-
+// rigid object -> world
 int BulletPhysicsManager::createRigidP2PConstraint(
     int objectId,
     const Magnum::Vector3& position,
@@ -330,7 +381,6 @@ int BulletPhysicsManager::createRigidP2PConstraint(
         static_cast<BulletRigidObject*>(existingObjects_.at(objectId).get())
             ->bObjectRigidBody_.get();
     rb->setActivationState(DISABLE_DEACTIVATION);
-    // TODO: need to reactivate sleeping at some point
 
     Magnum::Vector3 localOffset = position;
     if (!positionLocal) {
@@ -343,6 +393,7 @@ int BulletPhysicsManager::createRigidP2PConstraint(
         new btPoint2PointConstraint(*rb, btVector3(localOffset));
     bWorld_->addConstraint(p2p);
     rigidP2ps.emplace(nextConstraintId_, p2p);
+    objectConstraints_[objectId].push_back(nextConstraintId_);
     return nextConstraintId_++;
   } else {
     Corrade::Utility::Debug()
@@ -352,6 +403,7 @@ int BulletPhysicsManager::createRigidP2PConstraint(
   }
 }
 
+// rigid object -> articulated object
 int BulletPhysicsManager::createArticulatedP2PConstraint(
     int articulatedObjectId,
     int linkId,
@@ -368,6 +420,7 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
   if (existingObjects_.at(objectId)->getMotionType() == MotionType::DYNAMIC) {
     rb = static_cast<BulletRigidObject*>(existingObjects_.at(objectId).get())
              ->bObjectRigidBody_.get();
+    rb->setActivationState(DISABLE_DEACTIVATION);
   } else {
     Corrade::Utility::Debug()
         << "Cannot create a dynamic P2P constraint for object with "
@@ -398,9 +451,12 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
   p2p->setMaxAppliedImpulse(maxImpulse);
   bWorld_->addMultiBodyConstraint(p2p);
   articulatedP2ps.emplace(nextConstraintId_, p2p);
+  objectConstraints_[articulatedObjectId].push_back(nextConstraintId_);
+  objectConstraints_[objectId].push_back(nextConstraintId_);
   return nextConstraintId_++;
 }
 
+// rigid object -> articulated object (fixed)
 int BulletPhysicsManager::createArticulatedFixedConstraint(
     int articulatedObjectId,
     int linkId,
@@ -417,6 +473,7 @@ int BulletPhysicsManager::createArticulatedFixedConstraint(
   if (existingObjects_.at(objectId)->getMotionType() == MotionType::DYNAMIC) {
     rb = static_cast<BulletRigidObject*>(existingObjects_.at(objectId).get())
              ->bObjectRigidBody_.get();
+    rb->setActivationState(DISABLE_DEACTIVATION);
   } else {
     Corrade::Utility::Debug()
         << "Cannot create a dynamic fixed constraint for object with "
@@ -439,7 +496,7 @@ int BulletPhysicsManager::createArticulatedFixedConstraint(
   } else {
     // hold object at it's current position relative to link
     btVector3 pivotWorld = rb->getCenterOfMassTransform() * pivotInB;
-    btVector3 pivotInA = mb->worldPosToLocal(linkId, pivotWorld);
+    pivotInA = mb->worldPosToLocal(linkId, pivotWorld);
   }
 
   // We constrain the relative orientation of the link and object to match their
@@ -457,9 +514,12 @@ int BulletPhysicsManager::createArticulatedFixedConstraint(
   constraint->setMaxAppliedImpulse(maxImpulse);
   bWorld_->addMultiBodyConstraint(constraint);
   articulatedFixedConstraints.emplace(nextConstraintId_, constraint);
+  objectConstraints_[objectId].push_back(nextConstraintId_);
+  objectConstraints_[articulatedObjectId].push_back(nextConstraintId_);
   return nextConstraintId_++;
 }
 
+// articulated object -> articulated object (general)
 int BulletPhysicsManager::createArticulatedP2PConstraint(
     int articulatedObjectIdA,
     int linkIdA,
@@ -484,7 +544,6 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
           existingArticulatedObjects_.at(articulatedObjectIdB).get())
           ->btMultiBody_.get();
 
-  // TODO: need to reactivate sleeping at some point
   mbA->setCanSleep(false);
   mbB->setCanSleep(false);
 
@@ -494,9 +553,12 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
   p2p->setMaxAppliedImpulse(maxImpulse);
   bWorld_->addMultiBodyConstraint(p2p);
   articulatedP2ps.emplace(nextConstraintId_, p2p);
+  objectConstraints_[articulatedObjectIdA].push_back(nextConstraintId_);
+  objectConstraints_[articulatedObjectIdB].push_back(nextConstraintId_);
   return nextConstraintId_++;
 }
 
+// articulated object -> articulated object (global)
 int BulletPhysicsManager::createArticulatedP2PConstraint(
     int articulatedObjectIdA,
     int linkIdA,
@@ -530,6 +592,7 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
                                         maxImpulse);
 }
 
+// articulated object -> world (w/ offset)
 int BulletPhysicsManager::createArticulatedP2PConstraint(
     int articulatedObjectId,
     int linkId,
@@ -544,15 +607,16 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
           existingArticulatedObjects_.at(articulatedObjectId).get())
           ->btMultiBody_.get();
   mb->setCanSleep(false);
-  // TODO: need to reactivate sleeping at some point
   btMultiBodyPoint2Point* p2p = new btMultiBodyPoint2Point(
-      mb, linkId, 0, btVector3(linkOffset), btVector3(pickPos));
+      mb, linkId, nullptr, btVector3(linkOffset), btVector3(pickPos));
   p2p->setMaxAppliedImpulse(maxImpulse);
   bWorld_->addMultiBodyConstraint(p2p);
   articulatedP2ps.emplace(nextConstraintId_, p2p);
+  objectConstraints_[articulatedObjectId].push_back(nextConstraintId_);
   return nextConstraintId_++;
 }
 
+// articulated object -> world (global)
 int BulletPhysicsManager::createArticulatedP2PConstraint(
     int articulatedObjectId,
     int linkId,
@@ -574,9 +638,9 @@ int BulletPhysicsManager::createArticulatedP2PConstraint(
 void BulletPhysicsManager::updateP2PConstraintPivot(
     int p2pId,
     const Magnum::Vector3& pivot) {
-  if (articulatedP2ps.count(p2pId)) {
+  if (articulatedP2ps.count(p2pId) != 0u) {
     articulatedP2ps.at(p2pId)->setPivotInB(btVector3(pivot));
-  } else if (rigidP2ps.count(p2pId)) {
+  } else if (rigidP2ps.count(p2pId) != 0u) {
     rigidP2ps.at(p2pId)->setPivotB(btVector3(pivot));
   } else {
     Corrade::Utility::Debug() << "No P2P constraint with ID: " << p2pId;
@@ -584,33 +648,54 @@ void BulletPhysicsManager::updateP2PConstraintPivot(
 }
 
 void BulletPhysicsManager::removeConstraint(int constraintId) {
-  if (articulatedP2ps.count(constraintId)) {
+  if (articulatedP2ps.count(constraintId) != 0u) {
     articulatedP2ps.at(constraintId)->getMultiBodyA()->setCanSleep(true);
     bWorld_->removeMultiBodyConstraint(articulatedP2ps.at(constraintId));
     delete articulatedP2ps.at(constraintId);
     articulatedP2ps.erase(constraintId);
-  } else if (rigidP2ps.count(constraintId)) {
-    rigidP2ps.at(constraintId)
-        ->getRigidBodyA()
-        .setActivationState(WANTS_DEACTIVATION);
+  } else if (rigidP2ps.count(constraintId) != 0u) {
     bWorld_->removeConstraint(rigidP2ps.at(constraintId));
     delete rigidP2ps.at(constraintId);
     rigidP2ps.erase(constraintId);
-  } else if (articulatedFixedConstraints.count(constraintId)) {
+  } else if (articulatedFixedConstraints.count(constraintId) != 0u) {
     bWorld_->removeMultiBodyConstraint(
         articulatedFixedConstraints.at(constraintId));
     delete articulatedFixedConstraints.at(constraintId);
     articulatedFixedConstraints.erase(constraintId);
   } else {
     Corrade::Utility::Debug() << "No constraint with ID: " << constraintId;
+    return;
   }
-};
+  // remove the constraint from any referencing object maps
+  for (auto& itr : objectConstraints_) {
+    auto conIdItr =
+        std::find(itr.second.begin(), itr.second.end(), constraintId);
+    if (conIdItr != itr.second.end()) {
+      itr.second.erase(conIdItr);
+      // when no constraints active for the object, allow it to sleep again
+      if (itr.second.empty()) {
+        if (existingArticulatedObjects_.count(itr.first) > 0) {
+          btMultiBody* mb = static_cast<BulletArticulatedObject*>(
+                                existingArticulatedObjects_.at(itr.first).get())
+                                ->btMultiBody_.get();
+          mb->setCanSleep(true);
+        } else if (existingObjects_.count(itr.first) > 0) {
+          btRigidBody* rb = static_cast<BulletRigidObject*>(
+                                existingObjects_.at(itr.first).get())
+                                ->bObjectRigidBody_.get();
+          rb->forceActivationState(ACTIVE_TAG);
+          rb->activate(true);
+        }
+      }
+    }
+  }
+}
 
 RaycastResults BulletPhysicsManager::castRay(const esp::geo::Ray& ray,
                                              double maxDistance) {
   RaycastResults results;
   results.ray = ray;
-  double rayLength = ray.direction.length();
+  double rayLength = static_cast<double>(ray.direction.length());
   if (rayLength == 0) {
     LOG(ERROR) << "BulletPhysicsManager::castRay : Cannot case ray with zero "
                   "length, aborting. ";
@@ -628,7 +713,9 @@ RaycastResults BulletPhysicsManager::castRay(const esp::geo::Ray& ray,
 
     hit.normal = Magnum::Vector3{allResults.m_hitNormalWorld[i]};
     hit.point = Magnum::Vector3{allResults.m_hitPointWorld[i]};
-    hit.rayDistance = (allResults.m_hitFractions[i] * maxDistance) / rayLength;
+    hit.rayDistance =
+        (static_cast<double>(allResults.m_hitFractions[i]) * maxDistance) /
+        rayLength;
     // default to -1 for "scene collision" if we don't know which object was
     // involved
     hit.objectId = -1;
@@ -642,30 +729,27 @@ RaycastResults BulletPhysicsManager::castRay(const esp::geo::Ray& ray,
   return results;
 }
 
-// todo: unit test for this
 void BulletPhysicsManager::lookUpObjectIdAndLinkId(
     const btCollisionObject* colObj,
     int* objectId,
     int* linkId) const {
-  ASSERT(objectId);
-  ASSERT(linkId);
+  ASSERT(objectId, );
+  ASSERT(linkId, );
 
   *linkId = -1;
   // If the lookup fails, default to the stage. TODO: better error-handling.
   *objectId = -1;
 
-  if (collisionObjToObjIds_->count(colObj)) {
+  if (collisionObjToObjIds_->count(colObj) != 0u) {
     int rawObjectId = collisionObjToObjIds_->at(colObj);
-    if (existingObjects_.count(rawObjectId)) {
-      *objectId = rawObjectId;
-      return;
-    } else if (existingArticulatedObjects_.count(rawObjectId)) {
+    if (existingObjects_.count(rawObjectId) != 0u ||
+        existingArticulatedObjects_.count(rawObjectId) != 0u) {
       *objectId = rawObjectId;
       return;
     } else {
       // search articulated objects to see if this is a link
       for (const auto& pair : existingArticulatedObjects_) {
-        if (pair.second->objectIdToLinkId_.count(rawObjectId)) {
+        if (pair.second->objectIdToLinkId_.count(rawObjectId) != 0u) {
           *objectId = pair.first;
           *linkId = pair.second->objectIdToLinkId_.at(rawObjectId);
           return;
@@ -676,31 +760,28 @@ void BulletPhysicsManager::lookUpObjectIdAndLinkId(
 
   // lookup failed
 }
+int BulletPhysicsManager::getNumActiveContactPoints() {
+  int count = 0;
+  auto* dispatcher = bWorld_->getDispatcher();
+  for (int i = 0; i < dispatcher->getNumManifolds(); i++) {
+    auto* manifold = dispatcher->getManifoldByIndexInternal(i);
+    const btCollisionObject* colObj0 =
+        static_cast<const btCollisionObject*>(manifold->getBody0());
+    const btCollisionObject* colObj1 =
+        static_cast<const btCollisionObject*>(manifold->getBody1());
 
-std::vector<ContactPointData> BulletPhysicsManager::getContactPoints() const {
-  if (m_recentNumSubStepsTaken != 1) {
-    if (m_recentNumSubStepsTaken == -1) {
-      LOG(WARNING) << "getContactPoints: no previous call to stepPhysics";
-    } else {
-      // todo: proper logging-throttling API
-      static int count = 0;
-      if (count++ < 5) {
-        LOG(WARNING)
-            << "getContactPoints: the previous call to stepPhysics performed "
-            << m_recentNumSubStepsTaken
-            << " substeps, so getContactPoints's behavior may be unexpected.";
-      }
-      if (count == 5) {
-        LOG(WARNING)
-            << "getContactPoints: additional warnings will be suppressed.";
-      }
+    // logic copied from btSimulationIslandManager::buildIslands. We want to
+    // count manifolds only if related to non-sleeping bodies.
+    if (((colObj0) && colObj0->getActivationState() != ISLAND_SLEEPING) ||
+        ((colObj1) && colObj1->getActivationState() != ISLAND_SLEEPING)) {
+      count += manifold->getNumContacts();
     }
   }
+  return count;
+}
 
+std::vector<ContactPointData> BulletPhysicsManager::getContactPoints() const {
   std::vector<ContactPointData> contactPoints;
-
-  // sloppy: assume fixedTimeStep_ hasn't changed since last call to stepPhysics
-  const float recentSubstepDt = fixedTimeStep_;
 
   auto* dispatcher = bWorld_->getDispatcher();
   int numContactManifolds = dispatcher->getNumManifolds();
@@ -722,28 +803,31 @@ std::vector<ContactPointData> BulletPhysicsManager::getContactPoints() const {
 
     // logic copied from btSimulationIslandManager::buildIslands. We count
     // manifolds as active only if related to non-sleeping bodies.
-    bool isActive =
-        (((colObj0) && colObj0->getActivationState() != ISLAND_SLEEPING) ||
-         ((colObj1) && colObj1->getActivationState() != ISLAND_SLEEPING));
+    bool isActive = ((((colObj0) != nullptr) &&
+                      colObj0->getActivationState() != ISLAND_SLEEPING) ||
+                     (((colObj1) != nullptr) &&
+                      colObj1->getActivationState() != ISLAND_SLEEPING));
 
     for (int p = 0; p < manifold->getNumContacts(); p++) {
       ContactPointData pt;
       pt.objectIdA = objectIdA;
       pt.objectIdB = objectIdB;
       const btManifoldPoint& srcPt = manifold->getContactPoint(p);
-      pt.contactDistance = srcPt.getDistance();
+      pt.contactDistance = static_cast<double>(srcPt.getDistance());
       pt.linkIndexA = linkIndexA;
       pt.linkIndexB = linkIndexB;
       pt.contactNormalOnBInWS = Mn::Vector3(srcPt.m_normalWorldOnB);
       pt.positionOnAInWS = Mn::Vector3(srcPt.getPositionWorldOnA());
       pt.positionOnBInWS = Mn::Vector3(srcPt.getPositionWorldOnB());
 
-      pt.normalForce = srcPt.getAppliedImpulse() / recentSubstepDt;
+      // convert impulses to forces w/ recent physics timstep
+      pt.normalForce =
+          static_cast<double>(srcPt.getAppliedImpulse()) / recentTimeStep_;
 
       pt.linearFrictionForce1 =
-          srcPt.m_appliedImpulseLateral1 / recentSubstepDt;
+          static_cast<double>(srcPt.m_appliedImpulseLateral1) / recentTimeStep_;
       pt.linearFrictionForce2 =
-          srcPt.m_appliedImpulseLateral2 / recentSubstepDt;
+          static_cast<double>(srcPt.m_appliedImpulseLateral2) / recentTimeStep_;
 
       pt.linearFrictionDirection1 = Mn::Vector3(srcPt.m_lateralFrictionDir1);
       pt.linearFrictionDirection2 = Mn::Vector3(srcPt.m_lateralFrictionDir2);

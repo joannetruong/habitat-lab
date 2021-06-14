@@ -24,7 +24,12 @@
 #
 
 if(WITH_PYTHON)
-    add_custom_target(CorradeContainersPython SOURCES PythonBindings.h)
+    set(CorradeContainersPython_HEADERS
+        OptionalPythonBindings.h
+        PythonBindings.h
+        StridedArrayViewPythonBindings.h)
+
+    add_custom_target(CorradeContainersPython SOURCES ${CorradeContainersPython_HEADERS})
     set_target_properties(CorradeContainersPython PROPERTIES FOLDER "Corrade/Python")
-    install(FILES PythonBindings.h DESTINATION ${CORRADE_INCLUDE_INSTALL_DIR}/Containers)
+    install(FILES ${CorradeContainersPython_HEADERS} DESTINATION ${CORRADE_INCLUDE_INSTALL_DIR}/Containers)
 endif()

@@ -23,43 +23,43 @@
     DEALINGS IN THE SOFTWARE.
 ..
 
-.. py:class:: magnum.shaders.Flat2D
+.. py:class:: magnum.shaders.FlatGL2D
     :data POSITION: Vertex position
     :data TEXTURE_COORDINATES: 2D texture coordinates
     :data COLOR3: Three-component vertex color
     :data COLOR4: Four-component vertex color
 
-.. py:class:: magnum.shaders.Flat3D
+.. py:class:: magnum.shaders.FlatGL3D
     :data POSITION: Vertex position
     :data TEXTURE_COORDINATES: 2D texture coordinates
     :data COLOR3: Three-component vertex color
     :data COLOR4: Four-component vertex color
 
-.. py:property:: magnum.shaders.Flat2D.alpha_mask
+.. py:property:: magnum.shaders.FlatGL2D.alpha_mask
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.ALPHA_MASK`
-.. py:property:: magnum.shaders.Flat3D.alpha_mask
+.. py:property:: magnum.shaders.FlatGL3D.alpha_mask
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.ALPHA_MASK`
 
-.. py:function:: magnum.shaders.Flat2D.bind_texture
+.. py:function:: magnum.shaders.FlatGL2D.bind_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.TEXTURED`
-.. py:function:: magnum.shaders.Flat3D.bind_texture
+.. py:function:: magnum.shaders.FlatGL3D.bind_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.TEXTURED`
 
-.. py:class:: magnum.shaders.VertexColor2D
+.. py:class:: magnum.shaders.VertexColorGL2D
     :data POSITION: Vertex position
     :data COLOR3: Three-component vertex color
     :data COLOR4: Four-component vertex color
 
-.. py:class:: magnum.shaders.VertexColor3D
+.. py:class:: magnum.shaders.VertexColorGL3D
     :data POSITION: Vertex position
     :data COLOR3: Three-component vertex color
     :data COLOR4: Four-component vertex color
 
-.. py:class:: magnum.shaders.Phong
+.. py:class:: magnum.shaders.PhongGL
     :data POSITION: Vertex position
     :data NORMAL: Normal direction
     :data TANGENT: Tangent direction
@@ -72,36 +72,35 @@
     :data NORMAL_MATRIX: (Instanced) normal matrix
     :data TEXTURE_OFFSET: (Instanced) texture offset
 
-.. py:property:: magnum.shaders.Phong.normal_texture_scale
+.. py:property:: magnum.shaders.PhongGL.normal_texture_scale
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.NORMAL_TEXTURE`
-.. py:property:: magnum.shaders.Phong.alpha_mask
+.. py:property:: magnum.shaders.PhongGL.alpha_mask
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.ALPHA_MASK`
-.. py:property:: magnum.shaders.Phong.texture_matrix
+.. py:property:: magnum.shaders.PhongGL.texture_matrix
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.TEXTURE_TRANSFORMATION`
-.. py:property:: magnum.shaders.Phong.light_positions
+.. py:property:: magnum.shaders.PhongGL.light_positions
     :raise ValueError: If list length is different from :ref:`light_count`
-.. py:property:: magnum.shaders.Phong.light_colors
+.. py:property:: magnum.shaders.PhongGL.light_colors
     :raise ValueError: If list length is different from :ref:`light_count`
-.. py:property:: magnum.shaders.Phong.light_ranges
+.. py:property:: magnum.shaders.PhongGL.light_ranges
     :raise ValueError: If list length is different from :ref:`light_count`
 
-.. py:function:: magnum.shaders.Phong.bind_ambient_texture
+.. py:function:: magnum.shaders.PhongGL.bind_ambient_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.AMBIENT_TEXTURE`
-.. py:function:: magnum.shaders.Phong.bind_diffuse_texture
+.. py:function:: magnum.shaders.PhongGL.bind_diffuse_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.DIFFUSE_TEXTURE`
-.. py:function:: magnum.shaders.Phong.bind_specular_texture
+.. py:function:: magnum.shaders.PhongGL.bind_specular_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.SPECULAR_TEXTURE`
-.. py:function:: magnum.shaders.Phong.bind_normal_texture
+.. py:function:: magnum.shaders.PhongGL.bind_normal_texture
     :raise AttributeError: If the shader was not created with
         :ref:`Flags.NORMAL_TEXTURE`
-.. py:function:: magnum.shaders.Phong.bind_textures
+.. py:function:: magnum.shaders.PhongGL.bind_textures
     :raise AttributeError: If the shader was not created with any of
         :ref:`Flags.AMBIENT_TEXTURE`, :ref:`Flags.DIFFUSE_TEXTURE`,
         :ref:`Flags.SPECULAR_TEXTURE` or :ref:`Flags.NORMAL_TEXTURE`
-

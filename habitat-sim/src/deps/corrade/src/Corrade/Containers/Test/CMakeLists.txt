@@ -24,6 +24,7 @@
 #   DEALINGS IN THE SOFTWARE.
 #
 
+corrade_add_test(ContainersAnyReferenceTest AnyReferenceTest.cpp)
 corrade_add_test(ContainersArrayTest ArrayTest.cpp)
 corrade_add_test(ContainersArrayTupleTest ArrayTupleTest.cpp LIBRARIES CorradeUtilityTestLib)
 corrade_add_test(ContainersArrayViewTest ArrayViewTest.cpp)
@@ -37,15 +38,16 @@ if(CORRADE_TARGET_EMSCRIPTEN)
     # TODO: somehow, for std::vector the available memory is enough?
     set_property(TARGET ContainersGrowableArrayTest APPEND_STRING PROPERTY LINK_FLAGS " -s ALLOW_MEMORY_GROWTH=1")
 endif()
-corrade_add_test(ContainersGrowableArraySani___FailTest GrowableArraySanitizerFailTest.cpp)
+corrade_add_test(ContainersGrowableArraySa___FailTest GrowableArraySanitizerFailTest.cpp)
 # Not matching with the -f, as MSVC might use either /f or -f. Source:
 # https://devblogs.microsoft.com/cppblog/addresssanitizer-asan-for-windows-with-msvc/
 if(CMAKE_CXX_FLAGS MATCHES "fsanitize=address")
-    set_tests_properties(ContainersGrowableArraySani___FailTest PROPERTIES
+    set_tests_properties(ContainersGrowableArraySa___FailTest PROPERTIES
         PASS_REGULAR_EXPRESSION "AddressSanitizer: container-overflow")
 endif()
 
 corrade_add_test(ContainersLinkedListTest LinkedListTest.cpp)
+corrade_add_test(ContainersMoveReferenceTest MoveReferenceTest.cpp)
 corrade_add_test(ContainersOptionalTest OptionalTest.cpp)
 corrade_add_test(ContainersPointerTest PointerTest.cpp)
 corrade_add_test(ContainersPointerStlTest PointerStlTest.cpp)
@@ -62,9 +64,9 @@ corrade_add_test(ContainersStringTest StringTest.cpp LIBRARIES CorradeUtilityTes
 corrade_add_test(ContainersStringStlTest StringStlTest.cpp)
 corrade_add_test(ContainersStringViewTest StringViewTest.cpp LIBRARIES CorradeUtilityTestLib)
 corrade_add_test(ContainersStringViewStlTest StringViewStlTest.cpp)
-corrade_add_test(ContainersTagsTest TagsTest.cpp)
 
 set_property(TARGET
+    ContainersAnyReferenceTest
     ContainersLinkedListTest
     ContainersArrayTest
     ContainersArrayViewTest
@@ -83,9 +85,12 @@ set_target_properties(
     ContainersArrayTest
     ContainersArrayTupleTest
     ContainersArrayViewTest
+    ContainersGrowableArrayTest
+    ContainersGrowableArraySa___FailTest
     ContainersBigEnumSetTest
     ContainersEnumSetTest
     ContainersLinkedListTest
+    ContainersMoveReferenceTest
     ContainersPointerTest
     ContainersPointerStlTest
     ContainersRawForwardListTest
@@ -99,16 +104,15 @@ set_target_properties(
     ContainersStringStlTest
     ContainersStringViewTest
     ContainersStringViewStlTest
-    ContainersTagsTest
     PROPERTIES FOLDER "Corrade/Containers/Test")
 
 # Build these only if there's no explicit -std= passed in the flags
 if(NOT CMAKE_CXX_FLAGS MATCHES "-std=")
     # Copied verbatim from src/Corrade/Test/CMakeLists.txt, please keep in sync
     if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "7.0") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5.0") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.3") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.10"))
+       (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "5.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "9.3") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.10"))
         corrade_add_test(ContainersOptionalStlTest OptionalStlTest.cpp)
         set_target_properties(ContainersOptionalStlTest PROPERTIES
             CORRADE_CXX_STANDARD 17
@@ -117,9 +121,9 @@ if(NOT CMAKE_CXX_FLAGS MATCHES "-std=")
 
     # Copied verbatim from src/Corrade/Test/CMakeLists.txt, please keep in sync
     if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "8.0") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "10.0") OR
-    (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.15"))
+       (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "6.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "10.0") OR
+       (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS "19.15"))
         corrade_add_test(ContainersArrayStlSpanTest ArrayStlSpanTest.cpp)
         corrade_add_test(ContainersArrayViewStlSpanTest ArrayViewStlSpanTest.cpp)
         corrade_add_test(ContainersStaticArrayStlSpanTest StaticArrayStlSpanTest.cpp)

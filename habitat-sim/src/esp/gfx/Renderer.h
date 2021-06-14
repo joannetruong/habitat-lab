@@ -7,13 +7,14 @@
 
 #include "esp/core/esp.h"
 #include "esp/gfx/RenderCamera.h"
-#include "esp/gfx/WindowlessContext.h"
 #include "esp/scene/SceneGraph.h"
 #include "esp/sensor/VisualSensor.h"
 
 namespace esp {
+namespace sim {
+class Simulator;
+}
 namespace gfx {
-
 class Renderer {
  public:
   enum class Flag {
@@ -24,7 +25,14 @@ class Renderer {
      * Note: Cannot set this flag when doing RGB rendering
      */
     NoTextures = 1 << 0,
-    BackgroundThread = 1 << 1
+
+    /**
+     * When binding the render target to a depth or a sementic sensor,
+     * setting this flag will give the render target the ability to visualize
+     * the depth, or sementic info
+     * see bindRenderTarget for more info.
+     */
+    VisualizeTexture = 1 << 1,
   };
 
   typedef Corrade::Containers::EnumSet<Flag> Flags;
@@ -36,40 +44,37 @@ class Renderer {
   explicit Renderer(Flags flags = {});
 
   /**
-   * @brief Constructor for when creating a background thread
+   * @brief draw the scene graph with the camera specified by user
+   * @param[in] camera the render camera to render the scene
+   * @param[in] sceneGraph the scene to render
+   * @param[in] flags flags to control the rendering
    */
-  explicit Renderer(WindowlessContext* context, Flags flags = {});
-
-  // draw the scene graph with the camera specified by user
   void draw(RenderCamera& camera,
             scene::SceneGraph& sceneGraph,
             RenderCamera::Flags flags = {RenderCamera::Flag::FrustumCulling});
+  /**
+   * @brief draw the active scene in current sim using the specified visual
+   * sensor
+   * @param[in] visualSensor, the visual sensor, from which the observation is
+   * obtained
+   * @param[in] sim, the simulator instance
+   */
+  void draw(sensor::VisualSensor& visualSensor, sim::Simulator& sim);
 
-  // draw the scene graph with the visual sensor provided by user
-  void draw(sensor::VisualSensor& visualSensor,
-            scene::SceneGraph& sceneGraph,
-            RenderCamera::Flags flags = {RenderCamera::Flag::FrustumCulling});
+  /**
+   * @brief visualize the observation of a non-rgb visual sensor, e.g., depth,
+   * semantic
+   */
+  void visualize(sensor::VisualSensor& visualSensor,
+                 float colorMapOffset = 1.0f / 512.0f,
+                 float colorMapScale = 1.0f / 256.0f);
 
-#if !defined(CORRADE_TARGET_EMSCRIPTEN)
-  // draw the scene graph with the visual sensor provided by user
-  // async
-  void drawAsync(sensor::VisualSensor& visualSensor,
-                 scene::SceneGraph& sceneGraph,
-                 const Mn::MutableImageView2D& view,
-                 RenderCamera::Flags flags = {
-                     RenderCamera::Flag::FrustumCulling});
-
-  void drawWait();
-  void waitSG();
-
-  void startDrawJobs();
-#endif
-
-  void acquireGlContext();
   /**
    * @brief Binds a @ref RenderTarget to the sensor
+   * @param[in] sensor the target sensor
+   * @param[in] bindingFlags flags, such as to control the bindings
    */
-  void bindRenderTarget(sensor::VisualSensor& sensor);
+  void bindRenderTarget(sensor::VisualSensor& sensor, Flags bindingFlags = {});
 
   ESP_SMART_POINTERS_WITH_UNIQUE_PIMPL(Renderer)
 };

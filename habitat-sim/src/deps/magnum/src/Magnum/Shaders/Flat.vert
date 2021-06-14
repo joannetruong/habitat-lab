@@ -27,11 +27,30 @@
 #extension GL_EXT_gpu_shader4: require
 #endif
 
+#if defined(UNIFORM_BUFFERS) && defined(TEXTURE_ARRAYS) && !defined(GL_ES)
+#extension GL_ARB_shader_bit_encoding: require
+#endif
+
+#ifdef MULTI_DRAW
+#ifndef GL_ES
+#extension GL_ARB_shader_draw_parameters: require
+#else /* covers WebGL as well */
+#extension GL_ANGLE_multi_draw: require
+#endif
+#endif
+
 #ifndef NEW_GLSL
 #define in attribute
 #define out varying
 #endif
 
+#ifndef RUNTIME_CONST
+#define const
+#endif
+
+/* Uniforms */
+
+#ifndef UNIFORM_BUFFERS
 #ifdef EXPLICIT_UNIFORM_LOCATION
 layout(location = 0)
 #endif
@@ -62,6 +81,68 @@ uniform mediump mat3 textureMatrix
     ;
 #endif
 
+#ifdef TEXTURE_ARRAYS
+#ifdef EXPLICIT_UNIFORM_LOCATION
+layout(location = 2)
+#endif
+/* mediump is just 2^10, which might not be enough, this is 2^16 */
+uniform highp uint textureLayer; /* defaults to zero */
+#endif
+
+/* Uniform buffers */
+
+#else
+#if DRAW_COUNT > 1
+#ifdef EXPLICIT_UNIFORM_LOCATION
+layout(location = 0)
+#endif
+uniform highp uint drawOffset
+    #ifndef GL_ES
+    = 0u
+    #endif
+    ;
+#else
+#define drawOffset 0u
+#endif
+
+layout(std140
+    #ifdef EXPLICIT_BINDING
+    , binding = 1
+    #endif
+) uniform TransformationProjection {
+    highp
+        #ifdef TWO_DIMENSIONS
+        /* Can't be a mat3 because of ANGLE, see DrawUniform in Phong.vert for
+           details */
+        mat3x4
+        #elif defined(THREE_DIMENSIONS)
+        mat4
+        #else
+        #error
+        #endif
+    transformationProjectionMatrices[DRAW_COUNT];
+};
+
+#ifdef TEXTURE_TRANSFORMATION
+struct TextureTransformationUniform {
+    highp vec4 rotationScaling;
+    highp vec4 offsetLayerReserved;
+    #define textureTransformation_offset offsetLayerReserved.xy
+    #define textureTransformation_layer offsetLayerReserved.z
+};
+
+layout(std140
+    #ifdef EXPLICIT_BINDING
+    , binding = 3
+    #endif
+) uniform TextureTransformation {
+    TextureTransformationUniform textureTransformations[DRAW_COUNT];
+};
+#endif
+#endif
+
+/* Inputs */
+
 #ifdef EXPLICIT_ATTRIB_LOCATION
 layout(location = POSITION_ATTRIBUTE_LOCATION)
 #endif
@@ -78,8 +159,6 @@ in highp vec4 position;
 layout(location = TEXTURECOORDINATES_ATTRIBUTE_LOCATION)
 #endif
 in mediump vec2 textureCoordinates;
-
-out mediump vec2 interpolatedTextureCoordinates;
 #endif
 
 #ifdef VERTEX_COLOR
@@ -87,8 +166,6 @@ out mediump vec2 interpolatedTextureCoordinates;
 layout(location = COLOR_ATTRIBUTE_LOCATION)
 #endif
 in lowp vec4 vertexColor;
-
-out lowp vec4 interpolatedVertexColor;
 #endif
 
 #ifdef INSTANCED_OBJECT_ID
@@ -96,8 +173,6 @@ out lowp vec4 interpolatedVertexColor;
 layout(location = OBJECT_ID_ATTRIBUTE_LOCATION)
 #endif
 in highp uint instanceObjectId;
-
-flat out highp uint interpolatedInstanceObjectId;
 #endif
 
 #ifdef INSTANCED_TRANSFORMATION
@@ -117,10 +192,68 @@ in highp mat4 instancedTransformationMatrix;
 #ifdef EXPLICIT_ATTRIB_LOCATION
 layout(location = TEXTURE_OFFSET_ATTRIBUTE_LOCATION)
 #endif
-in mediump vec2 instancedTextureOffset;
+in mediump
+    #ifndef TEXTURE_ARRAYS
+    vec2
+    #else
+    vec3
+    #endif
+    instancedTextureOffset;
+#endif
+
+/* Outputs */
+
+#ifdef TEXTURED
+out mediump
+    #ifndef TEXTURE_ARRAYS
+    vec2
+    #else
+    vec3
+    #endif
+    interpolatedTextureCoordinates;
+#endif
+
+#ifdef VERTEX_COLOR
+out lowp vec4 interpolatedVertexColor;
+#endif
+
+#ifdef INSTANCED_OBJECT_ID
+flat out highp uint interpolatedInstanceObjectId;
+#endif
+
+#ifdef MULTI_DRAW
+flat out highp uint drawId;
 #endif
 
 void main() {
+    #ifdef UNIFORM_BUFFERS
+    #ifdef MULTI_DRAW
+    drawId = drawOffset + uint(
+        #ifndef GL_ES
+        gl_DrawIDARB /* Using GL_ARB_shader_draw_parameters, not GLSL 4.6 */
+        #else
+        gl_DrawID
+        #endif
+        );
+    #else
+    #define drawId drawOffset
+    #endif
+
+    #ifdef TWO_DIMENSIONS
+    highp const mat3 transformationProjectionMatrix = mat3(transformationProjectionMatrices[drawId]);
+    #elif defined(THREE_DIMENSIONS)
+    highp const mat4 transformationProjectionMatrix = transformationProjectionMatrices[drawId];
+    #else
+    #error
+    #endif
+    #ifdef TEXTURE_TRANSFORMATION
+    mediump const mat3 textureMatrix = mat3(textureTransformations[drawId].rotationScaling.xy, 0.0, textureTransformations[drawId].rotationScaling.zw, 0.0, textureTransformations[drawId].textureTransformation_offset, 1.0);
+    #ifdef TEXTURE_ARRAYS
+    highp const uint textureLayer = floatBitsToUint(textureTransformations[drawId].textureTransformation_layer);
+    #endif
+    #endif
+    #endif
+
     #ifdef TWO_DIMENSIONS
     gl_Position.xywz = vec4(transformationProjectionMatrix*
         #ifdef INSTANCED_TRANSFORMATION
@@ -139,17 +272,25 @@ void main() {
 
     #ifdef TEXTURED
     /* Texture coordinates, if needed */
-    interpolatedTextureCoordinates =
+    interpolatedTextureCoordinates.xy =
         #ifdef TEXTURE_TRANSFORMATION
         (textureMatrix*vec3(
             #ifdef INSTANCED_TEXTURE_OFFSET
-            instancedTextureOffset +
+            instancedTextureOffset.xy +
             #endif
             textureCoordinates, 1.0)).xy
         #else
         textureCoordinates
         #endif
         ;
+    #ifdef TEXTURE_ARRAYS
+    interpolatedTextureCoordinates.z = float(
+        #ifdef INSTANCED_TEXTURE_OFFSET
+        uint(instancedTextureOffset.z) +
+        #endif
+        textureLayer
+    );
+    #endif
     #endif
 
     #ifdef VERTEX_COLOR
