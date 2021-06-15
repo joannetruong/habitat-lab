@@ -174,7 +174,8 @@ class Workspace(object):
         robot_file = urdf_files[robot_file_name]
         print(robot_file)
         art_obj_mgr = self.sim.get_articulated_object_manager()
-        self.robot_id = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+        self.robot = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+        self.robot_id = self.robot.object_id
         #self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
 
         jms = []
@@ -201,7 +202,7 @@ class Workspace(object):
                         10.0,  # max_impulse
                     ))      
         for i in range(12):
-            self.sim.update_joint_motor(self.robot_id, i, jms[np.mod(i,3)])
+            self.robot.update_joint_motor(i, jms[np.mod(i,3)])
 
         # existing_joint_motors = sim.get_existing_joint_motors(robot_id)    
         agent_config = habitat_sim.AgentConfiguration()
@@ -219,7 +220,7 @@ class Workspace(object):
         elif self.robot_name == 'Daisy_4legged':
             self.robot = Daisy4(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Spot':
-            self.robot = Spot(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot = Spot(sim=self.sim, robot=self.robot, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
             
         self.robot.robot_specific_reset()
         
@@ -235,8 +236,8 @@ class Workspace(object):
         agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
         base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
         base_transform.translation = agent_transform.transform_point(local_base_pos)
-        self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
-
+        #self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        self.robot.transformation = base_transform
         self.init_state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         self.raibert_controller.set_init_state(self.init_state)
         time.sleep(1)

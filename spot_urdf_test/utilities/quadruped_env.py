@@ -8,8 +8,9 @@ from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, qu
 import squaternion
 
 class A1():
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+    def __init__(self, sim=None, robot=None, agent=None, robot_id=0, dt=1/60):
         #self.torque = config.get("torque", 1.0)
+        self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
         self.agent = agent
@@ -65,9 +66,10 @@ class A1():
                 in euler angles.
         """
 
-        joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
-        joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
-
+        #joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
+        #joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
+        joint_positions = self.robot.joint_positions
+        joint_velocities = self.robot.joint_velocities
         robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
 
         # Must comment out for habitat migration
@@ -126,7 +128,7 @@ class A1():
         self.sim.update_joint_motor(self.robot_id, joint, jms)
 
     def set_joint_pos(self, joint_idx, angle):
-        set_pos = np.array(self.sim.get_articulated_object_positions(self.robot_id))
+        set_pos = np.array(self.robot.joint_positions) #self.sim.get_articulated_object_positions(self.robot_id))
         set_pos[joint_idx] = angle
         self.sim.set_articulated_object_positions(self.robot_id, set_pos)
 
@@ -175,7 +177,8 @@ class A1():
         return depth_obs, ortho_obs
 
     def _follow_robot(self):
-        robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
+        #robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
+        robot_state = self.robot.transformation
         node = self.sim._default_agent.scene_node
         self.h_offset = 0.69
         cam_pos = mn.Vector3(0, 0.0, 0)
@@ -214,8 +217,8 @@ class Laikago(A1):
                                          0.1, 0.65, -1.2]
 
 class Spot(A1):
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
-        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot=None, agent=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim,robot=robot, agent=agent, robot_id=robot_id, dt=dt)
         self._initial_joint_positions = [0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
