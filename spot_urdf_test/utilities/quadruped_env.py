@@ -147,12 +147,10 @@ class A1():
     def robot_specific_reset(self, joint_pos=None):
         if joint_pos is None:
             joint_pos = self._initial_joint_positions
-            self.sim.set_articulated_object_positions(self.robot_id, joint_pos)
+            self.robot.joint_positions = joint_pos
         else:
-            self.sim.set_articulated_object_positions(self.robot_id, joint_pos)
-        # for n, j in enumerate(self.ordered_joints):
-        #     a = joint_pos[n]
-        #     j.reset_joint_state(position=a, velocity=0.0)
+            self.robot.joint_positions = joint_pos
+
 
     def step(self, action, pos_gain, vel_gain, dt=1/240.0, verbose=False, get_frames=True, follow_robot=False):
         

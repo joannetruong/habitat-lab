@@ -172,14 +172,15 @@ class Workspace(object):
         # load a URDF file
         robot_file_name = self.robot_name
         robot_file = urdf_files[robot_file_name]
-        print(robot_file)
+        
         art_obj_mgr = self.sim.get_articulated_object_manager()
         self.robot = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
         self.robot_id = self.robot.object_id
         #self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
 
         jms = []
-
+        
+        
         jms.append(habitat_sim.physics.JointMotorSettings(
                         0,  # position_target
                         self.pos_gain[0],  # position_gain
@@ -234,7 +235,7 @@ class Workspace(object):
         local_base_pos = start_pose
 
         agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
-        base_transform = mn.Matrix4.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0, 0))
+        base_transform = mn.Matrix4.rotation(mn.Rad(0.01), mn.Vector3(1.0, 0, 0))
         base_transform.translation = agent_transform.transform_point(local_base_pos)
         #self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
         self.robot.transformation = base_transform
@@ -383,7 +384,7 @@ class Workspace(object):
 
     # This is wrapped such that it can be added to a unit test
     def test_robot(self):
-        self.reset_robot(np.array([-2,1.3,-4]))
+        self.reset_robot(np.array([-2,3.0,-4]))
         # Set desired linear and angular velocities
         print("MOVING FORWARD")
         self.cmd_vel_xyt(0.35, 0.0, 0.0)
