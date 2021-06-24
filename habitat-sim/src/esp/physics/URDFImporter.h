@@ -32,7 +32,7 @@ enum ConvertURDFFlags {
   CUF_USE_SELF_COLLISION_INCLUDE_PARENT = 8192,
   CUF_PARSE_SENSORS = 16384,
   CUF_USE_MATERIAL_COLORS_FROM_MTL = 32768,
-  CUF_USE_MATERIAL_TRANSPARANCY_FROM_MTL = 65536,
+  CUF_USE_MATERIAL_TRANSPARENCY_FROM_MTL = 65536,
   CUF_MAINTAIN_LINK_ORDER = 131072,
 };
 
@@ -122,21 +122,28 @@ class URDFImporter {
   virtual void getMassAndInertia2(int linkIndex,
                                   float& mass,
                                   Magnum::Vector3& localInertiaDiagonal,
-                                  Magnum::Matrix4& inertialFrame,
-                                  int flags) const;
+                                  Magnum::Matrix4& inertialFrame) const;
 
   bool logMessages = false;
 
   //! collect and return a list of cached model keys (filepaths)
   std::vector<std::string> getCachedModelKeys() {
     std::vector<std::string> keys;
-    for (std::map<std::string, std::shared_ptr<io::URDF::Model>>::iterator it =
-             modelCache_.begin();
-         it != modelCache_.end(); ++it) {
-      keys.push_back(it->first);
+    keys.reserve(modelCache_.size());
+    for (auto& it : modelCache_) {
+      keys.push_back(it.first);
     }
     return keys;
   };
+
+  /**
+   * @brief Load/import any required render and collision assets for the
+   * acrive io::URDF::Model before instantiating it.
+   */
+  void importURDFAssets();
+
+  //! importer model conversion flags
+  int flags = 0;
 
  protected:
   // parses the URDF file into general, simulation platform invariant

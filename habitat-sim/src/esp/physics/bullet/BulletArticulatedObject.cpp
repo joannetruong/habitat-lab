@@ -20,8 +20,8 @@ namespace physics {
 // TODO: this should probably be moved
 static void setRotationScalingFromBulletTransform(const btTransform& trans,
                                                   scene::SceneNode* node) {
-  Magnum::Matrix4 converted{trans};
-  node->setRotation(Magnum::Quaternion::fromMatrix(converted.rotation()));
+  Mn::Matrix4 converted{trans};
+  node->setRotation(Mn::Quaternion::fromMatrix(converted.rotation()));
   node->setTranslation(converted.translation());
 }
 
@@ -62,59 +62,44 @@ BulletArticulatedObject::~BulletArticulatedObject() {
     BulletArticulatedObject::removeJointMotor(motorId.first);
   }
 
-  std::map<int, JointLimitConstraintInfo>::iterator jlIter;
-  for (jlIter = jointLimitConstraints.begin();
-       jlIter != jointLimitConstraints.end(); jlIter++) {
-    bWorld_->removeMultiBodyConstraint(jlIter->second.con);
-    delete jlIter->second.con;
+  // remove joint limit constraints
+  for (auto& jlIter : jointLimitConstraints) {
+    bWorld_->removeMultiBodyConstraint(jlIter.second.con);
+    delete jlIter.second.con;
   }
 }
 
-bool BulletArticulatedObject::initializeFromURDF(
+void BulletArticulatedObject::initializeFromURDF(
     URDFImporter& urdfImporter,
-    const Magnum::Matrix4& worldTransform,
-    gfx::DrawableGroup* drawables,
-    scene::SceneNode* physicsNode,
-    bool fixedBase) {
-  // TODO: should this be included as optional parameter?
-  // btTransform rootTransformInWorldSpace = btTransform::getIdentity();
-  Magnum::Matrix4 rootTransformInWorldSpace{worldTransform};
-  // rootTransformInWorldSpace.setOrigin(btVector3{0,10.0,0});
+    const Mn::Matrix4& worldTransform,
+    scene::SceneNode* physicsNode) {
+  Mn::Matrix4 rootTransformInWorldSpace{worldTransform};
 
   BulletURDFImporter& u2b = *(static_cast<BulletURDFImporter*>(&urdfImporter));
-  u2b.setFixedBase(fixedBase);
 
   auto urdfModel = u2b.getModel();
-
-  // TODO: are these needed? Not used in examples.
-  int flags = 0;
-
-  URDF2BulletCached cache;
-  u2b.InitURDF2BulletCache(cache, flags);
 
   int urdfLinkIndex = u2b.getRootLinkIndex();
   // int rootIndex = u2b.getRootLinkIndex();
 
   // NOTE: recursive path only
-  u2b.ConvertURDF2BulletInternal(cache, urdfLinkIndex,
-                                 rootTransformInWorldSpace, bWorld_.get(),
-                                 flags, linkCompoundShapes_, linkChildShapes_);
+  u2b.convertURDF2BulletInternal(urdfLinkIndex, rootTransformInWorldSpace,
+                                 bWorld_.get(), linkCompoundShapes_,
+                                 linkChildShapes_);
 
-  if (cache.m_bulletMultiBody) {
-    btMultiBody* mb = cache.m_bulletMultiBody;
-    jointLimitConstraints = cache.m_jointLimitConstraints;
+  if (u2b.cache->m_bulletMultiBody) {
+    btMultiBody* mb = u2b.cache->m_bulletMultiBody;
+    jointLimitConstraints = u2b.cache->m_jointLimitConstraints;
 
-    mb->setHasSelfCollision((flags & CUF_USE_SELF_COLLISION) !=
+    mb->setHasSelfCollision((u2b.flags & CUF_USE_SELF_COLLISION) !=
                             0);  // NOTE: default no
 
     mb->finalizeMultiDof();
 
     btTransform localInertialFrameRoot =
-        cache.m_urdfLinkLocalInertialFrames[urdfLinkIndex];
+        u2b.cache->m_urdfLinkLocalInertialFrames[urdfLinkIndex];
 
-    //?
-    if ((flags & CUF_USE_MJCF) != 0) {
-    } else {
+    {
       mb->setBaseWorldTransform(btTransform(rootTransformInWorldSpace) *
                                 localInertialFrameRoot);
     }
@@ -130,68 +115,24 @@ bool BulletArticulatedObject::initializeFromURDF(
     bWorld_->addMultiBody(btMultiBody_.get());
     btMultiBody_->setCanSleep(true);
 
-    bFixedObjectShape_ = std::make_unique<btCompoundShape>();
+    // construct separate fixed base rigid object proxy for marked links
+    constructStaticRigidBaseObject();
 
-    // By convention, when fixed links in the URDF are assigned Noncollidable,
-    // we then insert corresponding fixed rigid bodies with group Static.
-    // Collisions with a fixed rigid body are cheaper than collisions with a
-    // fixed link, due to problems with multibody sleeping behavior.
-    {
-      auto* col = mb->getBaseCollider();
-      if (col->getBroadphaseHandle()->m_collisionFilterGroup ==
-          int(CollisionGroup::Noncollidable)) {
-        // The collider child is an aligned compound or single shape
-        btTransform identity;
-        identity.setIdentity();
-        bFixedObjectShape_->addChildShape(identity, col->getCollisionShape());
-      }
+    // create the BulletArticulatedLinks
+    for (size_t urdfLinkIx = 0;
+         urdfLinkIx < urdfImporter.getModel()->m_links.size(); ++urdfLinkIx) {
+      int bulletLinkIx =
+          u2b.cache->m_urdfLinkIndices2BulletLinkIndices[urdfLinkIx];
+      auto urdfLink = u2b.getModel()->m_links.at(
+          u2b.getModel()->m_linkIndicesToNames[urdfLinkIx]);
 
-      for (int m = 0; m < mb->getNumLinks(); m++) {
-        btMultiBodyLinkCollider* col = mb->getLink(m).m_collider;
-        if (col) {
-          if (col->getBroadphaseHandle()->m_collisionFilterGroup ==
-              int(CollisionGroup::Noncollidable)) {
-            bFixedObjectShape_->addChildShape(col->getWorldTransform(),
-                                              col->getCollisionShape());
-          }
-        }
-      }
-
-      if (bFixedObjectShape_->getNumChildShapes() != 0) {
-        btRigidBody::btRigidBodyConstructionInfo info =
-            btRigidBody::btRigidBodyConstructionInfo(0.f, nullptr,
-                                                     bFixedObjectShape_.get());
-        bFixedObjectRigidBody_ = std::make_unique<btRigidBody>(info);
-        BulletDebugManager::get().mapCollisionObjectTo(
-            bFixedObjectRigidBody_.get(),
-            "URDF, " + u2b.getModel()->m_name + ", fixed body");
-        bWorld_->addRigidBody(
-            bFixedObjectRigidBody_.get(), int(CollisionGroup::Static),
-            uint32_t(
-                CollisionGroupHelper::getMaskForGroup(CollisionGroup::Static)));
-        collisionObjToObjIds_->emplace(bFixedObjectRigidBody_.get(), objectId_);
-      } else {
-        bFixedObjectShape_ = nullptr;
-      }
-    }
-
-    // Attach SceneNode visual components
-    int urdfLinkIx = 0;
-    for (auto& link : urdfModel->m_links) {
-      int bulletLinkIx = cache.m_urdfLinkIndices2BulletLinkIndices[urdfLinkIx];
-      /*
-      Corrade::Utility::Debug()
-          << "urdfLinkIx = " << urdfLinkIx
-          << ", m_name = " << link.second->m_name
-          << ", m_linkIndex = " << link.second->m_linkIndex
-          << ", bulletLinkIx = " << bulletLinkIx;
-       */
       ArticulatedLink* linkObject = nullptr;
       if (bulletLinkIx >= 0) {
         links_[bulletLinkIx] = std::make_unique<BulletArticulatedLink>(
             &physicsNode->createChild(), resMgr_, bWorld_, bulletLinkIx,
             collisionObjToObjIds_);
         linkObject = links_[bulletLinkIx].get();
+        linkObject->linkJointName = urdfLink->m_parentJoint.lock()->m_name;
       } else {
         if (!baseLink_) {
           baseLink_ = std::make_unique<BulletArticulatedLink>(
@@ -200,46 +141,71 @@ bool BulletArticulatedObject::initializeFromURDF(
         }
         linkObject = baseLink_.get();
       }
+      linkObject->linkName = urdfLink->m_name;
 
       linkObject->node().setType(esp::scene::SceneNodeType::OBJECT);
-      // attach visual geometry for the link if specified
-      if (link.second->m_visualArray.size() > 0) {
-        ESP_CHECK(attachGeometry(linkObject, link.second, drawables),
-                  "BulletArticulatedObject::initializeFromURDF(): Failed to "
-                  "instance render asset (attachGeometry) for link "
-                      << urdfLinkIndex << ".");
-      }
-
-      urdfLinkIx++;
     }
 
-    // top level only valid in initial state, but computes valid sub-part AABBs.
-    node().computeCumulativeBB();
-
     // Build damping motors
-    int dofCount = 0;
     for (int linkIx = 0; linkIx < btMultiBody_->getNumLinks(); ++linkIx) {
       btMultibodyLink& link = btMultiBody_->getLink(linkIx);
       JointMotorSettings settings;
       settings.maxImpulse = double(link.m_jointDamping);
-      if (supportsJointMotor(linkIx)) {
-        for (int dof = 0; dof < link.m_dofCount; ++dof) {
-          createJointMotorInternal(linkIx, dof, dofCount, settings);
-          dofCount++;
-        }
+      if (supportsSingleDofJointMotor(linkIx)) {
+        settings.motorType = JointMotorType::SingleDof;
+        createJointMotor(linkIx, settings);
       } else if (link.m_jointType == btMultibodyLink::eSpherical) {
         settings.motorType = JointMotorType::Spherical;
-        createJointMotorInternal(linkIx, -1, -1, settings);
-        dofCount += link.m_dofCount;
-      } else {
-        dofCount += link.m_dofCount;
+        createJointMotor(linkIx, settings);
       }
+    }
+
+    // in case the base transform is not zero by default
+    syncPose();
+  }
+}
+
+void BulletArticulatedObject::constructStaticRigidBaseObject() {
+  // start explicitly with base collider
+  btCollisionObject* col = btMultiBody_->getBaseCollider();
+  btTransform tr;
+  tr.setIdentity();
+  for (int m = -1; m < btMultiBody_->getNumLinks(); ++m) {
+    if (m >= 0) {
+      // prepare for link
+      col = btMultiBody_->getLink(m).m_collider;
+      tr = col->getWorldTransform();
+      if (col == nullptr) {
+        continue;
+      }
+    }
+    if (col->getBroadphaseHandle()->m_collisionFilterGroup ==
+        int(CollisionGroup::Static)) {
+      // accumulate shapes in the new compound
+      if (bFixedObjectShape_ == nullptr) {
+        bFixedObjectShape_ = std::make_unique<btCompoundShape>();
+      }
+      bFixedObjectShape_->addChildShape(tr, col->getCollisionShape());
+      // disable collisions for the old object
+      col->getBroadphaseHandle()->m_collisionFilterGroup =
+          int(CollisionGroup::Noncollidable);
+      col->getBroadphaseHandle()->m_collisionFilterMask = uint32_t(
+          CollisionGroupHelper::getMaskForGroup(CollisionGroup::Noncollidable));
     }
   }
 
-  // in case the base transform is not zero by default
-  syncPose();
-  return true;
+  // create the proxy btRigidBody to replace the static shapes
+  if (bFixedObjectShape_ != nullptr) {
+    btRigidBody::btRigidBodyConstructionInfo info =
+        btRigidBody::btRigidBodyConstructionInfo(0.f, nullptr,
+                                                 bFixedObjectShape_.get());
+    bFixedObjectRigidBody_ = std::make_unique<btRigidBody>(info);
+    bWorld_->addRigidBody(
+        bFixedObjectRigidBody_.get(), int(CollisionGroup::Static),
+        uint32_t(
+            CollisionGroupHelper::getMaskForGroup(CollisionGroup::Static)));
+    collisionObjToObjIds_->emplace(bFixedObjectRigidBody_.get(), objectId_);
+  }
 }
 
 void BulletArticulatedObject::updateNodes(bool force) {
@@ -261,122 +227,6 @@ void BulletArticulatedObject::updateNodes(bool force) {
 // BulletArticulatedLink
 ////////////////////////////
 
-bool BulletArticulatedObject::attachGeometry(
-    ArticulatedLink* linkObject,
-    const std::shared_ptr<io::URDF::Link>& link,
-    gfx::DrawableGroup* drawables) {
-  bool geomSuccess = false;
-
-  for (auto& visual : link->m_visualArray) {
-    bool visualSetupSuccess = true;
-    // create a new child for each visual component
-    scene::SceneNode& visualGeomComponent = linkObject->node().createChild();
-    // cache the visual node
-    linkObject->visualNodes_.push_back(&visualGeomComponent);
-    visualGeomComponent.setType(esp::scene::SceneNodeType::OBJECT);
-    visualGeomComponent.setTransformation(
-        link->m_inertia.m_linkLocalFrame.invertedRigid() *
-        visual.m_linkLocalFrame);
-
-    // prep the AssetInfo, overwrite the filepath later
-    assets::AssetInfo visualMeshInfo{assets::AssetType::UNKNOWN};
-    visualMeshInfo.requiresLighting = true;
-
-    // create a modified asset if necessary for material override
-    std::shared_ptr<io::URDF::Material> material =
-        visual.m_geometry.m_localMaterial;
-    if (material) {
-      visualMeshInfo.overridePhongMaterial = assets::PhongMaterialColor();
-      visualMeshInfo.overridePhongMaterial->ambientColor =
-          material->m_matColor.m_rgbaColor;
-      visualMeshInfo.overridePhongMaterial->diffuseColor =
-          material->m_matColor.m_rgbaColor;
-      visualMeshInfo.overridePhongMaterial->specularColor =
-          Mn::Color4(material->m_matColor.m_specularColor);
-    }
-
-    switch (visual.m_geometry.m_type) {
-      case io::URDF::GEOM_CAPSULE:
-        visualMeshInfo.type = esp::assets::AssetType::PRIMITIVE;
-        // should be registered and cached already
-        visualMeshInfo.filepath = visual.m_geometry.m_meshFileName;
-        // scale by radius as suggested by magnum docs
-        visualGeomComponent.scale(
-            Mn::Vector3(visual.m_geometry.m_capsuleRadius));
-        // Magnum capsule is Y up, URDF is Z up
-        visualGeomComponent.setTransformation(
-            visualGeomComponent.transformation() *
-            Mn::Matrix4::rotationX(Mn::Rad(M_PI_2)));
-        break;
-      case io::URDF::GEOM_CYLINDER:
-        visualMeshInfo.type = esp::assets::AssetType::PRIMITIVE;
-        // the default created primitive handle for the cylinder with radius 1
-        // and length 2
-        visualMeshInfo.filepath =
-            "cylinderSolid_rings_1_segments_12_halfLen_1_useTexCoords_false_"
-            "useTangents_false_capEnds_true";
-        visualGeomComponent.scale(
-            Mn::Vector3(visual.m_geometry.m_capsuleRadius,
-                        visual.m_geometry.m_capsuleHeight / 2.0,
-                        visual.m_geometry.m_capsuleRadius));
-        // Magnum cylinder is Y up, URDF is Z up
-        visualGeomComponent.setTransformation(
-            visualGeomComponent.transformation() *
-            Mn::Matrix4::rotationX(Mn::Rad(M_PI_2)));
-        break;
-      case io::URDF::GEOM_BOX:
-        visualMeshInfo.type = esp::assets::AssetType::PRIMITIVE;
-        visualMeshInfo.filepath = "cubeSolid";
-        visualGeomComponent.scale(visual.m_geometry.m_boxSize * 0.5);
-        break;
-      case io::URDF::GEOM_SPHERE: {
-        visualMeshInfo.type = esp::assets::AssetType::PRIMITIVE;
-        // default sphere prim is already constructed w/ radius 1
-        visualMeshInfo.filepath = "icosphereSolid_subdivs_1";
-        visualGeomComponent.scale(
-            Mn::Vector3(visual.m_geometry.m_sphereRadius));
-      } break;
-      case io::URDF::GEOM_MESH: {
-        visualGeomComponent.scale(visual.m_geometry.m_meshScale);
-        visualMeshInfo.filepath = visual.m_geometry.m_meshFileName;
-      } break;
-      case io::URDF::GEOM_PLANE:
-        Corrade::Utility::Debug()
-            << "Trying to add visual plane, not implemented";
-        // TODO:
-        visualSetupSuccess = false;
-        break;
-      default:
-        Corrade::Utility::Debug() << "BulletArticulatedObject::attachGeometry "
-                                     ": Unsupported visual type.";
-        visualSetupSuccess = false;
-        break;
-    }
-
-    // add the visual shape to the SceneGraph
-    if (visualSetupSuccess) {
-      assets::RenderAssetInstanceCreationInfo::Flags flags;
-      flags |= assets::RenderAssetInstanceCreationInfo::Flag::IsRGBD;
-      flags |= assets::RenderAssetInstanceCreationInfo::Flag::IsSemantic;
-      assets::RenderAssetInstanceCreationInfo creation(
-          visualMeshInfo.filepath, Mn::Vector3{1}, flags, DEFAULT_LIGHTING_KEY);
-
-      geomSuccess = const_cast<esp::assets::ResourceManager&>(resMgr_)
-                        .loadAndCreateRenderAssetInstance(
-                            visualMeshInfo, creation, &visualGeomComponent,
-                            drawables, &linkObject->visualNodes_) != nullptr;
-
-      // cache the visual component for later query
-      if (geomSuccess) {
-        linkObject->visualAttachments_.emplace_back(
-            &visualGeomComponent, visual.m_geometry.m_meshFileName);
-      }
-    }
-  }
-
-  return geomSuccess;
-}
-
 void BulletArticulatedObject::resetStateFromSceneInstanceAttr(
     CORRADE_UNUSED bool defaultCOMCorrection) {
   auto sceneInstanceAttr = getSceneInstanceAttributes();
@@ -391,8 +241,8 @@ void BulletArticulatedObject::resetStateFromSceneInstanceAttr(
   auto translate = sceneInstanceAttr->getTranslation();
 
   // construct initial transformation state.
-  Magnum::Matrix4 state = Magnum::Matrix4::from(
-      sceneInstanceAttr->getRotation().toMatrix(), translate);
+  Mn::Matrix4 state =
+      Mn::Matrix4::from(sceneInstanceAttr->getRotation().toMatrix(), translate);
   setTransformation(state);
   // set object's motion type if different than set value
   const physics::MotionType attrObjMotionType =
@@ -402,7 +252,7 @@ void BulletArticulatedObject::resetStateFromSceneInstanceAttr(
   }
   // set initial joint positions
   // get array of existing joint dofs
-  std::vector<float> aoJointPose = getPositions();
+  std::vector<float> aoJointPose = getJointPositions();
   // get instance-specified initial joint positions
   std::map<std::string, float>& initJointPos =
       sceneInstanceAttr->getInitJointPose();
@@ -419,11 +269,11 @@ void BulletArticulatedObject::resetStateFromSceneInstanceAttr(
     }
     aoJointPose[idx++] = elem.second;
   }
-  setPositions(aoJointPose);
+  setJointPositions(aoJointPose);
 
   // set initial joint velocities
   // get array of existing joint vel dofs
-  std::vector<float> aoJointVels = getVelocities();
+  std::vector<float> aoJointVels = getJointVelocities();
   // get instance-specified initial joint velocities
   std::map<std::string, float>& initJointVel =
       sceneInstanceAttr->getInitJointVelocities();
@@ -440,11 +290,11 @@ void BulletArticulatedObject::resetStateFromSceneInstanceAttr(
     aoJointVels[idx++] = elem.second;
   }
 
-  setVelocities(aoJointVels);
+  setJointVelocities(aoJointVels);
 
 }  // BulletArticulatedObject::resetStateFromSceneInstanceAttr
 
-void BulletArticulatedObject::setRootState(const Magnum::Matrix4& state) {
+void BulletArticulatedObject::setRootState(const Mn::Matrix4& state) {
   btTransform tr{state};
   btMultiBody_->setBaseWorldTransform(tr);
   if (bFixedObjectRigidBody_) {
@@ -470,11 +320,12 @@ void BulletArticulatedObject::setRootAngularVelocity(
   btMultiBody_->setBaseOmega(btVector3(angVel));
 }
 
-void BulletArticulatedObject::setForces(const std::vector<float>& forces) {
+void BulletArticulatedObject::setJointForces(const std::vector<float>& forces) {
   if (forces.size() != size_t(btMultiBody_->getNumDofs())) {
     Corrade::Utility::Debug()
-        << "setForces - Force vector size mis-match (input: " << forces.size()
-        << ", expected: " << btMultiBody_->getNumDofs() << "), aborting.";
+        << "setJointForces - Force vector size mis-match (input: "
+        << forces.size() << ", expected: " << btMultiBody_->getNumDofs()
+        << "), aborting.";
   }
 
   int dofCount = 0;
@@ -487,11 +338,12 @@ void BulletArticulatedObject::setForces(const std::vector<float>& forces) {
   }
 }
 
-void BulletArticulatedObject::addForces(const std::vector<float>& forces) {
+void BulletArticulatedObject::addJointForces(const std::vector<float>& forces) {
   if (forces.size() != size_t(btMultiBody_->getNumDofs())) {
     Corrade::Utility::Debug()
-        << "setForces - Force vector size mis-match (input: " << forces.size()
-        << ", expected: " << btMultiBody_->getNumDofs() << "), aborting.";
+        << "addJointForces - Force vector size mis-match (input: "
+        << forces.size() << ", expected: " << btMultiBody_->getNumDofs()
+        << "), aborting.";
   }
 
   int dofCount = 0;
@@ -504,7 +356,7 @@ void BulletArticulatedObject::addForces(const std::vector<float>& forces) {
   }
 }
 
-std::vector<float> BulletArticulatedObject::getForces() {
+std::vector<float> BulletArticulatedObject::getJointForces() {
   std::vector<float> forces(btMultiBody_->getNumDofs());
   int dofCount = 0;
   for (int i = 0; i < btMultiBody_->getNumLinks(); ++i) {
@@ -517,10 +369,11 @@ std::vector<float> BulletArticulatedObject::getForces() {
   return forces;
 }
 
-void BulletArticulatedObject::setVelocities(const std::vector<float>& vels) {
+void BulletArticulatedObject::setJointVelocities(
+    const std::vector<float>& vels) {
   if (vels.size() != size_t(btMultiBody_->getNumDofs())) {
     Corrade::Utility::Debug()
-        << "setVelocities - Velocity vector size mis-match (input: "
+        << "setJointVelocities - Velocity vector size mis-match (input: "
         << vels.size() << ", expected: " << btMultiBody_->getNumDofs()
         << "), aborting.";
   }
@@ -536,7 +389,7 @@ void BulletArticulatedObject::setVelocities(const std::vector<float>& vels) {
   }
 }
 
-std::vector<float> BulletArticulatedObject::getVelocities() {
+std::vector<float> BulletArticulatedObject::getJointVelocities() {
   std::vector<float> vels(btMultiBody_->getNumDofs());
   int dofCount = 0;
   for (int i = 0; i < btMultiBody_->getNumLinks(); ++i) {
@@ -549,11 +402,11 @@ std::vector<float> BulletArticulatedObject::getVelocities() {
   return vels;
 }
 
-void BulletArticulatedObject::setPositions(
+void BulletArticulatedObject::setJointPositions(
     const std::vector<float>& positions) {
   if (positions.size() != size_t(btMultiBody_->getNumPosVars())) {
     Corrade::Utility::Debug()
-        << "setPositions - Position vector size mis-match (input: "
+        << "setJointPositions - Position vector size mis-match (input: "
         << positions.size() << ", expected: " << btMultiBody_->getNumPosVars()
         << "), aborting.";
   }
@@ -572,7 +425,7 @@ void BulletArticulatedObject::setPositions(
   updateKinematicState();
 }
 
-std::vector<float> BulletArticulatedObject::getPositions() {
+std::vector<float> BulletArticulatedObject::getJointPositions() {
   std::vector<float> positions(btMultiBody_->getNumPosVars());
   int posCount = 0;
   for (int i = 0; i < btMultiBody_->getNumLinks(); ++i) {
@@ -585,32 +438,29 @@ std::vector<float> BulletArticulatedObject::getPositions() {
   return positions;
 }
 
-std::vector<float> BulletArticulatedObject::getPositionLimits(
-    bool upperLimits) {
-  std::vector<float> posLimits(btMultiBody_->getNumPosVars());
+std::pair<std::vector<float>, std::vector<float>>
+BulletArticulatedObject::getJointPositionLimits() {
+  std::vector<float> lowerLimits(btMultiBody_->getNumPosVars(), -INFINITY);
+  std::vector<float> upperLimits(btMultiBody_->getNumPosVars(), INFINITY);
+
   int posCount = 0;
   for (int i = 0; i < btMultiBody_->getNumLinks(); ++i) {
     if (jointLimitConstraints.count(i) > 0) {
       // a joint limit constraint exists for this link's parent joint
       auto& jlc = jointLimitConstraints.at(i);
-      posLimits[posCount] = upperLimits ? jlc.upperLimit : jlc.lowerLimit;
+      lowerLimits[posCount] = jlc.lowerLimit;
+      upperLimits[posCount] = jlc.upperLimit;
       posCount++;
     } else {
-      // iterate through joint dofs. Note: multi-dof joints cannot be limited,
-      // so ok to skip.
-      for (int posVar = 0; posVar < btMultiBody_->getLink(i).m_posVarCount;
-           ++posVar) {
-        posLimits[posCount] = upperLimits ? INFINITY : -INFINITY;
-        posCount++;
-      }
+      posCount += btMultiBody_->getLink(i).m_posVarCount;
     }
   }
   CHECK(posCount == btMultiBody_->getNumPosVars());
-  return posLimits;
+  return std::make_pair(lowerLimits, upperLimits);
 }
 
 void BulletArticulatedObject::addArticulatedLinkForce(int linkId,
-                                                      Magnum::Vector3 force) {
+                                                      Mn::Vector3 force) {
   CHECK(getNumLinks() > linkId);
   btMultiBody_->addLinkForce(linkId, btVector3{force});
 }
@@ -667,7 +517,7 @@ void BulletArticulatedObject::reset() {
   }
 
   // also updates kinematic state
-  setPositions(zeros);
+  setJointPositions(zeros);
 
   btMultiBody_->clearConstraintForces();
   btMultiBody_->clearVelocities();
@@ -710,177 +560,8 @@ void BulletArticulatedObject::setMotionType(MotionType mt) {
   objectMotionType_ = mt;
 }
 
-bool BulletArticulatedObject::supportsJointMotor(int linkIx) const {
-  bool canHaveMotor = (btMultiBody_->getLink(linkIx).m_jointType ==
-                           btMultibodyLink::eRevolute ||
-                       btMultiBody_->getLink(linkIx).m_jointType ==
-                           btMultibodyLink::ePrismatic);
-  return canHaveMotor;
-}
-
-std::map<int, int> BulletArticulatedObject::createMotorsForAllDofs(
-    JointMotorSettings settings) {
-  std::map<int, int> dofsToMotorIds;
-  int dofCount = 0;
-  for (int linkIx = 0; linkIx < btMultiBody_->getNumLinks(); ++linkIx) {
-    if (supportsJointMotor(linkIx)) {
-      for (int dof = 0; dof < btMultiBody_->getLink(linkIx).m_dofCount; ++dof) {
-        int motorId = createJointMotorInternal(linkIx, dof, dofCount, settings);
-        dofsToMotorIds[dofCount++] = motorId;
-      }
-    } else if (btMultiBody_->getLink(linkIx).m_jointType ==
-               btMultibodyLink::eSpherical) {
-      auto sphericalSettings = settings;
-      sphericalSettings.motorType = JointMotorType::Spherical;
-      int motorId = createJointMotorInternal(linkIx, -1, -1, sphericalSettings);
-      for (int dof = 0; dof < btMultiBody_->getLink(linkIx).m_dofCount; ++dof) {
-        dofsToMotorIds[dofCount++] = motorId;
-      }
-    } else {
-      dofCount += btMultiBody_->getLink(linkIx).m_dofCount;
-    }
-  }
-  Mn::Debug{} << "BulletArticulatedObject::createMotorsForAllDofs(): "
-              << dofsToMotorIds;
-  return dofsToMotorIds;
-}
-
-float BulletArticulatedObject::getJointMotorMaxImpulse(int motorId) {
-  CHECK(articulatedJointMotors.count(motorId));
-  return articulatedJointMotors.at(motorId)->getMaxAppliedImpulse();
-}
-
-int BulletArticulatedObject::createJointMotorInternal(
-    const int linkIx,
-    const int linkDof,
-    const int globalDof,
-    const JointMotorSettings& settings) {
-  auto motor = JointMotor::create_unique();
-  motor->settings = settings;
-  motor->index = globalDof;
-  motor->motorId = nextJointMotorId_;
-  jointMotors_.emplace(nextJointMotorId_,
-                       std::move(motor));  // cache the Habitat structure
-
-  if (settings.motorType == JointMotorType::SingleDof) {
-    auto btMotor = std::make_unique<btMultiBodyJointMotor>(
-        btMultiBody_.get(), linkIx, linkDof, settings.velocityTarget,
-        settings.maxImpulse);
-    btMotor->setPositionTarget(settings.positionTarget, settings.positionGain);
-    btMotor->setVelocityTarget(settings.velocityTarget, settings.velocityGain);
-    bWorld_->addMultiBodyConstraint(btMotor.get());
-    articulatedJointMotors.emplace(
-        nextJointMotorId_, std::move(btMotor));  // cache the Bullet structure
-  } else if (settings.motorType == JointMotorType::Spherical) {
-    // TODO: should we map to global dofs and make this a vector to be more
-    // consistent?
-    jointMotors_.at(nextJointMotorId_)->index = linkIx;
-    auto btMotor = std::make_unique<btMultiBodySphericalJointMotor>(
-        btMultiBody_.get(), linkIx, settings.maxImpulse);
-    btMotor->setPositionTarget(btQuaternion(settings.sphericalPositionTarget),
-                               settings.positionGain);
-    btMotor->setVelocityTarget(btVector3(settings.sphericalVelocityTarget),
-                               settings.velocityGain);
-    bWorld_->addMultiBodyConstraint(btMotor.get());
-    articulatedSphericalJointMotors.emplace(
-        nextJointMotorId_, std::move(btMotor));  // cache the Bullet structure
-  } else {
-    // shouldn't get here
-    Mn::Debug{} << "BulletArticulatedObject::createJointMotor - invalid "
-                   "settings or incompatible joint.";
-    return -1;
-  }
-  return nextJointMotorId_++;
-}  // BulletArticulatedObject::createJointMotorInternal
-
-int BulletArticulatedObject::createJointMotor(
-    const int index,
-    const JointMotorSettings& settings) {
-  if (settings.motorType == JointMotorType::SingleDof) {
-    int linkIx = 0;
-    int linkDof = -1;
-    int dofCount = 0;
-    for (; linkIx < btMultiBody_->getNumLinks(); ++linkIx) {
-      if (dofCount > index) {
-        Mn::Debug{} << "BulletArticulatedObject::createJointMotor failed. "
-                    << index << " is not a valid JointMotor type.";
-        return ID_UNDEFINED;
-      }
-      if (supportsJointMotor(linkIx)) {
-        for (int _dof = 0; _dof < btMultiBody_->getLink(linkIx).m_dofCount;
-             ++_dof) {
-          if (dofCount == index) {
-            linkDof = _dof;
-            break;
-          }
-          dofCount++;
-        }
-      } else {
-        dofCount += btMultiBody_->getLink(linkIx).m_dofCount;
-      }
-      if (linkDof >= 0) {
-        // break out of the loop if we found what we are looking for
-        break;
-      }
-    }
-
-    if (index > dofCount) {
-      Mn::Debug{} << "BulletArticulatedObject::createJointMotor failed. "
-                  << index << " is not a valid DOF for this model.";
-      return ID_UNDEFINED;
-    }
-
-    return createJointMotorInternal(linkIx, linkDof, index, settings);
-  } else if (settings.motorType == JointMotorType::Spherical) {
-    CHECK(btMultiBody_->getLink(index).m_jointType ==
-          btMultibodyLink::eSpherical);
-    return createJointMotorInternal(index, -1, -1, settings);
-  }
-  return -1;
-}
-
-void BulletArticulatedObject::removeJointMotor(const int motorId) {
-  CHECK(jointMotors_.count(motorId) > 0);
-  if (articulatedJointMotors.count(motorId) != 0u) {
-    bWorld_->removeMultiBodyConstraint(
-        articulatedJointMotors.at(motorId).get());
-    articulatedJointMotors.erase(motorId);
-  } else if (articulatedSphericalJointMotors.count(motorId) != 0u) {
-    bWorld_->removeMultiBodyConstraint(
-        articulatedSphericalJointMotors.at(motorId).get());
-    articulatedSphericalJointMotors.erase(motorId);
-  } else {
-    Mn::Debug{} << "Cannot remove JointMotor. Invalid ID (" << motorId << ").";
-    return;
-  }
-  jointMotors_.erase(motorId);
-}
-
-void BulletArticulatedObject::updateJointMotor(
-    const int motorId,
-    const JointMotorSettings& settings) {
-  CHECK(jointMotors_.count(motorId) > 0);
-  CHECK(jointMotors_.at(motorId)->settings.motorType == settings.motorType);
-  jointMotors_.at(motorId)->settings = settings;
-  if (articulatedJointMotors.count(motorId) != 0u) {
-    auto& motor = articulatedJointMotors.at(motorId);
-    motor->setPositionTarget(settings.positionTarget, settings.positionGain);
-    motor->setVelocityTarget(settings.velocityTarget, settings.velocityGain);
-    motor->setMaxAppliedImpulse(settings.maxImpulse);
-  } else if (articulatedSphericalJointMotors.count(motorId) != 0u) {
-    auto& motor = articulatedSphericalJointMotors.at(motorId);
-    motor->setPositionTarget(btQuaternion(settings.sphericalPositionTarget),
-                             settings.positionGain);
-    motor->setVelocityTarget(btVector3(settings.sphericalVelocityTarget),
-                             settings.velocityGain);
-    motor->setMaxAppliedImpulse(settings.maxImpulse);
-  } else {
-    Mn::Debug{} << "Cannot update JointMotor. Invalid ID (" << motorId << ").";
-  }
-}
-
 void BulletArticulatedObject::clampJointLimits() {
-  auto pose = getPositions();
+  auto pose = getJointPositions();
   bool poseModified = false;
 
   // some small contrived error term for overflow
@@ -909,7 +590,7 @@ void BulletArticulatedObject::clampJointLimits() {
   }
 
   if (poseModified) {
-    setPositions(pose);
+    setJointPositions(pose);
   }
 }
 
@@ -1012,6 +693,200 @@ bool BulletArticulatedObject::contactTest() {
   }
   return false;
 }  // contactTest
+
+// ------------------------
+// Joint Motor API
+// ------------------------
+
+bool BulletArticulatedObject::supportsSingleDofJointMotor(int linkIx) const {
+  bool canHaveMotor = (btMultiBody_->getLink(linkIx).m_jointType ==
+                           btMultibodyLink::eRevolute ||
+                       btMultiBody_->getLink(linkIx).m_jointType ==
+                           btMultibodyLink::ePrismatic);
+  return canHaveMotor;
+}
+
+std::unordered_map<int, int> BulletArticulatedObject::createMotorsForAllDofs(
+    const JointMotorSettings& settings) {
+  std::unordered_map<int, int> motorIdsToLinks;
+  auto settingsCopy = settings;
+  for (int linkIx = 0; linkIx < btMultiBody_->getNumLinks(); ++linkIx) {
+    if (supportsSingleDofJointMotor(linkIx)) {
+      settingsCopy.motorType = JointMotorType::SingleDof;
+    } else if (btMultiBody_->getLink(linkIx).m_jointType ==
+               btMultibodyLink::eSpherical) {
+      settingsCopy.motorType = JointMotorType::Spherical;
+    } else {
+      // skip the creation phase for unsupported joints
+      continue;
+    }
+    int motorId = createJointMotor(linkIx, settingsCopy);
+    motorIdsToLinks[motorId] = linkIx;
+  }
+  Mn::Debug{} << "BulletArticulatedObject::createMotorsForAllDofs(): "
+              << motorIdsToLinks;
+  return motorIdsToLinks;
+}
+
+int BulletArticulatedObject::createJointMotor(
+    const int linkIndex,
+    const JointMotorSettings& settings) {
+  // check for valid configuration
+  ESP_CHECK(
+      links_.count(linkIndex) != 0,
+      "BulletArticulatedObject::createJointMotor - no link with linkIndex = "
+          << linkIndex);
+  if (settings.motorType == JointMotorType::SingleDof) {
+    ESP_CHECK(supportsSingleDofJointMotor(linkIndex),
+              "BulletArticulatedObject::createJointMotor - "
+              "JointMotorSettings.motorType==SingleDof incompatible with joint "
+                  << linkIndex);
+  } else {
+    // JointMotorType::Spherical
+    ESP_CHECK(getLinkJointType(linkIndex) == JointType::Spherical,
+              "BulletArticulatedObject::createJointMotor - "
+              "JointMotorSettings.motorType==Spherical incompatible with joint "
+                  << linkIndex);
+  }
+
+  auto motor = JointMotor::create_unique();
+  motor->settings = settings;
+  motor->index = linkIndex;
+  motor->motorId = nextJointMotorId_;
+  jointMotors_.emplace(nextJointMotorId_,
+                       std::move(motor));  // cache the Habitat structure
+
+  if (settings.motorType == JointMotorType::SingleDof) {
+    auto btMotor = std::make_unique<btMultiBodyJointMotor>(
+        btMultiBody_.get(), linkIndex, settings.velocityTarget,
+        settings.maxImpulse);
+    btMotor->setPositionTarget(settings.positionTarget, settings.positionGain);
+    btMotor->setVelocityTarget(settings.velocityTarget, settings.velocityGain);
+    bWorld_->addMultiBodyConstraint(btMotor.get());
+    btMotor->finalizeMultiDof();
+    articulatedJointMotors.emplace(
+        nextJointMotorId_, std::move(btMotor));  // cache the Bullet structure
+  } else {
+    // JointMotorType::Spherical
+    auto btMotor = std::make_unique<btMultiBodySphericalJointMotor>(
+        btMultiBody_.get(), linkIndex, settings.maxImpulse);
+    btMotor->setPositionTarget(btQuaternion(settings.sphericalPositionTarget),
+                               settings.positionGain);
+    btMotor->setVelocityTarget(btVector3(settings.sphericalVelocityTarget),
+                               settings.velocityGain);
+    bWorld_->addMultiBodyConstraint(btMotor.get());
+    btMotor->finalizeMultiDof();
+    articulatedSphericalJointMotors.emplace(
+        nextJointMotorId_, std::move(btMotor));  // cache the Bullet structure
+  }
+  // force activation if motors are updated
+  setActive(true);
+  return nextJointMotorId_++;
+}  // BulletArticulatedObject::createJointMotor
+
+void BulletArticulatedObject::removeJointMotor(const int motorId) {
+  ESP_CHECK(jointMotors_.count(motorId) > 0,
+            "BulletArticulatedObject::removeJointMotor - No motor exists with "
+            "motorId = "
+                << motorId);
+  if (articulatedJointMotors.count(motorId) != 0u) {
+    bWorld_->removeMultiBodyConstraint(
+        articulatedJointMotors.at(motorId).get());
+    articulatedJointMotors.erase(motorId);
+  } else if (articulatedSphericalJointMotors.count(motorId) != 0u) {
+    bWorld_->removeMultiBodyConstraint(
+        articulatedSphericalJointMotors.at(motorId).get());
+    articulatedSphericalJointMotors.erase(motorId);
+  } else {
+    Mn::Error{} << "Cannot remove JointMotor: invalid ID (" << motorId << ").";
+    return;
+  }
+  jointMotors_.erase(motorId);
+  // force activation if motors are updated
+  btMultiBody_->wakeUp();
+}
+
+void BulletArticulatedObject::updateJointMotor(
+    const int motorId,
+    const JointMotorSettings& settings) {
+  ESP_CHECK(jointMotors_.count(motorId) > 0,
+            "BulletArticulatedObject::updateJointMotor - No motor exists with "
+            "motorId = "
+                << motorId);
+  ESP_CHECK(jointMotors_.at(motorId)->settings.motorType == settings.motorType,
+            "BulletArticulatedObject::updateJointMotor - "
+            "JointMotorSettings.motorType does not match joint type.");
+  jointMotors_.at(motorId)->settings = settings;
+  if (articulatedJointMotors.count(motorId) != 0u) {
+    auto& motor = articulatedJointMotors.at(motorId);
+    motor->setPositionTarget(settings.positionTarget, settings.positionGain);
+    motor->setVelocityTarget(settings.velocityTarget, settings.velocityGain);
+    motor->setMaxAppliedImpulse(settings.maxImpulse);
+  } else if (articulatedSphericalJointMotors.count(motorId) != 0u) {
+    auto& motor = articulatedSphericalJointMotors.at(motorId);
+    motor->setPositionTarget(btQuaternion(settings.sphericalPositionTarget),
+                             settings.positionGain);
+    motor->setVelocityTarget(btVector3(settings.sphericalVelocityTarget),
+                             settings.velocityGain);
+    motor->setMaxAppliedImpulse(settings.maxImpulse);
+  } else {
+    LOG(ERROR) << "Cannot update JointMotor. Invalid ID (" << motorId << ").";
+    return;
+  }
+  // force activation if motors are updated
+  setActive(true);
+}
+
+void BulletArticulatedObject::updateAllMotorTargets(
+    const std::vector<float>& stateTargets,
+    bool velocities) {
+  ESP_CHECK(stateTargets.size() == velocities ? btMultiBody_->getNumDofs()
+                                              : btMultiBody_->getNumPosVars(),
+            "BulletArticulatedObject::updateAllMotorTargets - stateTargets "
+            "size does not match object state size.");
+
+  for (auto& motor : jointMotors_) {
+    btMultibodyLink& btLink = btMultiBody_->getLink(motor.second->index);
+    int startIndex = velocities ? btLink.m_dofOffset : btLink.m_cfgOffset;
+    auto& settings = motor.second->settings;
+    if (settings.motorType == JointMotorType::SingleDof) {
+      auto& btMotor = articulatedJointMotors.at(motor.first);
+      if (velocities) {
+        settings.velocityTarget = double(stateTargets[startIndex]);
+        btMotor->setVelocityTarget(settings.velocityTarget,
+                                   settings.velocityGain);
+      } else {
+        // positions
+        settings.positionTarget = double(stateTargets[startIndex]);
+        btMotor->setPositionTarget(settings.positionTarget,
+                                   settings.positionGain);
+      }
+    } else {
+      // JointMotorType::Spherical
+      if (velocities) {
+        settings.sphericalVelocityTarget = {stateTargets[startIndex],
+                                            stateTargets[startIndex + 1],
+                                            stateTargets[startIndex + 2]};
+        articulatedSphericalJointMotors.at(motor.first)
+            ->setVelocityTarget(btVector3(settings.sphericalVelocityTarget),
+                                settings.velocityGain);
+      } else {
+        // positions
+        settings.sphericalPositionTarget =
+            Mn::Quaternion(Mn::Vector3(stateTargets[startIndex],
+                                       stateTargets[startIndex + 1],
+                                       stateTargets[startIndex + 2]),
+                           stateTargets[startIndex + 3])
+                .normalized();
+        articulatedSphericalJointMotors.at(motor.first)
+            ->setPositionTarget(btQuaternion(settings.sphericalPositionTarget),
+                                settings.positionGain);
+      }
+    }
+  }
+  // force activation when motors are updated
+  setActive(true);
+}
 
 }  // namespace physics
 }  // namespace esp

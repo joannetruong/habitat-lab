@@ -79,7 +79,7 @@ int PhysicsManager::addObjectInstance(
     bool defaultCOMCorrection,
     scene::SceneNode* attachmentNode,
     const std::string& lightSetup) {
-  const std::string errMsgTmplt = "PhysicsManager::addObjectInstance : ";
+  const std::string errMsgTmplt = "::addObjectInstance : ";
   // Get ObjectAttributes
   auto objAttributes =
       resourceManager_.getObjectAttributesManager()->getObjectCopyByHandle(
@@ -134,9 +134,9 @@ int PhysicsManager::addObject(const std::string& attributesHandle,
       resourceManager_.getObjectAttributesManager()->getObjectCopyByHandle(
           attributesHandle);
   if (!attributes) {
-    LOG(ERROR) << "PhysicsManager::addObject : "
-                  "Object creation failed due to unknown attributes "
-               << attributesHandle;
+    LOG(ERROR)
+        << "::addObject : Object creation failed due to unknown attributes "
+        << attributesHandle;
     return ID_UNDEFINED;
   } else {
     // attributes exist, get drawables if valid simulator accessible
@@ -157,7 +157,7 @@ int PhysicsManager::addObject(const int attributesID,
       resourceManager_.getObjectAttributesManager()->getObjectCopyByID(
           attributesID);
   if (!attributes) {
-    LOG(ERROR) << "PhysicsManager::addObject : "
+    LOG(ERROR) << "::addObject : "
                   "Object creation failed due to unknown attributes ID "
                << attributesID;
     return ID_UNDEFINED;
@@ -181,8 +181,7 @@ int PhysicsManager::addObject(
   //! Make rigid object and add it to existingObjects
   if (!objectAttributes) {
     // should never run, but just in case
-    LOG(ERROR) << "PhysicsManager::addObject : "
-                  "Object creation failed due to nonexistant "
+    LOG(ERROR) << "::addObject : Object creation failed due to nonexistant "
                   "objectAttributes";
     return ID_UNDEFINED;
   }
@@ -191,8 +190,8 @@ int PhysicsManager::addObject(
   bool objectSuccess =
       resourceManager_.instantiateAssetsOnDemand(objectAttributes);
   if (!objectSuccess) {
-    LOG(ERROR) << "PhysicsManager::addObject : "
-                  "ResourceManager::instantiateAssetsOnDemand unsuccessful. "
+    LOG(ERROR) << "::addObject : ResourceManager::instantiateAssetsOnDemand "
+                  "unsuccessful. "
                   "Aborting.";
     return ID_UNDEFINED;
   }
@@ -212,8 +211,8 @@ int PhysicsManager::addObject(
     if (attachmentNode == nullptr) {
       delete objectNode;
     }
-    LOG(ERROR) << "PhysicsManager::addObject : PhysicsManager::makeRigidObject "
-                  "unsuccessful.  Aborting.";
+    LOG(ERROR) << "::addObject : PhysicsManager::makeRigidObject unsuccessful. "
+                  " Aborting.";
     return ID_UNDEFINED;
   }
 
@@ -237,7 +236,7 @@ int PhysicsManager::addObject(
   if (!objectSuccess) {
     // if failed for some reason, remove and return
     removeObject(nextObjectID_, true, true);
-    LOG(ERROR) << "PhysicsManager::addObject : PhysicsManager::finalizeObject "
+    LOG(ERROR) << "::addObject : PhysicsManager::finalizeObject "
                   "unsuccessful.  Aborting.";
     return ID_UNDEFINED;
   }
@@ -246,12 +245,10 @@ int PhysicsManager::addObject(
   // and register wrapper with wrapper manager
   // 1.0 Get unique name for object using simplified attributes name.
   std::string simpleObjectHandle = objectAttributes->getSimplifiedHandle();
-  LOG(WARNING) << "PhysicsManager::addObject : simpleObjectHandle : "
-               << simpleObjectHandle;
+  LOG(WARNING) << "::addObject : simpleObjectHandle : " << simpleObjectHandle;
   std::string newObjectHandle =
       rigidObjectManager_->getUniqueHandleFromCandidate(simpleObjectHandle);
-  LOG(WARNING) << "PhysicsManager::addObject : newObjectHandle : "
-               << newObjectHandle;
+  LOG(WARNING) << "::addObject : newObjectHandle : " << newObjectHandle;
 
   existingObjects_.at(nextObjectID_)->setObjectName(newObjectHandle);
 
@@ -270,18 +267,19 @@ int PhysicsManager::addObject(
 int PhysicsManager::addArticulatedObjectInstance(
     const std::string& filepath,
     const std::shared_ptr<esp::metadata::attributes::SceneAOInstanceAttributes>&
-        aObjInstAttributes) {
+        aObjInstAttributes,
+    const std::string& lightSetup) {
   std::string errMsgTmplt = "PhysicsManager::addObjectInstance : ";
 
-  // Get drawables from simulator. TODO: Support non-existant simulator?
+  // Get drawables from simulator. TODO: Support non-existent simulator?
   auto& drawables = simulator_->getDrawableGroup();
 
   // call object creation (resides only in physics library-based derived physics
   // managers)
   int aObjID = this->addArticulatedObjectFromURDF(
       filepath, &drawables, aObjInstAttributes->getFixedBase(),
-      aObjInstAttributes->getUniformScale(),
-      aObjInstAttributes->getMassScale());
+      aObjInstAttributes->getUniformScale(), aObjInstAttributes->getMassScale(),
+      false, lightSetup);
   if (aObjID == ID_UNDEFINED) {
     // instancing failed for some reason.
     LOG(ERROR) << errMsgTmplt
@@ -422,7 +420,7 @@ void PhysicsManager::stepPhysics(double dt) {
   while (worldTime_ < targetTime) {
     // per fixed-step operations can be added here
 
-    // kinematic velocity control intergration
+    // kinematic velocity control integration
     for (auto& object : existingObjects_) {
       VelocityControl::ptr velControl = object.second->getVelocityControl();
       if (velControl->controllingAngVel || velControl->controllingLinVel) {
@@ -574,40 +572,6 @@ void PhysicsManager::setVoxelizationDraw(const std::string& gridName,
       rigidBase->node().computeCumulativeBB();
     }
   }
-}
-
-const scene::SceneNode& PhysicsManager::getArticulatedObjectSceneNode(
-    int physObjectID) const {
-  CHECK(existingArticulatedObjects_.count(physObjectID) > 0);
-  return existingArticulatedObjects_.at(physObjectID)->node();
-}
-
-scene::SceneNode& PhysicsManager::getArticulatedObjectSceneNode(
-    int physObjectID) {
-  CHECK(existingArticulatedObjects_.count(physObjectID) > 0);
-  return existingArticulatedObjects_.at(physObjectID)->node();
-}
-
-const scene::SceneNode& PhysicsManager::getArticulatedLinkSceneNode(
-    int physObjectID,
-    int linkId) const {
-  CHECK(existingArticulatedObjects_.count(physObjectID) > 0);
-  return existingArticulatedObjects_.at(physObjectID)->getLinkSceneNode(linkId);
-}
-
-scene::SceneNode& PhysicsManager::getArticulatedLinkSceneNode(int physObjectID,
-                                                              int linkId) {
-  CHECK(existingArticulatedObjects_.count(physObjectID) > 0);
-  return const_cast<scene::SceneNode&>(
-      existingArticulatedObjects_.at(physObjectID)->getLinkSceneNode(linkId));
-}
-
-std::vector<scene::SceneNode*>
-PhysicsManager::getArticulatedLinkVisualSceneNodes(const int objectID,
-                                                   const int linkID) const {
-  CHECK(existingArticulatedObjects_.count(objectID) > 0);
-  return existingArticulatedObjects_.at(objectID)->getLinkVisualSceneNodes(
-      linkID);
 }
 }  // namespace physics
 }  // namespace esp

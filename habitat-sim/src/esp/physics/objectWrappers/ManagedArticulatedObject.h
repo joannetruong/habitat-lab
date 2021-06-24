@@ -24,33 +24,6 @@ class ManagedArticulatedObject
       : AbstractManagedPhysicsObject<esp::physics::ArticulatedObject>(
             classKey) {}
 
-  int createJointMotor(const int dof,
-                       const JointMotorSettings& settings) const {
-    if (auto sp = getObjectReference()) {
-      return sp->createJointMotor(dof, settings);
-    }
-    return ID_UNDEFINED;
-  }
-
-  void removeJointMotor(const int motorId) {
-    if (auto sp = getObjectReference()) {
-      sp->removeJointMotor(motorId);
-    }
-  }
-
-  JointMotorSettings getJointMotorSettings(const int motorId) const {
-    if (auto sp = getObjectReference()) {
-      return sp->getJointMotorSettings(motorId);
-    }
-    return {};
-  }
-
-  void updateJointMotor(const int motorId, const JointMotorSettings& settings) {
-    if (auto sp = getObjectReference()) {
-      sp->updateJointMotor(motorId, settings);
-    }
-  }
-
   scene::SceneNode* getLinkSceneNode(int linkId = -1) const {
     if (auto sp = getObjectReference()) {
       return &const_cast<scene::SceneNode&>(sp->getLinkSceneNode(linkId));
@@ -109,54 +82,54 @@ class ManagedArticulatedObject
     return Mn::Vector3(0);
   }
 
-  void setForces(const std::vector<float>& forces) {
+  void setJointForces(const std::vector<float>& forces) {
     if (auto sp = getObjectReference()) {
-      sp->setForces(forces);
+      sp->setJointForces(forces);
     }
   }
 
-  void addForces(const std::vector<float>& forces) {
+  void addJointForces(const std::vector<float>& forces) {
     if (auto sp = getObjectReference()) {
-      sp->addForces(forces);
+      sp->addJointForces(forces);
     }
   }
 
-  std::vector<float> getForces() {
+  std::vector<float> getJointForces() {
     if (auto sp = getObjectReference()) {
-      return sp->getForces();
-    }
-    return {};
-  }
-
-  void setVelocities(const std::vector<float>& vels) {
-    if (auto sp = getObjectReference()) {
-      sp->setVelocities(vels);
-    }
-  }
-
-  std::vector<float> getVelocities() {
-    if (auto sp = getObjectReference()) {
-      return sp->getVelocities();
+      return sp->getJointForces();
     }
     return {};
   }
 
-  void setPositions(const std::vector<float>& positions) {
+  void setJointVelocities(const std::vector<float>& vels) {
     if (auto sp = getObjectReference()) {
-      sp->setPositions(positions);
+      sp->setJointVelocities(vels);
     }
   }
 
-  std::vector<float> getPositions() {
+  std::vector<float> getJointVelocities() {
     if (auto sp = getObjectReference()) {
-      return sp->getPositions();
+      return sp->getJointVelocities();
     }
     return {};
   }
 
-  std::vector<float> getPositionLimits(bool upperLimits = false) {
+  void setJointPositions(const std::vector<float>& positions) {
     if (auto sp = getObjectReference()) {
-      return sp->getPositionLimits(upperLimits);
+      sp->setJointPositions(positions);
+    }
+  }
+
+  std::vector<float> getJointPositions() {
+    if (auto sp = getObjectReference()) {
+      return sp->getJointPositions();
+    }
+    return {};
+  }
+
+  std::pair<std::vector<float>, std::vector<float>> getJointPositionLimits() {
+    if (auto sp = getObjectReference()) {
+      return sp->getJointPositionLimits();
     }
     return {};
   }
@@ -185,6 +158,20 @@ class ManagedArticulatedObject
       return sp->getLinkJointType(linkId);
     }
     return JointType::Invalid;
+  }
+
+  std::string getLinkJointName(int linkId) const {
+    if (auto sp = getObjectReference()) {
+      return sp->getLinkJointName(linkId);
+    }
+    return "";
+  }
+
+  std::string getLinkName(int linkId) const {
+    if (auto sp = getObjectReference()) {
+      return sp->getLinkName(linkId);
+    }
+    return "";
   }
 
   int getLinkDoFOffset(int linkId) const {
@@ -228,20 +215,6 @@ class ManagedArticulatedObject
     return false;
   }
 
-  std::map<int, int> getExistingJointMotors() const {
-    if (auto sp = getObjectReference()) {
-      return sp->getExistingJointMotors();
-    }
-    return {};
-  }
-
-  std::map<int, int> createMotorsForAllDofs(JointMotorSettings settings) {
-    if (auto sp = getObjectReference()) {
-      return sp->createMotorsForAllDofs(settings);
-    }
-    return {};
-  }
-
   void setAutoClampJointLimits(bool autoClamp) {
     if (auto sp = getObjectReference()) {
       sp->setAutoClampJointLimits(autoClamp);
@@ -258,6 +231,55 @@ class ManagedArticulatedObject
   void clampJointLimits() {
     if (auto sp = getObjectReference()) {
       sp->clampJointLimits();
+    }
+  }
+
+  int createJointMotor(const int dof,
+                       const JointMotorSettings& settings) const {
+    if (auto sp = getObjectReference()) {
+      return sp->createJointMotor(dof, settings);
+    }
+    return ID_UNDEFINED;
+  }
+
+  void removeJointMotor(const int motorId) {
+    if (auto sp = getObjectReference()) {
+      sp->removeJointMotor(motorId);
+    }
+  }
+
+  JointMotorSettings getJointMotorSettings(const int motorId) const {
+    if (auto sp = getObjectReference()) {
+      return sp->getJointMotorSettings(motorId);
+    }
+    return {};
+  }
+
+  void updateJointMotor(const int motorId, const JointMotorSettings& settings) {
+    if (auto sp = getObjectReference()) {
+      sp->updateJointMotor(motorId, settings);
+    }
+  }
+
+  std::unordered_map<int, int> getExistingJointMotors() const {
+    if (auto sp = getObjectReference()) {
+      return sp->getExistingJointMotors();
+    }
+    return {};
+  }
+
+  std::unordered_map<int, int> createMotorsForAllDofs(
+      JointMotorSettings settings) {
+    if (auto sp = getObjectReference()) {
+      return sp->createMotorsForAllDofs(settings);
+    }
+    return {};
+  }
+
+  void updateAllMotorTargets(const std::vector<float>& stateTargets,
+                             bool velocities) {
+    if (auto sp = getObjectReference()) {
+      sp->updateAllMotorTargets(stateTargets, velocities);
     }
   }
 

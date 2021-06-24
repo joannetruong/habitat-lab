@@ -124,7 +124,7 @@ class SceneDatasetAttributes : public AbstractAttributes {
       const std::string& path,
       bool overwrite = false) {
     return addNewValToMap(key, path, overwrite, navmeshMap_,
-                          "SceneDatasetAttributes::addNavmeshPathEntry");
+                          "::addNavmeshPathEntry");
   }  // addNavmeshPathEntry
 
   /**
@@ -140,9 +140,8 @@ class SceneDatasetAttributes : public AbstractAttributes {
       const std::string& key,
       const std::string& path,
       bool overwrite = false) {
-    return addNewValToMap(
-        key, path, overwrite, semanticSceneDescrMap_,
-        "SceneDatasetAttributes::addSemanticSceneDescrPathEntry");
+    return addNewValToMap(key, path, overwrite, semanticSceneDescrMap_,
+                          "::addSemanticSceneDescrPathEntry");
   }  // addNavmeshPathEntry
 
   /**
@@ -275,7 +274,7 @@ class SceneDatasetAttributes : public AbstractAttributes {
   }
 
   /**
-   * @brief TEMPRARY set discovered fully qualified file name along with
+   * @brief TEMPORARY set discovered fully qualified file name along with
    * simplified key for articulated object model file names. This will be
    * removed when ArticulatedModelManager is complete.
    * @param key Key in map built from simplified file name.

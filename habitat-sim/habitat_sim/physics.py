@@ -33,9 +33,9 @@ __all__ = [
     "VelocityControl",
     "RayHitInfo",
     "RaycastResults",
-    "JointMotorSettings",
     "CollisionGroups",
     "CollisionGroupHelper",
     "JointType",
+    "JointMotorSettings",
     "JointMotorType",
 ]

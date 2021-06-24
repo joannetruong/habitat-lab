@@ -4,7 +4,7 @@ import magnum as mn
 import habitat_sim 
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab, scalar_vector_to_quat
+from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab, scalar_vector_to_quat, rotate_vector_2d
 import squaternion
 
 class A1():
@@ -19,10 +19,10 @@ class A1():
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
-        self._initial_joint_positions = [-0.05, 0.60, -1.5,
-                                         0.05, 0.60, -1.5,
-                                         -0.05, 0.65, -1.5,
-                                         0.05, 0.65, -1.5]
+        self._initial_joint_positions = [0.05, 0.60, -1.5,
+                                         -0.05, 0.60, -1.5,
+                                         0.05, 0.65, -1.5,
+                                         -0.05, 0.65, -1.5]
         self.robot_specific_reset()
         self.dt = dt
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
@@ -53,6 +53,20 @@ class A1():
         assert False, "A1 does not support discrete actions"
 
     
+    def remap_joints(self, joints):
+        joint_remapped = [0]*len(joints)
+        joint_remapped[0] = joints[3]
+        joint_remapped[1] = joints[4]
+        joint_remapped[2] = joints[5]
+        joint_remapped[3] = joints[0]
+        joint_remapped[4] = joints[1]
+        joint_remapped[5] = joints[2]
+        joint_remapped[6] = joints[9]
+        joint_remapped[7] = joints[10]
+        joint_remapped[8] = joints[11]
+        joint_remapped[9] = joints[6]
+        joint_remapped[10] = joints[7]
+        joint_remapped[11] = joints[8]
 
     def calc_state(self, prev_state=None, finite_diff=False):
         """Computes the state.
@@ -66,45 +80,50 @@ class A1():
                 in euler angles.
         """
 
-        #joint_positions = self.sim.get_articulated_object_positions(self.robot_id)
-        #joint_velocities = self.sim.get_articulated_object_velocities(self.robot_id)
+
         joint_positions = self.robot.joint_positions
         joint_velocities = self.robot.joint_velocities
-        robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        robot_state = self.robot.rigid_state 
 
-        # Must comment out for habitat migration
-        # vels = self.sim.get_articulated_link_velocity(self.robot_id, 0)
-        # lin_vel, ang_vel = vels[0], vels[1]
+        joint_positions_remapped = self.remap_joints(joint_positions)
+        joint_velocities_remapped = self.remap_joints(joint_velocities)
+
+        lin_vel = self.robot.root_linear_velocity
+        ang_vel = self.robot.root_angular_velocity
         
         base_pos = robot_state.translation
-        # base_position[2] = -base_position[2]
         base_orientation_quat = robot_state.rotation
+        
+        base_orientation_quat.vector = mn.Vector3(base_orientation_quat.vector.x, base_orientation_quat.vector.z,base_orientation_quat.vector.y)
+
         base_position = base_pos
         base_pos_tmp = rotate_pos_from_hab(base_pos)
+        
         base_position.x = base_pos_tmp[0]
         base_position.y = base_pos_tmp[1]
-        base_position.z = base_pos_tmp[2]
+        base_position.z = -base_pos_tmp[2]
 
         base_orientation_euler = get_rpy(base_orientation_quat)
-        # base_orientation_euler_origin = get_rpy(base_orientation_quat, transform=False)
-
+        
         obs_quat = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector)
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1, 0, 0))
         base_orientation_quat_trans = obs_quat*inverse_base_transform
 
-        if finite_diff:
-            if prev_state is None:
-                base_velocity = mn.Vector3() #self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-                frame_pos = np.zeros((3))
-                base_angular_velocity_euler = mn.Vector3() # self.sim.get_articulated_link_angular_velocity(self.robot_id, 0)
-            else:
-                base_velocity = (base_position - prev_state['base_pos']) / self.dt
-                if base_velocity == mn.Vector3():
-                    base_velocity = mn.Vector3(prev_state['base_velocity'])
-                base_angular_velocity_euler = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
+
+        if prev_state is None:
+            base_velocity_finite = mn.Vector3() 
+            base_angular_velocity_euler_finite = mn.Vector3() 
+            print('prev state is not')
         else:
-            base_velocity = lin_vel
-            base_angular_velocity_euler = ang_vel
+            base_velocity_finite = (base_position - prev_state['base_pos']) / self.dt
+            base_angular_velocity_euler_finite = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
+
+
+        
+        lin_vel = mn.Vector3(lin_vel.x, lin_vel.z, lin_vel.y)
+
+        base_velocity = lin_vel
+        base_angular_velocity_euler = ang_vel
 
         return {
             'base_pos_x': base_position.x,
@@ -115,20 +134,20 @@ class A1():
             'base_ori_quat_hab': base_orientation_quat,
             'base_ori_quat': base_orientation_quat_trans,
             'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-            # 'base_velocity': list(base_velocity),
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
-            # 'base_ang_vel': list(base_angular_velocity_euler),
+            'base_velocity_finite': rotate_vector_3d(base_velocity_finite, *base_orientation_euler),
+            'base_ang_vel_finite': rotate_vector_3d(base_angular_velocity_euler_finite, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities
         }
 
     def set_mtr_pos(self, joint, ctrl):
-        jms = self.sim.get_joint_motor_settings(self.robot_id, joint)
+        jms = self.robot.get_joint_motor_settings(joint)
         jms.position_target = ctrl
-        self.sim.update_joint_motor(self.robot_id, joint, jms)
+        self.robot.update_joint_motor(joint, jms)
 
     def set_joint_pos(self, joint_idx, angle):
-        set_pos = np.array(self.robot.joint_positions) #self.sim.get_articulated_object_positions(self.robot_id))
+        set_pos = np.array(self.robot.joint_positions) 
         set_pos[joint_idx] = angle
         self.sim.set_articulated_object_positions(self.robot_id, set_pos)
 

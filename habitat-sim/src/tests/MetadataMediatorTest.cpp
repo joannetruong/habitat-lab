@@ -66,8 +66,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
   // setup dataset 0 for test
   initDataset0();
 
-  LOG(INFO) << "Starting "
-               "MetadataMediatorTest::testDataset0 : test LoadStages";
+  LOG(INFO) << "Starting testDataset0 : test LoadStages";
   const auto& stageAttributesMgr = MM_->getStageAttributesManager();
   int numStageHandles = stageAttributesMgr->getNumObjects();
   // should be 7 - one for default NONE stage, one original JSON, one based on
@@ -403,8 +402,7 @@ TEST_F(MetadataMediatorTest, testDataset1) {
   // primarily testing glob file wildcard loading
   initDataset1();
 
-  LOG(INFO) << "Starting "
-               "MetadataMediatorTest::testDataset1 : test LoadStages";
+  LOG(INFO) << "Starting testDataset1 : test LoadStages";
   const auto& stageAttributesMgr = MM_->getStageAttributesManager();
   int numStageHandles = stageAttributesMgr->getNumObjects();
   // shoudld be 6 : one for default NONE stage, glob lookup yields 2 stages + 2
@@ -445,10 +443,10 @@ TEST_F(MetadataMediatorTest, testDataset1) {
   LOG(INFO) << "Starting test LoadArticulatedObjects";
 
   namespace Dir = Cr::Utility::Directory;
-  // verify # of urdf filepaths loaded - should be 5;
+  // verify # of urdf filepaths loaded - should be 6;
   const std::map<std::string, std::string>& urdfTestFilenames =
       MM_->getArticulatedObjectModelFilenames();
-  ASSERT_EQ(urdfTestFilenames.size(), 5);
+  ASSERT_EQ(urdfTestFilenames.size(), 6);
   // test that each stub name key corresponds to the actual file name passed
   // through the key making process
   for (std::map<std::string, std::string>::const_iterator iter =

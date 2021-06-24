@@ -332,38 +332,6 @@ void declareArticulatedObjectWrapper(py::module& m,
              AbstractManagedPhysicsObject<ArticulatedObject>,
              std::shared_ptr<ManagedArticulatedObject>>(m,
                                                         classStrPrefix.c_str())
-      .def("get_existing_joint_motor_ids",
-           &ManagedArticulatedObject::getExistingJointMotors,
-           ("Get a dictionary holding all of this " + objType +
-            "'s joint motor ids.")
-               .c_str())
-      .def("create_all_motors",
-           &ManagedArticulatedObject::createMotorsForAllDofs,
-           ("Make motors for all of this " + objType + "'s DOFs.").c_str())
-      .def("create_joint_motor", &ManagedArticulatedObject::createJointMotor,
-           ("Create a joint motor for the specified DOF on this " + objType +
-            " using the provided JointMotorSettings")
-               .c_str(),
-           "DOF"_a, "settings"_a)
-      .def(
-          "remove_joint_motor", &ManagedArticulatedObject::removeJointMotor,
-          ("Remove the joint motor specified by the given motor_id from this " +
-           objType + ".")
-              .c_str(),
-          "motor_id"_a)
-      .def("get_joint_motor_settings",
-           &ManagedArticulatedObject::getJointMotorSettings,
-           ("Get the JointMotorSettings for the motor with the given "
-            "motor_id in this " +
-            objType + ".")
-               .c_str(),
-           "motor_id"_a)
-      .def("update_joint_motor", &ManagedArticulatedObject::updateJointMotor,
-           ("Update the JointMotorSettings for the motor specified by the "
-            "provided motor_id on this " +
-            objType + ".")
-               .c_str(),
-           "motor_id"_a, "settings"_a)
       .def("get_link_scene_node", &ManagedArticulatedObject::getLinkSceneNode,
            ("Get the scene node for this " + objType +
             "'s articulated link specified by the passed "
@@ -400,35 +368,35 @@ void declareArticulatedObjectWrapper(py::module& m,
           &ManagedArticulatedObject::setRootAngularVelocity,
           ("The angular velocity (omega) of the " + objType + "'s root.")
               .c_str())
-      .def_property("joint_forces", &ManagedArticulatedObject::getForces,
-                    &ManagedArticulatedObject::setForces,
+      .def_property("joint_forces", &ManagedArticulatedObject::getJointForces,
+                    &ManagedArticulatedObject::setJointForces,
                     ("Get or set the joint forces/torques (indexed by DoF id) "
                      "currently acting on this " +
                      objType + ".")
                         .c_str())
-      .def("add_joint_forces", &ManagedArticulatedObject::addForces,
+      .def("add_joint_forces", &ManagedArticulatedObject::addJointForces,
            ("Add joint forces/torques (indexed by DoF id) to this " + objType +
             ".")
                .c_str(),
            "forces"_a)
       .def_property("joint_velocities",
-                    &ManagedArticulatedObject::getVelocities,
-                    &ManagedArticulatedObject::setVelocities,
+                    &ManagedArticulatedObject::getJointVelocities,
+                    &ManagedArticulatedObject::setJointVelocities,
                     ("Get or set this " + objType +
                      "'s joint velocities, indexed by DOF id.")
                         .c_str())
-      .def_property("joint_positions", &ManagedArticulatedObject::getPositions,
-                    &ManagedArticulatedObject::setPositions,
+      .def_property("joint_positions",
+                    &ManagedArticulatedObject::getJointPositions,
+                    &ManagedArticulatedObject::setJointPositions,
                     ("Get or set this " + objType +
-                     "'s joint positions, indexed by DOF id.")
+                     "'s joint positions. For link to index mapping see "
+                     "get_link_joint_pos_offset and get_link_num_joint_pos.")
                         .c_str())
-      .def("get_joint_position_limits",
-           &ManagedArticulatedObject::getPositionLimits,
-           ("Get a list of this " + objType +
-            "'s joint limits, either upper limits or lower limits, depending "
-            "on the supplied boolean value for upper_limits.")
-               .c_str(),
-           "upper_limits"_a)
+      .def_property_readonly("joint_position_limits",
+                             &ManagedArticulatedObject::getJointPositionLimits,
+                             ("Get a tuple of lists of this " + objType +
+                              "'s joint limits (lower, upper).")
+                                 .c_str())
       .def("get_link_dof_offset", &ManagedArticulatedObject::getLinkDoFOffset,
            ("Get the index of this " + objType +
             "'s link's first DoF in the global DoF array. Link specified by "
@@ -456,6 +424,16 @@ void declareArticulatedObjectWrapper(py::module& m,
            "link_id"_a)
       .def("get_link_joint_type", &ManagedArticulatedObject::getLinkJointType,
            ("Get the type of the parent joint for this " + objType +
+            "'s link specified by the given link_id.")
+               .c_str(),
+           "link_id"_a)
+      .def("get_link_joint_name", &ManagedArticulatedObject::getLinkJointName,
+           ("Get the name of the parent joint for this " + objType +
+            "'s link specified by the given link_id.")
+               .c_str(),
+           "link_id"_a)
+      .def("get_link_name", &ManagedArticulatedObject::getLinkName,
+           ("Get the name of the this " + objType +
             "'s link specified by the given link_id.")
                .c_str(),
            "link_id"_a)
@@ -495,7 +473,54 @@ void declareArticulatedObjectWrapper(py::module& m,
       .def("clamp_joint_limits", &ManagedArticulatedObject::clampJointLimits,
            ("Clamp this " + objType +
             "'s current pose to specified joint limits.")
-               .c_str());
+               .c_str())
+      // Joint Motor API
+      .def_property_readonly(
+          "existing_joint_motor_ids",
+          &ManagedArticulatedObject::getExistingJointMotors,
+          ("A dictionary mapping all of this " + objType +
+           "'s joint motor ids to their respective links/joints.")
+              .c_str())
+      .def("create_all_motors",
+           &ManagedArticulatedObject::createMotorsForAllDofs,
+           ("Make motors for all of this " + objType +
+            "'s links which support motors (Revolute, Prismatic, Spherical).")
+               .c_str(),
+           "settings"_a)
+      .def("update_all_motor_targets",
+           &ManagedArticulatedObject::updateAllMotorTargets,
+           ("Update all motors targets for this " + objType +
+            "'s joints which support motors (Revolute, Prismatic, Spherical) "
+            "from a state array. By default, state is interpreted as position "
+            "targets unless `velocities` is specified. Expected input is the "
+            "full length position or velocity array for this object. This "
+            "function will safely skip states for joints which don't support "
+            "JointMotors.")
+               .c_str(),
+           "state_targets"_a, "velocities"_a = false)
+      .def("create_joint_motor", &ManagedArticulatedObject::createJointMotor,
+           ("Create a joint motor for the specified DOF on this " + objType +
+            " using the provided JointMotorSettings")
+               .c_str(),
+           "link"_a, "settings"_a)
+      .def(
+          "remove_joint_motor", &ManagedArticulatedObject::removeJointMotor,
+          ("Remove the joint motor specified by the given motor_id from this " +
+           objType + ".")
+              .c_str(),
+          "motor_id"_a)
+      .def("get_joint_motor_settings",
+           &ManagedArticulatedObject::getJointMotorSettings,
+           ("Get the JointMotorSettings for the motor with the given "
+            "motor_id in this " +
+            objType + ".")
+               .c_str(),
+           "motor_id"_a)
+      .def("update_joint_motor", &ManagedArticulatedObject::updateJointMotor,
+           ("Update the JointMotorSettings for the motor on this " + objType +
+            " specified by the provided motor_id.")
+               .c_str(),
+           "motor_id"_a, "settings"_a);
 }  // declareArticulatedObjectWrapper
 
 template <class T>
@@ -542,15 +567,7 @@ void initPhysicsObjectBindings(py::module& m) {
       m, "ManagedBulletArticulatedObject")
       .def(
           "contact_test", &ManagedBulletArticulatedObject::contactTest,
-          R"(REQUIRES BULLET TO BE INSTALLED. Returns the result of a discrete collision test between this object and the world.)")
-      .def("supports_joint_motor",
-           &ManagedBulletArticulatedObject::supportsJointMotor,
-           R"(REQUIRES BULLET TO BE INSTALLED. )", "link_id"_a)
-      .def(
-          "get_joint_motor_max_impulse",
-          &ManagedBulletArticulatedObject::getJointMotorMaxImpulse,
-          R"(REQUIRES BULLET TO BE INSTALLED. Get the maximum impulse for the joint motor specified by the given motor_id)",
-          "motor_id"_a);
+          R"(REQUIRES BULLET TO BE INSTALLED. Returns the result of a discrete collision test between this object and the world.)");
 
 }  // initPhysicsObjectBindings
 

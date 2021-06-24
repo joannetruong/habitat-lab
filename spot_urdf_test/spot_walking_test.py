@@ -34,12 +34,13 @@ class Workspace(object):
         self.pos_gain[2] = 0.1 # 0.7
         self.vel_gain[2] = 1.0 # 1.5
         self.num_steps = 15
-        self.ctrl_freq = 240
+        self.ctrl_freq = 120
         self.time_per_step = 100
         self.prev_state = None
-        self.finite_diff = True
+        self.finite_diff = False
         self.robot_name = robot
         self.done = False
+        self.fixed_base = False
         self.num_actions = 0
 
     def make_configuration(self, scene):
@@ -48,7 +49,7 @@ class Workspace(object):
         # backend_cfg.scene_dataset_config_file = "../data/default.scene_dataset_config.json"
         # backend_cfg.physics_config_file = "../data/default.physics_config.json"
         backend_cfg.scene_id = scene
-        # backend_cfg.scene_id = "data/scene_datasets/coda/empty_room.stage_config.json"
+        #backend_cfg.scene_id = "data/scene_datasets/coda/empty_room.stage_config.json"
         # backend_cfg.scene_id = 
         backend_cfg.enable_physics = True
 
@@ -174,9 +175,8 @@ class Workspace(object):
         robot_file = urdf_files[robot_file_name]
         
         art_obj_mgr = self.sim.get_articulated_object_manager()
-        self.robot = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
-        self.robot_id = self.robot.object_id
-        #self.robot_id = self.sim.add_articulated_object_from_urdf(robot_file, fixed_base=False)
+        self.robot_hab = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=self.fixed_base)
+        self.robot_id = self.robot_hab.object_id
 
         jms = []
         
@@ -203,7 +203,7 @@ class Workspace(object):
                         10.0,  # max_impulse
                     ))      
         for i in range(12):
-            self.robot.update_joint_motor(i, jms[np.mod(i,3)])
+            self.robot_hab.update_joint_motor(i, jms[np.mod(i,3)])
 
         # existing_joint_motors = sim.get_existing_joint_motors(robot_id)    
         agent_config = habitat_sim.AgentConfiguration()
@@ -221,7 +221,7 @@ class Workspace(object):
         elif self.robot_name == 'Daisy_4legged':
             self.robot = Daisy4(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Spot':
-            self.robot = Spot(sim=self.sim, robot=self.robot, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot = Spot(sim=self.sim, robot=self.robot_hab, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
             
         self.robot.robot_specific_reset()
         
@@ -232,27 +232,23 @@ class Workspace(object):
         self.raibert_controller = Raibert_controller_turn_stable(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
 
     def reset_robot(self, start_pose):
-        local_base_pos = start_pose
-
-        agent_transform = self.sim.agents[0].scene_node.transformation_matrix()
-        base_transform = mn.Matrix4.rotation(mn.Rad(0.01), mn.Vector3(1.0, 0, 0))
-        base_transform.translation = agent_transform.transform_point(local_base_pos)
-        #self.sim.set_articulated_object_root_state(self.robot_id, base_transform)
-        self.robot.transformation = base_transform
+        self.robot_hab.translation = start_pose
+        self.robot_hab.rotation = mn.Quaternion.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0).normalized())
         self.init_state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         self.raibert_controller.set_init_state(self.init_state)
         time.sleep(1)
-
         pos, ori = self.get_robot_pos()
         print('robot start pos: ', pos, np.rad2deg(ori[-1]))
 
     def get_robot_pos(self):
-        robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
+        robot_state = self.robot_hab.rigid_state
         base_pos_hab = utils.rotate_pos_from_hab(robot_state.translation)
 
         robot_position = np.array([base_pos_hab[0], base_pos_hab[1], base_pos_hab[2]])
-        robot_ori = utils.get_rpy(robot_state.rotation) 
+        robot_ori = utils.get_rpy(robot_state.rotation)
+
         return robot_position, robot_ori
+
 
     def log_raibert_controller(self):
         self.raibert_infos[str(self.ep_id)] = {}
@@ -269,6 +265,8 @@ class Workspace(object):
         self.raibert_infos[str(self.ep_id)]["raibert_base_ang_velocity"] = [[float(iii) for iii in ii] for ii in self.raibert_base_ang_velocity]
         self.raibert_infos[str(self.ep_id)]["raibert_base_ori_euler"] = [[float(iii) for iii in ii] for ii in self.raibert_base_ori_euler]
         self.raibert_infos[str(self.ep_id)]["raibert_base_ori_quat"] = [[float(iii) for iii in ii] for ii in self.raibert_base_ori_quat]
+        self.raibert_infos[str(self.ep_id)]["raibert_base_velocity_finite"] = [[float(iii) for iii in ii] for ii in self.raibert_base_velocity_finite]
+        self.raibert_infos[str(self.ep_id)]["raibert_base_ang_velocity_finite"] = [[float(iii) for iii in ii] for ii in self.raibert_base_ang_velocity_finite]
 
     def cmd_vel_xyt(self, lin_x, lin_y, ang, log=True):
         for n in range(self.num_steps):
@@ -302,6 +300,8 @@ class Workspace(object):
         raibert_base_ori_euler = []
         raibert_base_ori_quat = []
         raibert_base_ori_quat_hab = []
+        raibert_base_ang_velocity_finite = []
+        raibert_base_velocity_finite = []
         for i in range(self.time_per_step):
             # Get actual joint actions 
             self.prev_state = state
@@ -339,12 +339,16 @@ class Workspace(object):
             raibert_base_ori_euler.append(state['base_ori_euler'])
             raibert_base_ori_quat.append(base_ori_quat)
             raibert_actions_measured.append(state['j_pos'])
+            raibert_base_velocity_finite.append(state['base_velocity_finite'])
+            raibert_base_ang_velocity_finite.append(state['base_ang_vel_finite'])
         self.raibert_action_commanded = raibert_actions_commanded
         self.raibert_action_measured = raibert_actions_measured
         self.raibert_base_velocity = raibert_base_velocity
         self.raibert_base_ang_velocity = raibert_base_ang_velocity
         self.raibert_base_ori_euler = raibert_base_ori_euler
         self.raibert_base_ori_quat = raibert_base_ori_quat
+        self.raibert_base_velocity_finite = raibert_base_velocity_finite
+        self.raibert_base_ang_velocity_finite = raibert_base_ang_velocity_finite
         return agent_obs[0]['depth_camera_1stperson']
 
     def stitch_show_img(self, agent_obs, ortho_obs):
@@ -375,7 +379,7 @@ class Workspace(object):
             if self.text is not None:
                 for i, line in enumerate(self.text[idx]):
                     font = cv2.FONT_HERSHEY_SIMPLEX
-                    cv2.putText(frame, line, (20, 100 + i*30), font, 0.5, (0, 0, 0), 2)
+                    cv2.putText(frame, line, (20, 100 + i*30), font, 0.5, (0, 250, 0), 2)
             video.write(frame)
         print('SAVED VIDEO')
 
@@ -383,8 +387,49 @@ class Workspace(object):
         pass
 
     # This is wrapped such that it can be added to a unit test
+
+    def test_orientation(self):
+        self.reset_robot(np.array([1.0, 0.7, -1.0]))
+
+        for th in range(8):
+            
+            src_quat = mn.Quaternion.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0).normalized())
+            test_rot = mn.Quaternion.rotation(mn.Rad(th/8 * 6.28), mn.Vector3(1.0, 0.0, 0.0).normalized())
+            self.robot_hab.rotation = src_quat.__mul__(test_rot)
+            print('rot: ' + str(th/8*360))
+            raibert_action = np.zeros((12,))
+            self.cmd_vel_xyt(0, 0.0, 0.0)
+
+        for th in range(8):
+            
+            src_quat = mn.Quaternion.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0).normalized())
+            test_rot = mn.Quaternion.rotation(mn.Rad(th/8 * 6.28), mn.Vector3(0.0, 1.0, 0.0).normalized())
+            self.robot_hab.rotation = src_quat.__mul__(test_rot)
+            print('rot: ' + str(th/8*360))
+            raibert_action = np.zeros((12,))
+            self.cmd_vel_xyt(0, 0.0, 0.0)
+
+        for th in range(8):
+            
+            src_quat = mn.Quaternion.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0).normalized())
+            test_rot = mn.Quaternion.rotation(mn.Rad(th/8 * 6.28), mn.Vector3(0.0, 0.0, 1.0).normalized())
+            self.robot_hab.rotation = src_quat.__mul__(test_rot)
+            print('rot: ' + str(th/8*360))
+            raibert_action = np.zeros((12,))
+            self.cmd_vel_xyt(0, 0.0, 0.0)
+
+
+
+        time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
+        save_name = time_str + 'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + \
+            str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff) + '.mp4'
+        rate = self.ctrl_freq // 30
+        self.save_video(rate, save_name)
+
+
+
     def test_robot(self):
-        self.reset_robot(np.array([-2,3.0,-4]))
+        self.reset_robot(np.array([1.0,1.0,-1.0]))
         # Set desired linear and angular velocities
         print("MOVING FORWARD")
         self.cmd_vel_xyt(0.35, 0.0, 0.0)
@@ -415,6 +460,7 @@ class Workspace(object):
 if __name__ == "__main__":
     robot = sys.argv[1]
     scene = "data/scene_datasets/coda/empty_room.glb"
+    #scene = "data/scene_datasets/coda/empty_room.stage_config.json"
     W = Workspace(robot)
     W.setup(scene)
     W.place_agent()

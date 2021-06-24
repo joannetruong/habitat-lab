@@ -106,6 +106,9 @@ class BulletRigidObject : public BulletBase,
     }
   }
 
+  /**
+   * @brief
+   */
   void updateNodes(bool force = false) override;
 
   /**
@@ -436,17 +439,6 @@ class BulletRigidObject : public BulletBase,
    */
   Magnum::Range3D getCollisionShapeAabb() const override;
 
-  /**
-   * @brief Check whether a specific @ref btCollisionObject belongs to this
-   * object.
-   */
-  bool isMe(const btCollisionObject* collisionObject);
-
-  /** @brief Object data: All components of a @ref RigidObjectType::OBJECT are
-   * wrapped into one @ref btRigidBody.
-   */
-  std::unique_ptr<btRigidBody> bObjectRigidBody_;
-
  private:
   /**
    * @brief Finalize initialization of this @ref BulletRigidObject as a @ref
@@ -462,8 +454,6 @@ class BulletRigidObject : public BulletBase,
    * after it was changed kinematically. Called automatically on kinematic
    * updates. See @ref btRigidBody::setWorldTransform. */
   void syncPose() override;
-
-  std::string getCollisionDebugName();
 
   /**
    * @brief construct a @ref btRigidBody for this object configured by
@@ -482,6 +472,11 @@ class BulletRigidObject : public BulletBase,
    * a collision island tag with this object's collision shape.
    */
   void activateCollisionIsland();
+
+  /** @brief Object data: All components of a @ref RigidObjectType::OBJECT are
+   * wrapped into one @ref btRigidBody.
+   */
+  std::unique_ptr<btRigidBody> bObjectRigidBody_;
 
  private:
   // === Physical object ===

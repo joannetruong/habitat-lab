@@ -193,7 +193,7 @@ class MetadataMediator {
   std::string getNavmeshPathByHandle(const std::string& navMeshHandle) {
     return getFilePathForHandle(navMeshHandle,
                                 getActiveDSAttribs()->getNavmeshMap(),
-                                "MetadataMediator::getNavmeshPathByHandle");
+                                "::getNavmeshPathByHandle");
 
   }  // MetadataMediator::getNavmeshPathByHandle
 
@@ -217,7 +217,7 @@ class MetadataMediator {
       const std::string& ssDescrHandle) {
     return getFilePathForHandle(
         ssDescrHandle, getActiveDSAttribs()->getSemanticSceneDescrMap(),
-        "MetadataMediator::getSemanticSceneDescriptorPathByHandle");
+        "::getSemanticSceneDescriptorPathByHandle");
 
   }  // MetadataMediator::getNavMeshPathByHandle
 
@@ -322,16 +322,8 @@ class MetadataMediator {
    */
   std::string getArticulatedObjModelFullHandle(
       const std::string& artObjModelName) {
-    attributes::SceneDatasetAttributes::ptr datasetAttr = getActiveDSAttribs();
-    // this should never happen
-    if (datasetAttr == nullptr) {
-      LOG(ERROR) << "MetadataMediator::getArticulatedObjModelFullHandle : No "
-                    "current active "
-                    "dataset specified/exists named :"
-                 << activeSceneDataset_ << ".";
-      return "";
-    }
-    return datasetAttr->getArticulatedObjModelFullHandle(artObjModelName);
+    return getActiveDSAttribs()->getArticulatedObjModelFullHandle(
+        artObjModelName);
   }  // getArticulatedObjModelFullHandle
 
   /**
@@ -350,7 +342,7 @@ class MetadataMediator {
    * @param lightSetupName Name of the attributes desired.  The attributes will
    * be found via substring search, so the name is expected to be sufficiently
    * restrictive to have exactly 1 match in dataset.
-   * @return name of AO model with handle containing @p artObjModelName or
+   * @return name of light setup with handle containing @p lightSetupName or
    * empty string if none.
    */
   std::string getLightSetupFullHandle(const std::string& lightSetupName) {
@@ -442,7 +434,7 @@ class MetadataMediator {
     // this should never happen - there will always be a dataset with the name
     // activeSceneDataset_
     if (datasetAttr == nullptr) {
-      LOG(ERROR) << "MetadataMediator::getActiveDSAttribs : Unable to set "
+      LOG(ERROR) << "::getActiveDSAttribs : Unable to set "
                     "active dataset due to Unknown dataset named "
                  << activeSceneDataset_
                  << " so changing dataset to \"default\".";
