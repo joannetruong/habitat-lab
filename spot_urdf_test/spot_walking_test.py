@@ -35,12 +35,12 @@ class Workspace(object):
         self.vel_gain[2] = 1.0 # 1.5
         self.num_steps = 15
         self.ctrl_freq = 120
-        self.time_per_step = 100
+        self.time_per_step = 5 #100
         self.prev_state = None
         self.finite_diff = False
         self.robot_name = robot
         self.done = False
-        self.fixed_base = False
+        self.fixed_base = True
         self.num_actions = 0
 
     def make_configuration(self, scene):
@@ -430,6 +430,7 @@ class Workspace(object):
 
     def test_robot(self):
         self.reset_robot(np.array([1.0,1.0,-1.0]))
+        #self.reset_robot(np.array([1.0,0.0,1.0]))
         # Set desired linear and angular velocities
         print("MOVING FORWARD")
         self.cmd_vel_xyt(0.35, 0.0, 0.0)
@@ -466,4 +467,4 @@ if __name__ == "__main__":
     W.place_agent()
     W.place_camera_agent()
     W.load_robot()
-    W.test_robot()
+    W.test_orientation()

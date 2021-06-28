@@ -94,7 +94,7 @@ class A1():
         base_pos = robot_state.translation
         base_orientation_quat = robot_state.rotation
         
-        base_orientation_quat.vector = mn.Vector3(base_orientation_quat.vector.x, base_orientation_quat.vector.z,base_orientation_quat.vector.y)
+        base_orientation_quat.vector = mn.Vector3(base_orientation_quat.vector.x, base_orientation_quat.vector.y,base_orientation_quat.vector.z)
 
         base_position = base_pos
         base_pos_tmp = rotate_pos_from_hab(base_pos)
@@ -149,7 +149,7 @@ class A1():
     def set_joint_pos(self, joint_idx, angle):
         set_pos = np.array(self.robot.joint_positions) 
         set_pos[joint_idx] = angle
-        self.sim.set_articulated_object_positions(self.robot_id, set_pos)
+        self.robot.joint_positions = set_pos
 
     def apply_robot_action(self, action, pos_gain, vel_gain):
         """Applies actions to the robot.
