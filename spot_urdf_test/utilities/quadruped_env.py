@@ -19,10 +19,10 @@ class A1():
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
-        self._initial_joint_positions = [0.05, 0.60, -1.5,
-                                         -0.05, 0.60, -1.5,
-                                         0.05, 0.65, -1.5,
-                                         -0.05, 0.65, -1.5]
+        self._initial_joint_positions = [-0.05, 0.60, -1.5,
+                                         0.05, 0.60, -1.5,
+                                         -0.05, 0.65, -1.5,
+                                         0.05, 0.65, -1.5]
         self.robot_specific_reset()
         self.dt = dt
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
@@ -98,27 +98,22 @@ class A1():
 
         base_position = base_pos
         base_pos_tmp = rotate_pos_from_hab(base_pos)
-        
         base_position.x = base_pos_tmp[0]
         base_position.y = base_pos_tmp[1]
-        base_position.z = -base_pos_tmp[2]
+        base_position.z = base_pos_tmp[2]
 
         base_orientation_euler = get_rpy(base_orientation_quat)
-        
+
         obs_quat = squaternion.Quaternion(base_orientation_quat.scalar, *base_orientation_quat.vector)
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1, 0, 0))
         base_orientation_quat_trans = obs_quat*inverse_base_transform
 
-
         if prev_state is None:
             base_velocity_finite = mn.Vector3() 
             base_angular_velocity_euler_finite = mn.Vector3() 
-            print('prev state is not')
         else:
             base_velocity_finite = (base_position - prev_state['base_pos']) / self.dt
             base_angular_velocity_euler_finite = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
-
-
         
         lin_vel = mn.Vector3(lin_vel.x, lin_vel.z, lin_vel.y)
 
@@ -236,7 +231,7 @@ class Laikago(A1):
 class Spot(A1):
     def __init__(self, sim=None, robot=None, agent=None, robot_id=0, dt=1/60):
         super().__init__(sim=sim,robot=robot, agent=agent, robot_id=robot_id, dt=dt)
-        self._initial_joint_positions = [0.05, 0.7, -1.3,
-                                         -0.05, 0.7, -1.3,
+        self._initial_joint_positions = [-0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
-                                         -0.05, 0.7, -1.3]
+                                         -0.05, 0.7, -1.3,
+                                         0.05, 0.7, -1.3]

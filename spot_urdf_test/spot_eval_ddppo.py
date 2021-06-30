@@ -39,17 +39,17 @@ class SpotWorkspace(Workspace):
         self.episode_pth = 'config/spot_waypoints_coda_hard.yaml'
         self.dim_actions = 2
         self.allow_backwards = False
+        self.linear_velocity_y_min, self.linear_velocity_y_max = -0.35, 0.35
+        self.angular_velocity_min, self.angular_velocity_max = -0.15, 0.15
         if self.allow_backwards:
             self.linear_velocity_x_min, self.linear_velocity_x_max = -0.35, 0.35
         else:
             self.linear_velocity_x_min, self.linear_velocity_x_max = 0.0, 0.35
-        self.linear_velocity_y_min, self.linear_velocity_y_max = -0.35, 0.35
-        self.angular_velocity_min, self.angular_velocity_max = -0.15, 0.15
 
-        self.success_dist = 0.36
+        self.success_dist = 0.30
         self.dist_to_goal = 100
         self.ctr = 0
-        self.max_num_actions = 500
+        self.max_num_actions = 400
         self.min_depth = 0.3
         self.max_depth = 10.0
         self.device = 'cpu'
@@ -76,81 +76,67 @@ class SpotWorkspace(Workspace):
         return np.array(start_poses), np.array(goal_poses)
 
     def get_robot_pos_hab(self):
-        robot_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        robot_position = np.array([*robot_state.translation])
+        robot_state = self.robot_hab.rigid_state
+        robot_position = utils.rotate_pos_from_hab(robot_state.translation)         
 
-        robot_ori = utils.quaternion_from_coeff(robot_state.rotation)
+        robot_ori = utils.get_rpy(robot_state.rotation)
         return robot_position, robot_ori
-
-    def _compute_pointgoal(self, source_position, source_rotation, goal_position):
-        source_position[1] = 0.0
-        goal_position[1] = 0.0
-        direction_vector = goal_position - source_position
-        direction_vector_agent = utils.quaternion_rotate_vector(
-            source_rotation.inverse(), direction_vector
-        )
-        rho, phi = utils.cartesian_to_polar(
-            -direction_vector_agent[2], direction_vector_agent[0]
-        )
-        print('goal sensor: ', rho, np.rad2deg(-phi), goal_position)
-        return np.array([rho, -phi], dtype=np.float32)
-
-    def transform_angle(self, rotation):
-        obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
-        inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
-        obs_quat = obs_quat*inverse_base_transform
-        # quat = squaternion.Quaternion.from_euler(0, 90, 0, degrees=True)
-        # inverse_base_transform_yaw = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
-        # obs_quat = obs_quat * inverse_base_transform_yaw * quat
-        return obs_quat
-
-    def get_goal_sensor(self, goal_position):
-        """
-        :return: non-perception observation, such as goal location
-        """
-        agent_state = self.sim.get_articulated_link_rigid_state(self.robot_id, 0)
-        agent_position = agent_state.translation
-        roll, pitch, yaw = utils.get_rpy(agent_state.rotation)
-        # yaw = yaw-np.deg2rad(90)
-        agent_rotation = squaternion.Quaternion.from_euler(roll, pitch, yaw, degrees=False)
-        # source_rotation = utils.quat_from_magnum(agent_rotation)
-        # inverse_base_transform = utils.scalar_vector_to_quat(np.pi/2,(1,0,0))
-        # agent_rotation = agent_rotation*inverse_base_transform
-
-        rotation_world_agent = utils.quat_from_magnum(agent_rotation)
-        print('robot state: ', agent_state.translation, np.rad2deg(roll), np.rad2deg(pitch), np.rad2deg(yaw))
-        return self._compute_pointgoal(
-            agent_position, rotation_world_agent, goal_position
-        )
 
     def evaluate_ddppo(self):
         start_poses, goal_poses = self.get_episodes()
         num_episodes = len(start_poses)
-        # for episode in range(num_episodes):
-        for episode in range(1):
-            self.evaluate_episode(start_poses[episode], goal_poses[episode])
+        for episode in range(num_episodes):
+            goal_pos_hab = utils.rotate_pos_from_hab(goal_poses[episode])
+            self.evaluate_episode(start_poses[episode], goal_pos_hab)
 
-    def check_done(self, action, state):
+    def compute_pointgoal(self, goal_pos):
+        """
+        :return: non-perception observation, such as goal location
+        """ 
+        robot_position, robot_rotation = self.get_robot_pos_hab()
+
+        agent_coordinates = np.array([robot_position[0], robot_position[1]])
+        agent_rotation = robot_rotation[-1]
+        goal = np.array([goal_pos[0], goal_pos[1]])
+        rho = np.linalg.norm(agent_coordinates - goal)
+        theta = (
+            np.arctan2(
+                goal[1] - agent_coordinates[1], goal[0] - agent_coordinates[0]
+            )
+            - agent_rotation
+        )
+        theta = theta % (2 * np.pi)
+        if theta >= np.pi:
+            theta = -((2 * np.pi) - theta)
+        print('goal sensor: ', rho, theta)
+        return np.array([rho, theta], dtype=np.float32)
+
+    def check_done(self, action):
         linear_velocity, strafe_velocity, angular_velocity = action
-        if abs(linear_velocity) < 0.1 and abs(strafe_velocity) < 0.1 and abs(angular_velocity) < 0.1:
-            print('ROBOT CALLED STOP!')
+        if self.dist_to_goal < self.success_dist:
             self.done = True
-            if self.dist_to_goal < self.success_dist:
-                print('EPISODE SUCCESS')
-                self.success = True
-            else:
-                print('EPISODE FAIL')
-                self.success = False
-        # roll, pitch, _ = state['base_ori_euler']
-        # if (np.abs(roll) > 0.75 or np.abs(pitch) > 0.75):
-        #     print('FAIL, ROBOT FELL OVER')
+        # if abs(linear_velocity) < 0.1 and abs(strafe_velocity) < 0.1 and abs(angular_velocity) < 0.1:
+        #     print('ROBOT CALLED STOP!')
         #     self.done = True
+        #     if self.dist_to_goal < self.success_dist:
+        #         print('EPISODE SUCCESS')
+        #         self.success = True
+        #     else:
+        #         print('EPISODE FAIL')
+        #         self.success = False
+        _, robot_rotation = self.get_robot_pos_hab()
+        if (np.abs(robot_rotation[0]) > 0.75 or np.abs(robot_rotation[1]) > 0.75):
+            print('FAIL, ROBOT FELL OVER')
+            self.done = True
+            self.success = False
     
     def evaluate_episode(self, start_pos, goal_pos):
         self.reset_robot(start_pos)
 
         self.success = False
         episode_reward = 0
+        self.num_actions = 0
+        self.done = False
         
         num_processes=1
         test_recurrent_hidden_states = torch.zeros(
@@ -167,9 +153,12 @@ class SpotWorkspace(Workspace):
             observations = {}
 
             # normalize depth images
+            # self.depth_obs = (self.depth_obs - self.min_depth) / (self.max_depth - self.min_depth)
             self.depth_obs = (self.depth_obs - self.min_depth) / (self.max_depth - self.min_depth)
             observations["depth"] = np.expand_dims(self.depth_obs, axis=2)
-            observations["pointgoal_with_gps_compass"] = self.get_goal_sensor(goal_pos)
+            observations["pointgoal_with_gps_compass"] = self.compute_pointgoal(goal_pos.copy())
+            self.dist_to_goal = observations["pointgoal_with_gps_compass"][0]
+            pointgoal_sensor = (observations["pointgoal_with_gps_compass"][0], np.rad2deg(observations["pointgoal_with_gps_compass"][1]))
             observations = [observations]
 
             batch = defaultdict(list)
@@ -217,12 +206,12 @@ class SpotWorkspace(Workspace):
 
             action = np.array([linear_velocity, strafe_velocity, angular_velocity])
             print('NUM ACTIONS: ', self.num_actions)
-            self.depth_obs = self.step_robot(action) 
+            self.depth_obs = self.step_robot(action, pointgoal_sensor, goal_pos) 
             self.num_actions +=1
         time_str = datetime.now().strftime("_%d%m%y_%H_%M_")
         save_name = time_str + 'pos_gain=' + str(self.pos_gain) + '_vel_gain=' + \
                     str(self.vel_gain) + '_finite_diff=' + str(self.finite_diff) + '.mp4'
-        rate = self.ctrl_freq // 30
+        rate = self.ctrl_freq // 10
         self.save_video(rate, save_name)
         # self.make_video()
 

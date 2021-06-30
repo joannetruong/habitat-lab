@@ -56,15 +56,11 @@ def get_rpy(rotation, transform=True):
     if transform:
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
         tmp_quat = tmp_quat*inverse_base_transform
-        # swap quaternion.y and quaternion.z to get correct roll, pitch, yaw
         obs_quat = squaternion.Quaternion(tmp_quat.scalar, tmp_quat.vector[0], tmp_quat.vector[2], tmp_quat.vector[1])
     else:
         obs_quat = tmp_quat
     roll, pitch, yaw = obs_quat.to_euler()
-    return np.array([roll, pitch, yaw])
-    # import pybullet as p
-    # rpy = p.getEulerFromQuaternion([tmp_quat.x, tmp_quat.z, tmp_quat.y, tmp_quat.w])
-    # return rpy
+    return np.array([roll, -pitch, yaw])
 
 def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
     a = np.quaternion(1, 0, 0, 0)
@@ -96,13 +92,13 @@ def get_quat(scalar, vector):
     return quat
     
 def rotate_pos_to_hab(position):
-    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
+    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, 1]))
     pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
     pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
     return pos
 
 def rotate_pos_from_hab(position):
-    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, 1]))
+    rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
     pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
     pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
     return pos 

@@ -35,12 +35,12 @@ class Workspace(object):
         self.vel_gain[2] = 1.0 # 1.5
         self.num_steps = 15
         self.ctrl_freq = 120
-        self.time_per_step = 5 #100
+        self.time_per_step = 100
         self.prev_state = None
         self.finite_diff = False
         self.robot_name = robot
         self.done = False
-        self.fixed_base = True
+        self.fixed_base = False
         self.num_actions = 0
 
     def make_configuration(self, scene):
@@ -167,6 +167,9 @@ class Workspace(object):
             "Daisy4": os.path.join(
                 data_path, "URDF_demo_assets/daisy/daisy_advanced_4legged.urdf"
             ),
+            "Locobot": os.path.join(
+                data_path, "URDF_demo_assets/locobot/urdf/locobot_description.urdf"
+            ),
         }
 
         # [basics]
@@ -249,7 +252,6 @@ class Workspace(object):
 
         return robot_position, robot_ori
 
-
     def log_raibert_controller(self):
         self.raibert_infos[str(self.ep_id)] = {}
         self.raibert_infos[str(self.ep_id)]["target_speed"] = [float(ii) for ii in self.target_speed]
@@ -277,7 +279,7 @@ class Workspace(object):
             self.ep_id +=1
             self.num_actions +=1
 
-    def step_robot(self, action):
+    def step_robot(self, action, gps_compass=None, goal=None):
         state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
         target_speed = np.array([action[0], action[1]])
         target_ang_vel = action[2]
@@ -313,7 +315,7 @@ class Workspace(object):
             # print(cur_obs[0]['depth_camera_1stperson'], cur_obs[0]['depth_camera_1stperson'].shape)
 
             state = self.robot.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
-            self.check_done(action, state)
+            self.check_done(action)
             if self.done:
                 break
             # Get text to add to video
@@ -329,6 +331,10 @@ class Workspace(object):
             text_to_add.append("Commanded Vel (x,y,ang): (" + str(target_speed) + " " +str(target_ang_vel) + ")")
             text_to_add.append("Pos Gain: " + str(self.pos_gain) + " Vel Gain: " +str(self.vel_gain))
             text_to_add.append("Action #: " + str(self.num_actions))
+            if gps_compass is not None:
+                text_to_add.append("Point Goal Sensor (r, theta): " + str(gps_compass))
+            if goal is not None:
+                text_to_add.append("goal: " + str(goal))
             self.text.append(text_to_add)
 
             self.stitch_show_img(agent_obs, ortho_obs)  
@@ -382,8 +388,9 @@ class Workspace(object):
                     cv2.putText(frame, line, (20, 100 + i*30), font, 0.5, (0, 250, 0), 2)
             video.write(frame)
         print('SAVED VIDEO')
+        self.depth_ortho_imgs = []
 
-    def check_done(self, action, state):
+    def check_done(self, action):
         pass
 
     # This is wrapped such that it can be added to a unit test
@@ -436,10 +443,10 @@ class Workspace(object):
         self.cmd_vel_xyt(0.35, 0.0, 0.0)
         print("MOVING BACKWARDS")
         self.cmd_vel_xyt(-0.35, 0.0, 0.0)
-        print("MOVING RIGHT")
-        self.cmd_vel_xyt(0.0, -0.35, 0.0)
-        print("MOVING LEFT")
-        self.cmd_vel_xyt(0.0, 0.35, 0.0)
+        # print("MOVING RIGHT")
+        # self.cmd_vel_xyt(0.0, -0.35, 0.0)
+        # print("MOVING LEFT")
+        # self.cmd_vel_xyt(0.0, 0.35, 0.0)
         print("MOVING FORWARD ARC RIGHT")
         self.cmd_vel_xyt(0.35, 0.0, -0.35)
         print("MOVING FORWARD ARC LEFT")
@@ -468,3 +475,4 @@ if __name__ == "__main__":
     W.place_camera_agent()
     W.load_robot()
     W.test_orientation()
+    # W.test_robot()
