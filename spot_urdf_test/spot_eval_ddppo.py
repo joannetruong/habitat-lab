@@ -85,7 +85,8 @@ class SpotWorkspace(Workspace):
     def evaluate_ddppo(self):
         start_poses, goal_poses = self.get_episodes()
         num_episodes = len(start_poses)
-        for episode in range(num_episodes):
+        # for episode in range(num_episodes):
+        for episode in range(1):
             goal_pos_hab = utils.rotate_pos_from_hab(goal_poses[episode])
             self.evaluate_episode(start_poses[episode], goal_pos_hab)
 
