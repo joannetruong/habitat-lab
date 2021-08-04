@@ -1194,6 +1194,7 @@ class VelocityAction(SimulatorTaskAction):
         self.max_collisions = config.MAX_COLLISIONS
         self.success_distance = config.SUCCESS_DISTANCE
         self.oblong_robot = config.USE_OBLONG_ROBOT
+        self.urdf_robot = config.USE_URDF_ROBOT
     @property
     def action_space(self):
         if self.use_strafe_vel:
@@ -1396,61 +1397,66 @@ class VelocityAction(SimulatorTaskAction):
 
             return agent_observations
         else:
-            agent_state = self._sim.get_agent_state()
+            if not self.urdf_robot:
+                agent_state = self._sim.get_agent_state()
 
-            # Convert from np.quaternion to mn.Quaternion
-            normalized_quaternion = agent_state.rotation
-            agent_mn_quat = mn.Quaternion(
-                normalized_quaternion.imag, normalized_quaternion.real
-            )
-            current_rigid_state = RigidState(
-                agent_mn_quat,
-                agent_state.position,
-            )
+                # Convert from np.quaternion to mn.Quaternion
+                normalized_quaternion = agent_state.rotation
+                agent_mn_quat = mn.Quaternion(
+                    normalized_quaternion.imag, normalized_quaternion.real
+                )
+                current_rigid_state = RigidState(
+                    agent_mn_quat,
+                    agent_state.position,
+                )
 
-            # manually integrate the rigid state
-            goal_rigid_state = self.vel_control.integrate_transform(
-                time_step, current_rigid_state
-            )
+                # manually integrate the rigid state
+                goal_rigid_state = self.vel_control.integrate_transform(
+                    time_step, current_rigid_state
+                )
 
-            # snap rigid state to navmesh and set state to object/agent
-            if allow_sliding:
-                step_fn = self._sim.pathfinder.try_step  # type: ignore
+                # snap rigid state to navmesh and set state to object/agent
+                if allow_sliding:
+                    step_fn = self._sim.pathfinder.try_step  # type: ignore
+                else:
+                    step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
+
+                final_position = step_fn(
+                    agent_state.position, goal_rigid_state.translation
+                )
+                final_rotation = [
+                    *goal_rigid_state.rotation.vector,
+                    goal_rigid_state.rotation.scalar,
+                ]
+
+                # Check if a collision occured
+                dist_moved_before_filter = (
+                    goal_rigid_state.translation - agent_state.position
+                ).dot()
+                dist_moved_after_filter = (final_position - agent_state.position).dot()
+
+                # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
+                # collision _didn't_ happen. One such case is going up stairs.  Instead,
+                # we check to see if the the amount moved after the application of the
+                # filter is _less_ than the amount moved before the application of the
+                # filter.
+                EPS = 1e-5
+                collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
+
+                agent_observations = self._sim.get_observations_at(
+                    position=final_position,
+                    rotation=final_rotation,
+                    keep_agent_at_new_pose=True,
+                )
+
+                # TODO: Make a better way to flag collisions
+                self._sim._prev_sim_obs["collided"] = collided  # type: ignore
+
+                return agent_observations
             else:
-                step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
-
-            final_position = step_fn(
-                agent_state.position, goal_rigid_state.translation
-            )
-            final_rotation = [
-                *goal_rigid_state.rotation.vector,
-                goal_rigid_state.rotation.scalar,
-            ]
-
-            # Check if a collision occured
-            dist_moved_before_filter = (
-                goal_rigid_state.translation - agent_state.position
-            ).dot()
-            dist_moved_after_filter = (final_position - agent_state.position).dot()
-
-            # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
-            # collision _didn't_ happen. One such case is going up stairs.  Instead,
-            # we check to see if the the amount moved after the application of the
-            # filter is _less_ than the amount moved before the application of the
-            # filter.
-            EPS = 1e-5
-            collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
-
-            agent_observations = self._sim.get_observations_at(
-                position=final_position,
-                rotation=final_rotation,
-                keep_agent_at_new_pose=True,
-            )
-
-            # TODO: Make a better way to flag collisions
-            self._sim._prev_sim_obs["collided"] = collided  # type: ignore
-
-            return agent_observations
+                state = self.robot_wrapper.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+                target_speed = np.array([action[0], action[1]])
+                target_ang_vel = action[2]
 
 
 @registry.register_task(name="Nav-v0")
