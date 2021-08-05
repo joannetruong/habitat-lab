@@ -4,7 +4,7 @@ import magnum as mn
 import habitat_sim 
 from habitat.utils.geometry_utils import quaternion_rotate_vector, quaternion_from_coeff
 from habitat.tasks.utils import cartesian_to_polar
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab, scalar_vector_to_quat, rotate_vector_2d
+from .utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad, rotate_pos_from_hab, scalar_vector_to_quat, rotate_vector_2d
 import squaternion
 
 class A1():

@@ -24,6 +24,7 @@ except ImportError:
     GreedyFollower = BaseException
 try:
     from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
+    from habitat.sims.habitat_simulator.spot_sim import SpotSim
 except ImportError:
     habitat_sim = BaseException
 ISLAND_RADIUS_LIMIT = 1.5

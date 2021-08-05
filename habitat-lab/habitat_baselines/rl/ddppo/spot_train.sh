@@ -3,6 +3,8 @@
 export GLOG_minloglevel=2
 export MAGNUM_LOG=quiet
 
+ln -s /coc/testnvme/jtruong33/data/scene_datasets /nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/data/
+
 set -x
 python -u -m torch.distributed.launch \
     --use_env \

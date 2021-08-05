@@ -23,14 +23,14 @@ from collections import defaultdict
 
 from habitat_sim.physics import MotionType
 
-from spot_utils.quadruped_env import A1, AlienGo, Laikago, Spot
-from spot_utils.daisy_env import Daisy, Daisy_4legged
-from spot_utils.raibert_controller import Raibert_controller
-from spot_utils.raibert_controller import Raibert_controller_turn_stable
+from .spot_utils.quadruped_env import A1, AlienGo, Laikago, Spot
+from .spot_utils.daisy_env import Daisy, Daisy_4legged
+from .spot_utils.raibert_controller import Raibert_controller
+from .spot_utils.raibert_controller import Raibert_controller_turn_stable
 import cv2
 import json
 import time
-from spot_utils import utils
+from .spot_utils import utils
 
 from typing import Callable
 
@@ -69,7 +69,7 @@ class SpotSim(HabitatSim):
         super().__init__(config)
 
         agent_config = self.habitat_config
-        self.navmesh_settings = get_nav_mesh_settings(self._get_agent_config())
+        #self.navmesh_settings = get_nav_mesh_settings(self._get_agent_config())
         self.robot_id = None
         self.first_setup = True
         self.is_render_obs = False
@@ -154,7 +154,6 @@ class SpotSim(HabitatSim):
         self._load_markers(ep_info)
 
 
-    @rutils.TimeProfiler("sim.reset.load_navmesh")
     def _load_navmesh(self):
         """
         Generates the navmesh if it was not specified. This must be called
@@ -175,7 +174,7 @@ class SpotSim(HabitatSim):
 
 
 
-    @rutils.TimeProfiler("sim.reset")
+
     def reset(self):
         self.event_callbacks = []
         ret = super().reset()
@@ -213,8 +212,7 @@ class SpotSim(HabitatSim):
                 self._sim.remove_articulated_object(art_obj)
             self.art_obj_ids = []
 
-    @profiling_utils.RangeContext("add_objs")
-    @rutils.TimeProfiler("sim.reset.add_objs")
+
     def _add_objs(self, ep_info):
         art_names = [x[0] for x in ep_info['art_objs']]
         self.clear_objs(art_names)
@@ -266,8 +264,7 @@ class SpotSim(HabitatSim):
         new_trans.translation = pos
         self._sim.set_articulated_object_root_state(self.robot_id, new_trans)
 
-    @profiling_utils.RangeContext("load_robot")
-    @rutils.TimeProfiler("sim.reset.load_robot")
+
     def _load_robot(self, ep_info):
         if not self.habitat_config.get('LOAD_ROBOT', True):
             return
@@ -466,8 +463,7 @@ class SpotSim(HabitatSim):
             self._sim.step_world(1/self.ctrl_freq)
 
 
-    @profiling_utils.RangeContext("simulator_step")
-    @rutils.TimeProfiler("sim.step")
+
     def step(self, action):
         self.update_i += 1
 

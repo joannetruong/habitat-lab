@@ -1,4 +1,4 @@
-from utilities.utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
+from .utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
 import gym, gym.spaces
 import numpy as np
 

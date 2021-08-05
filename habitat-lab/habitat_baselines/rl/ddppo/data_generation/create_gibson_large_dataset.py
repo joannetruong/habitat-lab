@@ -42,7 +42,9 @@ def _generate_fn(scene):
     cfg.SIMULATOR.SCENE = scene
     cfg.SIMULATOR.AGENT_0.SENSORS = []
     cfg.freeze()
-
+    print('\n\n\n\n\n')
+    print(cfg.SIMULATOR)
+    print('hereherer')
     sim = habitat.sims.make_sim("Sim-v0", config=cfg.SIMULATOR)
 
     dset = habitat.datasets.make_dataset("PointNav-v1")
