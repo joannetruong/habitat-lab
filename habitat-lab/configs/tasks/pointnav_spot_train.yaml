@@ -3,6 +3,9 @@ ENVIRONMENT:
   MAX_EPISODE_STEPS: 500
 SIMULATOR:
   TYPE: "SpotSim-v0"
+  ROBOT_URDF: "URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+  AC_FREQ_RATIO: 4
+  CTRL_FREQ: 120.0
   AGENT_0:
     HEIGHT: 0.60
     RADIUS: 0.25
@@ -34,6 +37,7 @@ TASK:
       MAX_COLLISIONS: -1
       SUCCESS_DISTANCE: 0.30
       USE_OBLONG_ROBOT: False
+      USE_URDF_ROBOT: True
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
     GOAL_FORMAT: "POLAR"

@@ -73,7 +73,9 @@ class SpotSim(HabitatSim):
         self.robot_id = None
         self.first_setup = True
         self.is_render_obs = False
-        self.pov_mode = agent_config.POV
+        
+
+
         self.update_i = 0
         self.h_offset = 0.3
         self.ep_info = None
@@ -383,28 +385,28 @@ class SpotSim(HabitatSim):
 
         node = self._sim._default_agent.scene_node
 
-        if self.pov_mode == 'bird':
-            cam_pos = mn.Vector3(0.0, 0.0, 4.0)
-        elif self.pov_mode == '3rd':
-            cam_pos = mn.Vector3(0.0, -1.2, 1.5)
-        elif self.pov_mode == '1st':
-            cam_pos = mn.Vector3(0.17, 0.0, 0.90+self.h_offset)
-        elif self.pov_mode == 'move':
-            cam_pos = mn.Vector3(*self.move_cam_pos)
-        else:
-            raise ValueError()
+        # if self.pov_mode == 'bird':
+        #     cam_pos = mn.Vector3(0.0, 0.0, 4.0)
+        # elif self.pov_mode == '3rd':
+        #     cam_pos = mn.Vector3(0.0, -1.2, 1.5)
+        # elif self.pov_mode == '1st':
+        #     cam_pos = mn.Vector3(0.17, 0.0, 0.90+self.h_offset)
+        # elif self.pov_mode == 'move':
+        #     cam_pos = mn.Vector3(*self.move_cam_pos)
+        # else:
+        #     raise ValueError()
 
         look_at = mn.Vector3(1, 0.0, 0.75)
         look_at = robot_state.transform_point(look_at)
-        if self.pov_mode == 'move':
-            agent_config = self.habitat_config
-            if 'LOOK_AT' in agent_config:
-                x,y,z = agent_config.LOOK_AT
-            else:
-                x,y,z = self.get_end_effector_pos()
-            look_at = mn.Vector3(x,y,z)
-        else:
-            cam_pos = robot_state.transform_point(cam_pos)
+        # if self.pov_mode == 'move':
+        #     agent_config = self.habitat_config
+        #     if 'LOOK_AT' in agent_config:
+        #         x,y,z = agent_config.LOOK_AT
+        #     else:
+        #         x,y,z = self.get_end_effector_pos()
+        #     look_at = mn.Vector3(x,y,z)
+        # else:
+        cam_pos = robot_state.transform_point(cam_pos)
 
         node.transformation = mn.Matrix4.look_at(
                 cam_pos,

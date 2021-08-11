@@ -319,7 +319,7 @@ class PPOTrainer(BaseRLTrainer):
             discrete_actions=discrete_actions,
         )
         self.rollouts.to(self.device)
-
+        print(self.envs)
         observations = self.envs.reset()
         batch = batch_obs(
             observations, device=self.device, cache=self._obs_batching_cache
