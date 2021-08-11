@@ -9,6 +9,7 @@ from habitat.core.registry import registry
 from habitat.sims.habitat_simulator import _try_register_habitat_sim
 from habitat.sims.pyrobot import _try_register_pyrobot
 from habitat.sims.habitat_simulator.spot_sim import SpotSim
+from habitat.sims.habitat_simulator.spot_sim_v2 import SpotSimv2
 
 
 def make_sim(id_sim, **kwargs):

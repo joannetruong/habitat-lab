@@ -248,6 +248,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
             ignore_keys={"gpu_gpu"},
         )
         sim_config.scene_id = self.habitat_config.SCENE
+        sim_config.enable_physics = self.habitat_config.ENABLE_PHYSICS
         agent_config = habitat_sim.AgentConfiguration()
         overwrite_config(
             config_from=self._get_agent_config(),
