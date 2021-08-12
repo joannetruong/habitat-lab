@@ -102,6 +102,7 @@ class SpotSimv2(HabitatSim):
         self.ac_freq_ratio = agent_config.AC_FREQ_RATIO
         # The physics update time step.
         self.ctrl_freq = agent_config.CTRL_FREQ
+        self.dt = 1/self.ctrl_freq
         # Effective control speed is (ctrl_freq/ac_freq_ratio)
 
 
@@ -133,6 +134,7 @@ class SpotSimv2(HabitatSim):
         # new_state.sensor_states = {}
         # agent.set_state(new_state, reset_sensors)
         # print('SPOT SIM SET AGENT STATE 3')
+        self.reset_robot()
         return True
 
     def reset(self):
@@ -216,17 +218,17 @@ class SpotSimv2(HabitatSim):
         rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
 
         if self.robot_name == 'A1':
-            self.robot_wrapper = A1(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = A1(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
         elif self.robot_name == 'AlienGo':
-            self.robot_wrapper = AlienGo(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = AlienGo(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
         elif self.robot_name == 'Daisy':
-            self.robot_wrapper = Daisy(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Daisy(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
         elif self.robot_name == 'Laikago':
-            self.robot_wrapper = Laikago(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Laikago(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
         elif self.robot_name == 'Daisy_4legged':
-            self.robot_wrapper = Daisy4(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Daisy4(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
         elif self.robot_name == 'Spot':
-            self.robot_wrapper = Spot(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Spot(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
 
         self.robot_wrapper.robot_specific_reset()
         
@@ -237,13 +239,11 @@ class SpotSimv2(HabitatSim):
         self.raibert_controller = Raibert_controller_turn_stable(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
         print('FINISHED LOADING ROBOT')
 
-    def reset_robot(self, start_pose):
-        self.robot_hab.translation = start_pose
-        self.robot_hab.rotation = mn.Quaternion.rotation(mn.Rad(-1.57), mn.Vector3(1.0, 0.0, 0.0).normalized())
-        self.init_state = self.robot_wrapper.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
+    def reset_robot(self):
+        self.init_state = self.robot_wrapper.calc_state()
         self.raibert_controller.set_init_state(self.init_state)
-        pos, ori = self.get_robot_pos()
-        print('robot start pos: ', pos, np.rad2deg(ori[-1]))
+        # pos, ori = self.get_robot_pos()
+        # print('robot start pos: ', pos, np.rad2deg(ori[-1]))
 
     def get_robot_pos(self):
         robot_state = self.robot_hab.rigid_state
@@ -314,36 +314,51 @@ class SpotSimv2(HabitatSim):
         # Viz the camera position
         #self.viz_marker = self.viz_pos(self.cam_pos, self.viz_marker)
 
+    def set_mtr_pos(self, joint, ctrl):
+        jms = self.robot_hab.get_joint_motor_settings(joint)
+        jms.position_target = ctrl
+        self.robot_hab.update_joint_motor(joint, jms)
 
-    def path_to_point(self, point):
-        trans = self.get_robot_transform()
-        agent_pos = trans.translation
-        closest_point = self._sim.pathfinder.snap_point(point)
-        path = habitat_sim.ShortestPath()
-        path.requested_start = agent_pos
-        path.requested_end = closest_point
-        found_path = self._sim.pathfinder.find_path(path)
-        if not found_path:
-            return [agent_pos, point]
-        if len(path.points) == 1:
-            return [agent_pos, path.points[0]]
-        return path.points
+    def apply_robot_action(self, action, pos_gain, vel_gain):
+        """Applies actions to the robot.
 
-    def inter_target(self, targs, idxs, seconds):
-        curs = np.array([self.get_mtr_pos(i) for i in idxs])
-        diff = targs - curs
-        T = int(seconds * self.ctrl_freq)
-        delta = diff / T
-
-        for i in range(T):
-            for j, jidx in enumerate(idxs):
-                self.set_mtr_pos(jidx, delta[j]*(i+1)+curs[j])
-                self.set_joint_pos(jidx, delta[j]*(i+1)+curs[j])
-            self._sim.step_world(1/self.ctrl_freq)
+        Args:
+            a (list): List of floats. Length must be equal to len(self.ordered_joints).
+        """
+        assert (np.isfinite(action).all())
+        assert len(action) == len(self.ordered_joints)
+        for n, j in enumerate(self.ordered_joints):
+            a = float(np.clip(action[n], -np.pi/2, np.pi/2)) 
+            self.set_mtr_pos(n, a)
 
     def step(self, action): 
-        sim_obs = super().step(action)
-        self._prev_sim_obs = sim_obs
+        print('SPOT SIM STEP')
+        state = self.robot_wrapper.calc_state()
+        print('SPOT SIM STEP 0')
+        target_speed = np.array([action[0], action[1]])
+        target_ang_vel = action[2]
+        print('SPOT SIM STEP 01')
+        latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+        print('SPOT SIM STEP 02')
+        self.raibert_controller.update_latent_action(state, latent_action)
+
+        print('SPOT SIM STEP 1')
+        for i in range(self.time_per_step):
+            print('SPOT SIM STEP 2')
+            state = self.robot_wrapper.calc_state()
+            print('SPOT SIM STEP 3')
+            raibert_action = self.raibert_controller.get_action(state, i+1)
+            print('SPOT SIM STEP 4')
+            self.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
+            print('SPOT SIM STEP 5')
+            if follow_robot:
+                self._follow_robot()
+            print('SPOT SIM STEP 6')
+
+            # while self.sim.get_world_time() < start_time + dt:
+            print('SPOT SIM STEP 6')
+            self._sim.step_physics(self.dt)
+        sim_obs = self._sim.get_sensor_observations(0)
         observations = self._sensor_suite.get_observations(sim_obs)
         return observations
 

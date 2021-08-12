@@ -67,7 +67,7 @@ class A1():
         joint_remapped[10] = joints[7]
         joint_remapped[11] = joints[8]
 
-    def calc_state(self, prev_state=None, finite_diff=False):
+    def calc_state(self):
         """Computes the state.
         Unlike the original gym environment, which returns only a single
         array, we return here a dict because this is much more intuitive later on.
@@ -78,7 +78,7 @@ class A1():
                 in the world. 'base_ori_euler' is the orientation of the robot
                 in euler angles.
         """
-
+        print('CALC STATE')
 
         joint_positions = self.robot.joint_positions
         joint_velocities = self.robot.joint_velocities
@@ -107,13 +107,6 @@ class A1():
         inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1, 0, 0))
         base_orientation_quat_trans = obs_quat*inverse_base_transform
 
-        if prev_state is None:
-            base_velocity_finite = mn.Vector3() 
-            base_angular_velocity_euler_finite = mn.Vector3() 
-        else:
-            base_velocity_finite = (base_position - prev_state['base_pos']) / self.dt
-            base_angular_velocity_euler_finite = (base_orientation_euler - prev_state['base_ori_euler']) / self.dt
-        
         lin_vel = mn.Vector3(lin_vel.x, lin_vel.z, lin_vel.y)
 
         base_velocity = lin_vel
@@ -129,8 +122,6 @@ class A1():
             'base_ori_quat': base_orientation_quat_trans,
             'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
-            'base_velocity_finite': rotate_vector_3d(base_velocity_finite, *base_orientation_euler),
-            'base_ang_vel_finite': rotate_vector_3d(base_angular_velocity_euler_finite, *base_orientation_euler),
             'j_pos': joint_positions,
             'j_vel': joint_velocities
         }
