@@ -8,12 +8,11 @@ from .utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
 import squaternion
 
 class A1():
-    def __init__(self, sim=None, robot=None, agent=None, robot_id=0, dt=1/60):
+    def __init__(self, sim=None, robot=None, robot_id=0, dt=1/60):
         #self.torque = config.get("torque", 1.0)
         self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
-        self.agent = agent
         self.robot_id = robot_id
         self.control = "position"
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
@@ -213,24 +212,24 @@ class A1():
         self.apply_robot_action(action)
 
 class AlienGo(A1):
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
-        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim, robot_id=robot_id, dt=dt)
         self._initial_joint_positions = [-0.1, 0.60, -1.5,
                                          0.1, 0.60, -1.5,
                                          -0.1, 0.6, -1.5,
                                          0.1, 0.6, -1.5]
 
 class Laikago(A1):
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
-        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim, robot_id=robot_id, dt=dt)
         self._initial_joint_positions = [-0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2]
 
 class Spot(A1):
-    def __init__(self, sim=None, robot=None, agent=None, robot_id=0, dt=1/60):
-        super().__init__(sim=sim,robot=robot, agent=agent, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot=None, robot_id=0, dt=1/60):
+        super().__init__(sim=sim,robot=robot, robot_id=robot_id, dt=dt)
         self._initial_joint_positions = [-0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3,

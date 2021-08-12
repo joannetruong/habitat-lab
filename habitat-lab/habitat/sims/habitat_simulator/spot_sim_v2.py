@@ -31,6 +31,7 @@ import cv2
 import json
 import time
 from .spot_utils import utils
+import squaternion
 
 from typing import Callable
 
@@ -86,13 +87,14 @@ class SpotSimv2(HabitatSim):
         self.snapped_obj_constraint_id = []
         self.prev_loaded_navmesh = None
         self.prev_scene_id = None
-        self.robot_name = agent_config.ROBOT_URDF.split("/")[-1].split(".")[0]
+        self.robot_name = agent_config.ROBOT
+        self.time_per_step = agent_config.TIME_PER_STEP
 
         self.pos_gain = np.ones((3,)) * 0.1 # 0.2
         self.vel_gain = np.ones((3,)) * 1.0 # 1.5
         self.pos_gain[2] = 0.1 # 0.7
         self.vel_gain[2] = 1.0 # 1.5
-        
+
         if 'CAM_START' in agent_config:
             self.move_cam_pos = np.array(agent_config.CAM_START)
 
@@ -108,6 +110,39 @@ class SpotSimv2(HabitatSim):
         self._goal_pos = None
         self._load_robot()
 
+    def set_agent_state(
+        self,
+        position,
+        rotation,
+        agent_id,
+        reset_sensors=True,
+    ):
+        self.set_robot_pos(position)
+        xyzw_quat = [rotation[-1], rotation[0], rotation[1], rotation[2]]
+        roll, yaw, pitch = squaternion.Quaternion(*xyzw_quat).to_euler()
+        self.set_robot_rot(yaw)
+        
+        # self.robot_hab.translation = mn.Vector3(position)
+        # self.robot_hab.rotation = rotation
+
+        # NB: The agent state also contains the sensor states in _absolute_
+        # coordinates. In order to set the agent's body to a specific
+        # location and have the sensors follow, we must not provide any
+        # state for the sensors. This will cause them to follow the agent's
+        # body
+        # new_state.sensor_states = {}
+        # agent.set_state(new_state, reset_sensors)
+        # print('SPOT SIM SET AGENT STATE 3')
+        return True
+
+    def reset(self):
+        sim_obs = super().reset()
+        if self._update_agents_state():
+            sim_obs = self.get_sensor_observations()
+
+        self._prev_sim_obs = sim_obs
+        return self._sensor_suite.get_observations(sim_obs)
+
     @property
     def _sim(self):
         return self
@@ -117,25 +152,26 @@ class SpotSimv2(HabitatSim):
         - set_pos: 2D coordinates of where the robot will be placed. The height
           will be same as current position.
         """
-        base_transform = self._sim.get_articulated_object_root_state(self.robot_id)
+        base_transform = self.robot_hab.transformation
         pos = base_transform.translation
         base_transform.translation = mn.Vector3(set_pos[0], pos[1], set_pos[1])
-        self._sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        # self._sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        self.robot_hab.translation = base_transform.translation
 
     def set_robot_rot(self, rot_rad):
         """
         Set the rotation of the robot along the y-axis. The position will
         remain the same.
         """
-        cur_trans = self._sim.get_articulated_object_root_state(self.robot_id)
+        cur_trans = self.robot_hab.transformation
         pos = cur_trans.translation
 
         rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
         add_rot_mat = mn.Matrix4.rotation(mn.Rad(rot_rad), mn.Vector3(0.0, 0, 1))
         new_trans = rot_trans @ add_rot_mat
         new_trans.translation = pos
-        self._sim.set_articulated_object_root_state(self.robot_id, new_trans)
-
+        self.robot_hab.rotation = mn.Quaternion.from_matrix(new_trans.rotation()) 
+        # self._sim.set_articulated_object_root_state(self.robot_id, new_trans)
 
     def _load_robot(self):
         print('loading robot')
@@ -146,10 +182,8 @@ class SpotSimv2(HabitatSim):
             agent_config = self.habitat_config
             robot_file = agent_config.ROBOT_URDF
             art_obj_mgr = self._sim.get_articulated_object_manager()
-            print('robot file: ', robot_file)
             backend_cfg = habitat_sim.SimulatorConfiguration()
             self.robot_hab = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=self.fixed_base)
-            print('self.robot hab: ', self.robot_hab)
             self.robot_id = self.robot_hab.object_id
             if self.robot_id == -1:
                 raise ValueError('Could not load ' + robot_file)
@@ -182,17 +216,17 @@ class SpotSimv2(HabitatSim):
         rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
 
         if self.robot_name == 'A1':
-            self.robot_wrapper = A1(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = A1(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'AlienGo':
-            self.robot_wrapper = AlienGo(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = AlienGo(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Daisy':
-            self.robot_wrapper = Daisy(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Daisy(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Laikago':
-            self.robot_wrapper = Laikago(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Laikago(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Daisy_4legged':
-            self.robot_wrapper = Daisy4(sim=self.sim, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Daisy4(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
         elif self.robot_name == 'Spot':
-            self.robot_wrapper = Spot(sim=self.sim, robot=self.robot_hab, agent=self.agent, robot_id=self.robot_id, dt=1/self.ctrl_freq)
+            self.robot_wrapper = Spot(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=1/self.ctrl_freq)
 
         self.robot_wrapper.robot_specific_reset()
         
@@ -201,6 +235,7 @@ class SpotSimv2(HabitatSim):
         action_limit[:, 0] = np.zeros(12) + np.pi / 2
         action_limit[:, 1] = np.zeros(12) - np.pi / 2
         self.raibert_controller = Raibert_controller_turn_stable(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
+        print('FINISHED LOADING ROBOT')
 
     def reset_robot(self, start_pose):
         self.robot_hab.translation = start_pose
@@ -223,7 +258,7 @@ class SpotSimv2(HabitatSim):
         self.move_cam_pos += np.array(delta_xyz)
 
     def _follow_robot(self):
-        robot_state = self._sim.get_articulated_object_root_state(self.robot_id)
+        robot_state = self.robot_hab.transformation
 
         node = self._sim._default_agent.scene_node
 
@@ -322,4 +357,7 @@ class SpotSimv2(HabitatSim):
         new_state.position = pos
         new_state.rotation = rot
         return new_state
+
+    def get_robot_transform(self):
+        return self.robot_hab.transformation
 

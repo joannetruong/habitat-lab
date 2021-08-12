@@ -1350,6 +1350,7 @@ class VelocityAction(SimulatorTaskAction):
             state = self.robot_wrapper.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
             target_speed = np.array([action[0], action[1]])
             target_ang_vel = action[2]
+            self._sim.step_physics(1/120.)
 
 
 @registry.register_task(name="Nav-v0")
