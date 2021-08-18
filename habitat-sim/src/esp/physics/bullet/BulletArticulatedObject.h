@@ -41,15 +41,13 @@ class BulletArticulatedLink : public ArticulatedLink, public BulletBase {
 
   Magnum::Range3D getCollisionShapeAabb() const override {
     // TODO: collision object should be linked here
-    Mn::Warning{}
-        << "BulletArticulatedLink::getCollisionShapeAabb : Not implemented.";
+    ESP_WARNING() << "Not implemented.";
     return Magnum::Range3D();
   }
 
   //! link can't do this.
   void setMotionType(CORRADE_UNUSED MotionType mt) override {
-    Mn::Warning{} << "BulletArticulatedLink::setMotionType : Cannot set "
-                     "MotionType individually for links.";
+    ESP_WARNING() << "Cannot set MotionType individually for links.";
   }
 
  protected:
@@ -354,18 +352,18 @@ class BulletArticulatedObject : public ArticulatedObject {
    * correctly configured for the target joint.
    * @return The motorId for the new joint motor
    */
-  int createJointMotor(const int linkIndex,
+  int createJointMotor(int linkIndex,
                        const JointMotorSettings& settings) override;
 
   /**
    * @brief Remove and destroy a joint motor.
    */
-  void removeJointMotor(const int motorId) override;
+  void removeJointMotor(int motorId) override;
 
   /**
    * @brief Update a JointMotor with new settings.
    */
-  void updateJointMotor(const int motorId,
+  void updateJointMotor(int motorId,
                         const JointMotorSettings& settings) override;
 
   /**

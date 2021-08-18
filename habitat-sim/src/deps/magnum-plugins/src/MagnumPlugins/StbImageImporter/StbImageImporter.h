@@ -73,7 +73,7 @@ Supports the following formats using the
 -   Truevision TGA (`*.tga`, `*.vda`, `*.icb`, `*.vst`)
 
 Creates RGB, RGBA, grayscale or grayscale + alpha images with 8, 16 or float 32
-bits per channel. Palleted images are automatically converted to RGB(A).
+bits per channel. Paletted images are automatically converted to RGB(A).
 
 This plugin provides the `BmpImporter`, `GifImporter`, `HdrImporter`,
 `JpegImporter`, `PgmImporter`, `PicImporter`, `PngImporter`, `PpmImporter`,
@@ -190,6 +190,9 @@ For some formats, it's possible to tune various output options through
 @ref configuration(). See below for all options and their default values:
 
 @snippet MagnumPlugins/StbImageImporter/StbImageImporter.conf config
+
+See @ref plugins-configuration for more information and an example showing how
+to edit the configuration values.
 
 @todo Enable ARM NEON when I'm able to test that
 */

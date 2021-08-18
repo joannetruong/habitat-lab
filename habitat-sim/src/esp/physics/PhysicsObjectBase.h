@@ -382,10 +382,14 @@ class PhysicsObjectBase : public Magnum::SceneGraph::AbstractFeature3D {
     }
   }
 
+  /** @brief Activate deferred updates, preventing SceneNode state changes until
+   * updateNodes is called to prevent SceneGraph pollution during render.
+   */
   virtual void deferUpdate() { isDeferringUpdate_ = true; }
 
-  /**
-   * @brief update the SceneNode state to match the simulation state
+  /** @brief Disable deferred updates if active and sets SceneNode states from
+   * internal object physics states.
+   * @param force If set, update sleeping nodes as well as active nodes.
    */
   virtual void updateNodes(CORRADE_UNUSED bool force = false) {
     isDeferringUpdate_ = false;
@@ -421,6 +425,13 @@ class PhysicsObjectBase : public Magnum::SceneGraph::AbstractFeature3D {
   virtual std::vector<scene::SceneNode*> getVisualSceneNodes() const = 0;
 
   core::Configuration::ptr getUserAttributes() const { return userAttributes_; }
+
+  /**
+   * @brief This function will completely overwrite this object's
+   * user-defined attributes.
+   * @param attr A ptr to the user defined attributes specified for this object.
+   * merge into them.
+   */
   void setUserAttributes(core::Configuration::ptr attr) {
     userAttributes_ = std::move(attr);
   }

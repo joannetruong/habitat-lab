@@ -26,14 +26,25 @@ void initPhysicsBindings(py::module& m) {
   // ==== struct object VelocityControl ====
   py::class_<VelocityControl, VelocityControl::ptr>(m, "VelocityControl")
       .def(py::init(&VelocityControl::create<>))
-      .def_readwrite("linear_velocity", &VelocityControl::linVel)
-      .def_readwrite("angular_velocity", &VelocityControl::angVel)
-      .def_readwrite("controlling_lin_vel", &VelocityControl::controllingLinVel)
-      .def_readwrite("lin_vel_is_local", &VelocityControl::linVelIsLocal)
-      .def_readwrite("controlling_ang_vel", &VelocityControl::controllingAngVel)
-      .def_readwrite("ang_vel_is_local", &VelocityControl::angVelIsLocal)
-      .def("integrate_transform", &VelocityControl::integrateTransform, "dt"_a,
-           "rigid_state"_a);
+      .def_readwrite("linear_velocity", &VelocityControl::linVel,
+                     R"(The linear velocity in meters/second.)")
+      .def_readwrite(
+          "angular_velocity", &VelocityControl::angVel,
+          R"(The angular velocity (Omega) in units of radians per second.)")
+      .def_readwrite("controlling_lin_vel", &VelocityControl::controllingLinVel,
+                     R"(Whether or not linear velocity is integrated.)")
+      .def_readwrite(
+          "lin_vel_is_local", &VelocityControl::linVelIsLocal,
+          R"(Whether the linear velocity is considered to be in object local space or global space.)")
+      .def_readwrite("controlling_ang_vel", &VelocityControl::controllingAngVel,
+                     R"(Whether or not angular velocity is integrated.)")
+      .def_readwrite(
+          "ang_vel_is_local", &VelocityControl::angVelIsLocal,
+          R"(Whether the angular velocity is considered to be in object local space or global space.)")
+      .def(
+          "integrate_transform", &VelocityControl::integrateTransform, "dt"_a,
+          "rigid_state"_a,
+          R"(Integrate the velocity (with explicit Euler) over a discrete timestep (dt) starting at a given state and using configured parameters. Returns the new state after integration.)");
 
   // ==== enum articulated JointType ====
   py::enum_<JointType>(m, "JointType")
@@ -84,6 +95,43 @@ void initPhysicsBindings(py::module& m) {
           "motor_type", &JointMotorSettings::motorType,
           R"(The type of motor parameterized by these settings. Determines which parameters to use.)");
 
+  // ==== enum RigidConstraintType ====
+  py::enum_<RigidConstraintType>(m, "RigidConstraintType")
+      .value("PointToPoint", RigidConstraintType::PointToPoint)
+      .value("Fixed", RigidConstraintType::Fixed);
+
+  // ==== struct object RigidConstraintSettings ====
+  py::class_<RigidConstraintSettings, RigidConstraintSettings::ptr>(
+      m, "RigidConstraintSettings")
+      .def(py::init(&RigidConstraintSettings::create<>))
+      .def_readwrite("constraint_type",
+                     &RigidConstraintSettings::constraintType,
+                     R"(The type of constraint described by these settings.)")
+      .def_readwrite(
+          "max_impulse", &RigidConstraintSettings::maxImpulse,
+          R"(The maximum impulse applied by this constraint. Should be tuned relative to physics timestep.)")
+      .def_readwrite(
+          "object_id_a", &RigidConstraintSettings::objectIdA,
+          R"(The id of the first object. Must be >=0. For mixed type constraints, objectA must be the ArticulatedObject.)")
+      .def_readwrite("object_id_b", &RigidConstraintSettings::objectIdB,
+                     R"(The id of the second object. -1 for world/global.)")
+      .def_readwrite(
+          "link_id_a", &RigidConstraintSettings::linkIdA,
+          R"(The id of the link for objectA if articulated, otherwise ignored. -1 for base link.)")
+      .def_readwrite(
+          "link_id_b", &RigidConstraintSettings::linkIdB,
+          R"(The id of the link for objectB if articulated, otherwise ignored. -1 for base link.)")
+      .def_readwrite("pivot_a", &RigidConstraintSettings::pivotA,
+                     R"(Constraint point in local space of objectA.)")
+      .def_readwrite("pivot_b", &RigidConstraintSettings::pivotB,
+                     R"(Constraint point in local space of objectB.)")
+      .def_readwrite(
+          "frame_a", &RigidConstraintSettings::frameA,
+          R"(Constraint orientation frame in local space of objectA as 3x3 rotation matrix for RigidConstraintType::Fixed.)")
+      .def_readwrite(
+          "frame_b", &RigidConstraintSettings::frameB,
+          R"(Constraint orientation frame in local space of objectB as 3x3 rotation matrix for RigidConstraintType::Fixed.)");
+
   // ==== struct object RayHitInfo ====
   py::class_<RayHitInfo, RayHitInfo::ptr>(m, "RayHitInfo")
       .def(py::init(&RayHitInfo::create<>))
@@ -102,16 +150,31 @@ void initPhysicsBindings(py::module& m) {
   // ==== struct object ContactPointData ====
   py::class_<ContactPointData, ContactPointData::ptr>(m, "ContactPointData")
       .def(py::init(&ContactPointData::create<>))
-      .def_readwrite("object_id_a", &ContactPointData::objectIdA)
-      .def_readwrite("object_id_b", &ContactPointData::objectIdB)
-      .def_readwrite("link_id_a", &ContactPointData::linkIndexA)
-      .def_readwrite("link_id_b", &ContactPointData::linkIndexB)
-      .def_readwrite("position_on_a_in_ws", &ContactPointData::positionOnAInWS)
-      .def_readwrite("position_on_b_in_ws", &ContactPointData::positionOnBInWS)
-      .def_readwrite("contact_normal_on_b_in_ws",
-                     &ContactPointData::contactNormalOnBInWS)
-      .def_readwrite("contact_distance", &ContactPointData::contactDistance)
-      .def_readwrite("normal_force", &ContactPointData::normalForce)
+      .def_readwrite(
+          "object_id_a", &ContactPointData::objectIdA,
+          R"(The Habitat object id of the first object in this collision pair.)")
+      .def_readwrite(
+          "object_id_b", &ContactPointData::objectIdB,
+          R"(The Habitat object id of the second object in this collision pair.)")
+      .def_readwrite(
+          "link_id_a", &ContactPointData::linkIndexA,
+          R"(The Habitat link id of the first object in this collision pair if an articulated link. -1 can indicate base link.)")
+      .def_readwrite(
+          "link_id_b", &ContactPointData::linkIndexB,
+          R"(The Habitat link id of the second object in this collision pair if an articulated link. -1 can indicate base link.)")
+      .def_readwrite(
+          "position_on_a_in_ws", &ContactPointData::positionOnAInWS,
+          R"(The global position of the contact point on the first object.)")
+      .def_readwrite(
+          "position_on_b_in_ws", &ContactPointData::positionOnBInWS,
+          R"(The global position of the contact point on the second object.)")
+      .def_readwrite(
+          "contact_normal_on_b_in_ws", &ContactPointData::contactNormalOnBInWS,
+          R"(The contact normal relative to the second object in world space.)")
+      .def_readwrite("contact_distance", &ContactPointData::contactDistance,
+                     R"(The penetration depth of the contact point.)")
+      .def_readwrite("normal_force", &ContactPointData::normalForce,
+                     R"(The normal force produced by the contact point.)")
       .def_readwrite("linear_friction_force1",
                      &ContactPointData::linearFrictionForce1)
       .def_readwrite("linear_friction_force2",
@@ -120,7 +183,9 @@ void initPhysicsBindings(py::module& m) {
                      &ContactPointData::linearFrictionDirection1)
       .def_readwrite("linear_friction_direction2",
                      &ContactPointData::linearFrictionDirection2)
-      .def_readwrite("is_active", &ContactPointData::isActive);
+      .def_readwrite(
+          "is_active", &ContactPointData::isActive,
+          R"(Whether or not the contact is between active objects. Deactivated objects may produce contact points but no reaction.)");
 
   // ==== enum object CollisionGroup ====
   py::enum_<CollisionGroup> collisionGroups{m, "CollisionGroups",

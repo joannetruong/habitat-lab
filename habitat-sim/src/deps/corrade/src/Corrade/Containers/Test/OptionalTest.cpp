@@ -436,6 +436,7 @@ void OptionalTest::constructMoveMake() {
     {
         auto a = optional(Movable{32});
         CORRADE_VERIFY(a);
+        CORRADE_VERIFY(std::is_same<decltype(a), Optional<Movable>>::value);
         CORRADE_COMPARE(a->a, 32);
     }
 
@@ -554,13 +555,13 @@ void OptionalTest::convertMove() {
     MaybePtr a(new int{35});
     CORRADE_COMPARE(*a.a, 35);
 
-    Optional<int*> b(std::move(a));
+    Optional<int*> b(Utility::move(a));
     CORRADE_VERIFY(b);
     CORRADE_VERIFY(*b);
     CORRADE_COMPARE(**b, 35);
     CORRADE_VERIFY(!a.a);
 
-    MaybePtr c(std::move(b));
+    MaybePtr c(Utility::move(b));
     CORRADE_VERIFY(c.a);
     CORRADE_COMPARE(*c.a, 35);
     CORRADE_VERIFY(!b);
@@ -622,7 +623,7 @@ void OptionalTest::constructCopyFromSet() {
 void OptionalTest::constructMoveFromNull() {
     {
         Optional<Copyable> a;
-        Optional<Copyable> b{std::move(a)};
+        Optional<Copyable> b{Utility::move(a)};
 
         CORRADE_VERIFY(!a);
         CORRADE_VERIFY(!b);
@@ -637,7 +638,7 @@ void OptionalTest::constructMoveFromNull() {
 void OptionalTest::constructMoveFromSet() {
     {
         Optional<Copyable> a{Corrade::InPlaceInit, 32};
-        Optional<Copyable> b{std::move(a)};
+        Optional<Copyable> b{Utility::move(a)};
 
         /* A is still set, because the type destructor needs to be called */
         CORRADE_VERIFY(a);
@@ -768,7 +769,7 @@ void OptionalTest::moveNullToNull() {
     {
         Optional<Movable> a;
         Optional<Movable> b;
-        b = std::move(a);
+        b = Utility::move(a);
 
         CORRADE_VERIFY(!a);
         CORRADE_VERIFY(!b);
@@ -783,7 +784,7 @@ void OptionalTest::moveNullToSet() {
     {
         Optional<Movable> a;
         Optional<Movable> b{Corrade::InPlaceInit, 32};
-        b = std::move(a);
+        b = Utility::move(a);
 
         CORRADE_VERIFY(!a);
         CORRADE_VERIFY(!b);
@@ -798,7 +799,7 @@ void OptionalTest::moveSetToNull() {
     {
         Optional<Movable> a{Corrade::InPlaceInit, 32};
         Optional<Movable> b;
-        b = std::move(a);
+        b = Utility::move(a);
 
         CORRADE_VERIFY(a);
         CORRADE_VERIFY(b);
@@ -814,7 +815,7 @@ void OptionalTest::moveSetToSet() {
     {
         Optional<Copyable> a{Corrade::InPlaceInit, 32};
         Optional<Copyable> b{Corrade::InPlaceInit, 78};
-        b = std::move(a);
+        b = Utility::move(a);
 
         CORRADE_VERIFY(a);
         CORRADE_VERIFY(b);
@@ -831,7 +832,7 @@ void OptionalTest::moveSetToSet() {
     {
         Optional<Movable> a{Corrade::InPlaceInit, 32};
         Optional<Movable> b{Corrade::InPlaceInit, 78};
-        b = std::move(a);
+        b = Utility::move(a);
 
         CORRADE_VERIFY(a);
         CORRADE_VERIFY(b);
@@ -924,7 +925,7 @@ void OptionalTest::accessRvalue() {
        4.9 as well), so disabling it there. It's not a widely needed feature
        (const&&, *why*) so I think this is okay. */
     const Optional<Movable> ca{Movable{1337}};
-    const Movable&& cb = *std::move(ca);
+    const Movable&& cb = *Utility::move(ca);
     CORRADE_COMPARE(cb.a, 1337);
     #endif
 }
@@ -1031,19 +1032,19 @@ void OptionalTest::moveConstructPlainStruct() {
         MoveOnlyPointer b;
     };
 
-    /* This needs special handling on GCC 4.8, where T{b} (copy-construction)
-       attempts to convert ExtremelyTrivial to int to initialize the first
-       argument and fails miserably. */
+    /* This needs special handling on GCC 4.8, where T{std::move(b)} attempts
+       to convert MoveOnlyStruct to int to initialize the first argument and
+       fails miserably. */
     Optional<MoveOnlyStruct> a{MoveOnlyStruct{3, 'a', nullptr}};
     CORRADE_COMPARE(a->a, 3);
 
     /* This copy-constructs the wrapped value */
-    Optional<MoveOnlyStruct> b = std::move(a);
+    Optional<MoveOnlyStruct> b = Utility::move(a);
     CORRADE_COMPARE(b->a, 3);
 
     /* This deletes and then copy-constructs the wrapped value */
     Optional<MoveOnlyStruct> c;
-    c = std::move(b);
+    c = Utility::move(b);
     CORRADE_COMPARE(c->a, 3);
 }
 

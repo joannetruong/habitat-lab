@@ -177,6 +177,16 @@ class MetadataMediator {
   }  // getCurrentPhysicsManagerAttributes
 
   /**
+   * @brief Get a list of all scene instances available in the currently active
+   * dataset
+   */
+  std::vector<std::string> getAllSceneInstanceHandles() {
+    return getActiveDSAttribs()
+        ->getSceneAttributesManager()
+        ->getObjectHandlesBySubstring();
+  }
+
+  /**
    * @brief Return copy of map of current active dataset's navmesh handles.
    */
   std::map<std::string, std::string> getActiveNavmeshMap() {
@@ -193,7 +203,7 @@ class MetadataMediator {
   std::string getNavmeshPathByHandle(const std::string& navMeshHandle) {
     return getFilePathForHandle(navMeshHandle,
                                 getActiveDSAttribs()->getNavmeshMap(),
-                                "::getNavmeshPathByHandle");
+                                "<getNavmeshPathByHandle>");
 
   }  // MetadataMediator::getNavmeshPathByHandle
 
@@ -217,7 +227,7 @@ class MetadataMediator {
       const std::string& ssDescrHandle) {
     return getFilePathForHandle(
         ssDescrHandle, getActiveDSAttribs()->getSemanticSceneDescrMap(),
-        "::getSemanticSceneDescriptorPathByHandle");
+        "<getSemanticSceneDescriptorPathByHandle>");
 
   }  // MetadataMediator::getNavMeshPathByHandle
 
@@ -370,6 +380,30 @@ class MetadataMediator {
         sceneDatasetName);
   }
 
+  /**
+   * @brief Returns the createRenderer flag that was set in the associated
+   * SimulatorConfiguration.
+   * @return the boolean flag.
+   */
+  bool getCreateRenderer() const;
+
+  /**
+   * @brief This function returns a list of all the scene datasets currently
+   * loaded, along with some key statistics for each, formatted as a
+   * comma-separated string.
+   * @return a vector of strings holding scene dataset info.
+   */
+  std::string getDatasetsOverview() const;
+
+  /**
+   * @brief this function will create a report of the contents of the scene
+   * dataset with the passed name. If no name is provided, a report on the
+   * current active dataset will be returned.
+   * @param sceneDataset The name of the scene dataset to perform the report on.
+   * @return Comma-separated string of data describing the desired dataset.
+   */
+  std::string createDatasetReport(const std::string& sceneDataset = "") const;
+
  protected:
   /**
    * @brief Return the file path corresponding to the passed handle in the
@@ -385,8 +419,8 @@ class MetadataMediator {
       const std::map<std::string, std::string>& assetMapping,
       const std::string& msgString) {
     if (assetMapping.count(assetHandle) == 0) {
-      LOG(WARNING) << msgString << " (getAsset) : Unable to find file path for "
-                   << assetHandle << ".  Aborting.";
+      ESP_WARNING() << msgString << ": Unable to find file path for"
+                    << assetHandle << ".  Aborting.";
       return "";
     }
     return assetMapping.at(assetHandle);
@@ -434,10 +468,9 @@ class MetadataMediator {
     // this should never happen - there will always be a dataset with the name
     // activeSceneDataset_
     if (datasetAttr == nullptr) {
-      LOG(ERROR) << "::getActiveDSAttribs : Unable to set "
-                    "active dataset due to Unknown dataset named "
-                 << activeSceneDataset_
-                 << " so changing dataset to \"default\".";
+      ESP_ERROR() << "Unable to set active dataset due to Unknown dataset named"
+                  << activeSceneDataset_
+                  << "so changing dataset to \"default\".";
       activeSceneDataset_ = "default";
 
       datasetAttr = sceneDatasetAttributesManager_->getObjectByHandle(
@@ -475,7 +508,7 @@ class MetadataMediator {
 
  public:
   ESP_SMART_POINTERS(MetadataMediator)
-};  // class MetadataMediator
+};  // namespace metadata
 
 }  // namespace metadata
 }  // namespace esp

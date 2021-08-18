@@ -10,11 +10,11 @@
 #include <cstdint>
 #define RAPIDJSON_NO_INT64DEFINE
 #include <rapidjson/document.h>
-#include "esp/core/esp.h"
-
 #include <functional>
 #include <string>
 #include <vector>
+#include "esp/core/Configuration.h"
+#include "esp/core/esp.h"
 
 #include <Magnum/Magnum.h>
 #include <Magnum/Math/Quaternion.h>
@@ -25,8 +25,22 @@ namespace io {
 
 typedef rapidjson::Document JsonDocument;
 
-//! Write a JsonDocument to file
-bool writeJsonToFile(const JsonDocument& document, const std::string& file);
+/**
+ * @brief Write a Json doc to file
+ *
+ * @param document an already-populated document object
+ * @param file
+ * @param usePrettyWriter The pretty writer does nice indenting and spacing but
+ * leads to larger filesize.
+ * @param maxDecimalPlaces Set this to a positive integer to shorten how
+ * floats/doubles are written. Beware loss of precision in your saved data.
+ *
+ * @return whether successful or not
+ */
+bool writeJsonToFile(const JsonDocument& document,
+                     const std::string& file,
+                     bool usePrettyWriter = true,
+                     int maxDecimalPlaces = -1);
 
 //! Parse JSON file and return as JsonDocument object
 JsonDocument parseJsonFile(const std::string& file);
@@ -39,6 +53,18 @@ std::string jsonToString(const JsonDocument& d);
 
 //! Return Vec3f coordinates representation of given JsonObject of array type
 esp::vec3f jsonToVec3f(const JsonGenericValue& jsonArray);
+
+/**
+ * @brief Recursively load a @ref esp::core::Configuration based on a json file.
+ * @param jsonObj The source json being read
+ * @param subGroupName The subgroup name to create amd populate within the
+ * configuration
+ * @param config The owning configuration that the subgroup is a part of
+ * @return The number of configuration settings successfully read.
+ */
+int loadJsonIntoConfiguration(const JsonGenericValue& jsonObj,
+                              const std::string& subGroupName,
+                              esp::core::Configuration& config);
 
 /**
  * @brief Check passed json doc for existence of passed jsonTag as value of

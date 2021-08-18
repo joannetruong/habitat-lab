@@ -158,7 +158,7 @@
 
     To simplify the implementation, Magnum matrices are convertible only from
     32-bit and 64-bit floating-point types (:py:`'f'` and :py:`'d'` numpy
-    ``dtype``). In the other direction, unless overriden using ``dtype`` or
+    ``dtype``). In the other direction, unless overridden using ``dtype`` or
     ``order``, the created numpy array matches Magnum data type and layout:
 
     .. code:: pycon
@@ -181,9 +181,9 @@
     .. code:: pycon
 
         >>> c = np.array(Matrix3.rotation(Deg(45.0)), order='C', dtype='d')
-        >>> c.strides[0] # row-major storage (overriden)
+        >>> c.strides[0] # row-major storage (overridden)
         24
-        >>> c[0] # first column, 64-bit floats (overriden)
+        >>> c[0] # first column, 64-bit floats (overridden)
         array([ 0.70710677, -0.70710677,  0.        ])
 
     `Major differences to the C++ API`_

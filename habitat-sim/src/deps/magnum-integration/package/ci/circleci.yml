@@ -13,9 +13,12 @@ executors:
   ubuntu-16_04:
     docker:
     - image: ubuntu:xenial-20201014
-  xcode-10_0:
+  xcode-10_2:
     macos:
-      xcode: 10.0.0
+      # Since 2021-06-15, Homebrew proceeds with compiling Python by hand on
+      # macOS 10.13, as only 10.14 and up bottles are provided. So that forces
+      # me to drop testing for < 10.14 as well. FFS.
+      xcode: 10.2.1
   emscripten:
     docker:
     # 1.39.0 is the oldest on Docker. Anything before 1.39.2 is useless as emar
@@ -47,6 +50,15 @@ commands:
         type: string
         default: ""
     steps:
+    - run:
+        # ninja needs python@3.9 as a dependency FOR SOME FUCKING REASON and
+        # when THE DAMN THING installs it, it proceeds with reinstalling
+        # python@2. FROM SOURCES! FUCK! and then it fails to link it because
+        # NO SHIT, python@3.9 is already installed! HOW THE FUCK ARE PEOPLE
+        # ABLE TO DEAL WITH SUCH CURSED SHIT ALL THE TIME?! FUCK OFF
+        name: Remove Python 2 curse
+        command: |
+          HOMEBREW_NO_AUTO_UPDATE=1 brew uninstall python@2
     - run:
         name: Install base packages
         # As usual, homebrew takes five minutes to update and then explodes in
@@ -300,10 +312,7 @@ jobs:
         script: unix-desktop.sh
 
   macos-gl:
-    # On 9.4, freeglut (which is a dependency of dart or bullet, probably)
-    # fails to install because of an unsatisfied XQuartz dependency. Not sure
-    # what that is about, using an image that works instead.
-    executor: xcode-10_0
+    executor: xcode-10_2
     environment:
       CMAKE_CXX_FLAGS: --coverage
       CONFIGURATION: Debug

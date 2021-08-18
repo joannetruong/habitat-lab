@@ -58,6 +58,16 @@ class MetadataMediatorTest : public testing::Test {
     MM_->setSimulatorConfiguration(cfg_1);
   }
 
+  void displayDSReports() {
+    // display info report
+    std::string dsOverView = MM_->getDatasetsOverview();
+    ESP_WARNING() << "\nDataset Overview : \n" << dsOverView << "\n";
+    // display info report
+    std::string dsInfoReport = MM_->createDatasetReport();
+    ESP_WARNING() << "\nActive Dataset Details : \n" << dsInfoReport << "\n";
+  }
+
+  esp::logging::LoggingContext loggingContext;
   MetadataMediator::ptr MM_ = nullptr;
 
 };  // class MetadataMediatorTest
@@ -66,7 +76,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
   // setup dataset 0 for test
   initDataset0();
 
-  LOG(INFO) << "Starting testDataset0 : test LoadStages";
+  ESP_DEBUG() << "Starting testDataset0 : test LoadStages";
   const auto& stageAttributesMgr = MM_->getStageAttributesManager();
   int numStageHandles = stageAttributesMgr->getNumObjects();
   // should be 7 - one for default NONE stage, one original JSON, one based on
@@ -149,7 +159,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
 
   // end test LoadStages
 
-  LOG(INFO) << "Starting test LoadObjects";
+  ESP_DEBUG() << "Starting test LoadObjects";
 
   const auto& objectAttributesMgr = MM_->getObjectAttributesManager();
   int numObjHandles = objectAttributesMgr->getNumFileTemplateObjects();
@@ -229,7 +239,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
 
   // end test LoadObjects
 
-  LOG(INFO) << "Starting test LoadLights";
+  ESP_DEBUG() << "Starting test LoadLights";
 
   const auto& lightsLayoutAttributesMgr =
       MM_->getLightLayoutAttributesManager();
@@ -279,7 +289,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
 
   // end test LoadLights
 
-  LOG(INFO) << "Starting test LoadSceneInstances";
+  ESP_DEBUG() << "Starting test LoadSceneInstances";
   //
   // SHOULD NOT BE REFERENCED DIRECTLY IN USER CODE, but rather desired scene
   // instance should be acquired through MM.
@@ -296,8 +306,8 @@ TEST_F(MetadataMediatorTest, testDataset0) {
   ASSERT_EQ(sceneAttrHandles.size(), 1);
 
   const std::string activeSceneName = sceneAttrHandles[0];
-  LOG(WARNING) << "testLoadSceneInstances : Scene instance attr handle : "
-               << activeSceneName;
+  ESP_WARNING() << "testLoadSceneInstances : Scene instance attr handle :"
+                << activeSceneName;
   // get scene instance attributes ref
   // metadata::attributes::SceneAttributes::cptr curSceneInstanceAttributes =
   auto sceneAttrs = MM_->getSceneAttributesByName(activeSceneName);
@@ -305,9 +315,9 @@ TEST_F(MetadataMediatorTest, testDataset0) {
   ASSERT_NE(sceneAttrs, nullptr);
   // verify default value for translation origin
   ASSERT_EQ(sceneAttrs->getTranslationOrigin(),
-            static_cast<int>(AttrMgrs::SceneInstanceTranslationOrigin::COM));
+            static_cast<int>(Attrs::SceneInstanceTranslationOrigin::COM));
   const int assetLocalInt =
-      static_cast<int>(AttrMgrs::SceneInstanceTranslationOrigin::AssetLocal);
+      static_cast<int>(Attrs::SceneInstanceTranslationOrigin::AssetLocal);
 
   //
   // miscellaneous scene instance attribute values
@@ -366,7 +376,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
 
   // end test LoadSceneInstances
 
-  LOG(INFO) << "Starting test LoadNavmesh";
+  ESP_DEBUG() << "Starting test LoadNavmesh";
   // get map of navmeshes
   const std::map<std::string, std::string> navmeshMap =
       MM_->getActiveNavmeshMap();
@@ -381,7 +391,7 @@ TEST_F(MetadataMediatorTest, testDataset0) {
   ASSERT_EQ(navmeshMap.at("navmesh_path2"), "test_navmesh_path2");
   // end test LoadNavmesh
 
-  LOG(INFO) << "Starting test LoadSemanticScene";
+  ESP_DEBUG() << "Starting test LoadSemanticScene";
   // get map of semantic scene instances
   const std::map<std::string, std::string> semanticMap =
       MM_->getActiveSemanticSceneDescriptorMap();
@@ -395,29 +405,32 @@ TEST_F(MetadataMediatorTest, testDataset0) {
             "test_semantic_descriptor_path1");
   ASSERT_EQ(semanticMap.at("semantic_descriptor_path2"),
             "test_semantic_descriptor_path2");
+
   // end test LoadSemanticScene
+  displayDSReports();
+
 }  // testDataset0
 
 TEST_F(MetadataMediatorTest, testDataset1) {
   // primarily testing glob file wildcard loading
   initDataset1();
 
-  LOG(INFO) << "Starting testDataset1 : test LoadStages";
+  ESP_DEBUG() << "Starting testDataset1 : test LoadStages";
   const auto& stageAttributesMgr = MM_->getStageAttributesManager();
   int numStageHandles = stageAttributesMgr->getNumObjects();
-  // shoudld be 6 : one for default NONE stage, glob lookup yields 2 stages + 2
-  // modified and 1 new stage in scene dataset config
+  // shoudld be 6 : one for default NONE stage, glob lookup yields 2 stages +
+  // 2 modified and 1 new stage in scene dataset config
   ASSERT_EQ(numStageHandles, 6);
   // end test LoadStages
 
-  LOG(INFO) << "Starting test LoadObjects";
+  ESP_DEBUG() << "Starting test LoadObjects";
   const auto& objectAttributesMgr = MM_->getObjectAttributesManager();
   int numObjHandles = objectAttributesMgr->getNumFileTemplateObjects();
   // glob lookup yields 4 files + 2 modified in config
   ASSERT_EQ(numObjHandles, 6);
   // end test LoadObjects
 
-  LOG(INFO) << "Starting test LoadLights";
+  ESP_DEBUG() << "Starting test LoadLights";
   const auto& lightsLayoutAttributesMgr =
       MM_->getLightLayoutAttributesManager();
   // get # of loaded light layout attributes.
@@ -427,7 +440,7 @@ TEST_F(MetadataMediatorTest, testDataset1) {
 
   // end test LoadLights
 
-  LOG(INFO) << "Starting test LoadSceneInstances";
+  ESP_DEBUG() << "Starting test LoadSceneInstances";
   //
   // SHOULD NOT BE REFERENCED DIRECTLY IN USER CODE, but rather desired scene
   // instance should be acquired through MM.
@@ -440,7 +453,7 @@ TEST_F(MetadataMediatorTest, testDataset1) {
 
   // end test LoadSceneInstances
 
-  LOG(INFO) << "Starting test LoadArticulatedObjects";
+  ESP_DEBUG() << "Starting test LoadArticulatedObjects";
 
   namespace Dir = Cr::Utility::Directory;
   // verify # of urdf filepaths loaded - should be 6;
@@ -464,10 +477,13 @@ TEST_F(MetadataMediatorTest, testDataset1) {
     ASSERT_EQ(Dir::splitExtension(Dir::filename(iter->second))
                   .second.compare(".urdf"),
               0);
+    // test that file actually exists
+    const std::string filename = iter->second;
+    ASSERT_EQ(Dir::exists(filename), true);
   }
   // end test LoadArticulatedObjects
 
-  LOG(INFO) << "Starting test LoadNavmesh";
+  ESP_DEBUG() << "Starting test LoadNavmesh";
   // get map of navmeshes
   const std::map<std::string, std::string> navmeshMap =
       MM_->getActiveNavmeshMap();
@@ -475,13 +491,16 @@ TEST_F(MetadataMediatorTest, testDataset1) {
   ASSERT_EQ(navmeshMap.size(), 3);
   // end test LoadNavmesh
 
-  LOG(INFO) << "Starting test LoadSemanticScene";
+  ESP_DEBUG() << "Starting test LoadSemanticScene";
   // get map of semantic scene instances
   const std::map<std::string, std::string> semanticMap =
       MM_->getActiveSemanticSceneDescriptorMap();
   // should have 3
   ASSERT_EQ(semanticMap.size(), 3);
   // testLoadSemanticScene
+  // display info report
+  displayDSReports();
+
 }  // testDataset1
 
 TEST_F(MetadataMediatorTest, testDatasetDelete) {
@@ -513,6 +532,19 @@ TEST_F(MetadataMediatorTest, testDatasetDelete) {
 
   // verify deleted scene dataset's stage manager is nullptr
   ASSERT_EQ(stageAttrMgr_DS1, nullptr);
+
+  // attempt to delete dataset 0 and verify fails - cannot delete active dataset
+  ASSERT_EQ(MM_->removeSceneDataset(nameDS0), false);
+
+  // switch to default active dataset
+  MM_->setActiveSceneDatasetName("default");
+  // attempt to delete dataset 0 and verify delete
+  ASSERT_EQ(MM_->removeSceneDataset(nameDS0), true);
+  // verify the dataset does not exist anymore
+  ASSERT_EQ(MM_->sceneDatasetExists(nameDS0), false);
+
+  // display info report
+  displayDSReports();
 
 }  // testDatasetDelete
 

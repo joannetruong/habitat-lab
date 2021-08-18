@@ -69,7 +69,8 @@ involved!
     Are the below lists missing your name or something's wrong?
     `Let us know! <https://magnum.graphics/contact/>`_
 
--   **Aaron Gokaslan** (:gh:`Skylion007`) --- minor performance fixes
+-   **Aaron Gokaslan** (:gh:`Skylion007`) --- minor performance and
+    documentation fixes
 -   **Cameron Egbert** (:gh:`cegbertOculus`) --- initial Windows port
 -   **John Laxson** (:gh:`jlaxson`) --- Homebrew package improvements
 -   **Vladimir Gamalyan** (:gh:`vladimirgamalyan`) --- expanding

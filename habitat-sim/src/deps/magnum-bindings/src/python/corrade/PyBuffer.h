@@ -61,7 +61,7 @@ template<class Class, bool(*getter)(Class&, Py_buffer&, int)> void enableBetterB
 
         /* Set the memory owner to the object and increase its reference count.
            We need to keep the object around because buffer->shapes /
-           buffer->strides might be refering to it, moreover setting it to
+           buffer->strides might be referring to it, moreover setting it to
            something else (like ArrayView's memory owner object) would mean
            Python calls the releasebuffer on that object instead of on us,
            leading to reference count getting negative in many cases. */

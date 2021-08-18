@@ -16,7 +16,7 @@ RigidObject::RigidObject(scene::SceneNode* rigidBodyNode,
 bool RigidObject::initialize(
     metadata::attributes::AbstractObjectAttributes::ptr initAttributes) {
   if (initializationAttributes_ != nullptr) {
-    LOG(ERROR) << "Cannot initialize a RigidObject more than once";
+    ESP_ERROR() << "Cannot initialize a RigidObject more than once";
     return false;
   }
 
@@ -77,13 +77,13 @@ void RigidObject::resetStateFromSceneInstanceAttr(bool defaultCOMCorrection) {
   auto translate = sceneInstanceAttr->getTranslation();
   // get instance override value, if exists
   auto instanceCOMOrigin =
-      static_cast<metadata::managers::SceneInstanceTranslationOrigin>(
+      static_cast<metadata::attributes::SceneInstanceTranslationOrigin>(
           sceneInstanceAttr->getTranslationOrigin());
   if ((defaultCOMCorrection &&
        (instanceCOMOrigin !=
-        metadata::managers::SceneInstanceTranslationOrigin::COM)) ||
+        metadata::attributes::SceneInstanceTranslationOrigin::COM)) ||
       (instanceCOMOrigin ==
-       metadata::managers::SceneInstanceTranslationOrigin::AssetLocal)) {
+       metadata::attributes::SceneInstanceTranslationOrigin::AssetLocal)) {
     // if default COM correction is set and no object-based override, or if
     // Object set to correct for COM.
     translate -= sceneInstanceAttr->getRotation().transformVector(

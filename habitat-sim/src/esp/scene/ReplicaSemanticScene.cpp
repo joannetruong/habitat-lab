@@ -29,16 +29,20 @@ bool SemanticScene::loadReplicaHouse(
   }
 
   // top-level scene
-  VLOG(1) << "loadReplicaHouse::Parsing " << houseFilename;
+  ESP_VERY_VERBOSE() << "Parsing" << houseFilename;
   const auto& json = io::parseJsonFile(houseFilename);
-  VLOG(1) << "loadReplicaHouse::Parsed.";
+  ESP_VERY_VERBOSE() << "Parsed.";
 
-  return buildReplicaHouse(json, scene, worldRotation);
+  // check if Replica or ReplicaCAD
+  bool hasObjects = (json.HasMember("objects") && json["objects"].IsArray());
+
+  return buildReplicaHouse(json, scene, hasObjects, worldRotation);
 
 }  // SemanticScene::loadReplicaHouse
 
 bool SemanticScene::buildReplicaHouse(const io::JsonDocument& jsonDoc,
                                       SemanticScene& scene,
+                                      bool objectsExist,
                                       const quatf& worldRotation) {
   scene.categories_.clear();
   scene.objects_.clear();
@@ -54,7 +58,7 @@ bool SemanticScene::buildReplicaHouse(const io::JsonDocument& jsonDoc,
      * indexing easy.
      */
     if (id > kMaxIds) {
-      LOG(ERROR) << "Exceeded max number of ids";
+      ESP_ERROR() << "Exceeded max number of ids";
       continue;
     }
     if (scene.categories_.size() < id + 1) {
@@ -62,6 +66,12 @@ bool SemanticScene::buildReplicaHouse(const io::JsonDocument& jsonDoc,
     }
     scene.categories_[id] = std::make_shared<ReplicaObjectCategory>(
         id, category["name"].GetString());
+  }
+
+  // if does not have objects, then this is ReplcaCAD semantic map which lacks
+  // object semantic mappings
+  if (!objectsExist) {
+    return true;
   }
 
   // objects
@@ -76,7 +86,7 @@ bool SemanticScene::buildReplicaHouse(const io::JsonDocument& jsonDoc,
      * indexing easy.
      */
     if (id > kMaxIds) {
-      LOG(ERROR) << "Exceeded max number of ids";
+      ESP_ERROR() << "Exceeded max number of ids";
       continue;
     }
     if (scene.objects_.size() < id + 1) {

@@ -231,6 +231,8 @@ constexpr struct {
     {"vertex colors + diffuse texture", PhongGL::Flag::VertexColor|PhongGL::Flag::DiffuseTexture, 1},
     #ifndef MAGNUM_TARGET_GLES2
     {"object ID", PhongGL::Flag::ObjectId, 1},
+    /* This is fine, InstancedObjectId isn't (check in ConstructInvalidData) */
+    {"object ID + separate bitangent", PhongGL::Flag::ObjectId|PhongGL::Flag::Bitangent, 1},
     {"instanced object ID", PhongGL::Flag::InstancedObjectId, 1},
     {"object ID + alpha mask + specular texture", PhongGL::Flag::ObjectId|PhongGL::Flag::AlphaMask|PhongGL::Flag::SpecularTexture, 1},
     #endif
@@ -653,7 +655,7 @@ const struct {
     {"point, range=0.0", "light-none.tga",
         {0.75f, -0.75f, -0.75f, 1.0f}, Color3{1.0f}, Color3{1.0f},
         1.0f, 0.0f, {}},
-    /* Distance is 0, which means the direction is always prependicular and
+    /* Distance is 0, which means the direction is always perpendicular and
        thus contributes nothing */
     {"point, distance=0", "light-none.tga",
         {0.75f, -0.75f, -0.75f, 1.0f}, Color3{1.0f}, Color3{1.0f},

@@ -57,6 +57,8 @@ namespace Corrade {
     [mosra/corrade#117](https://github.com/mosra/corrade/pull/117).
 -   New @ref Containers::BigEnumSet class for storing enum sets with more than
     64 values
+-   New @ref Containers::Pair class that fixes various issues and pitfalls of
+    @ref std::pair
 -   New @ref Containers::String class as a lightweight but more flexible
     alternative to @ref std::string
 -   New @ref Containers::BasicStringView "Containers::StringView" class as a
@@ -85,12 +87,22 @@ namespace Corrade {
 
 -   @ref Utility::allocateAligned() family of functions for overaligned
     allocations, suitable for efficient SIMD operations
+-   Added @ref Utility::forward() and @ref Utility::move() equivalents to
+    @ref std::forward() and @m_class{m-doc-external} [std::move()](https://en.cppreference.com/w/cpp/utility/move)
+    without having to pull in everything else from @cpp #include <utility> @ce.
 -   Added @ref Utility::Arguments::addArrayArgument() as a positional
     counterpart to @ref Utility::Arguments::addArrayOption()
 -   @ref Utility::Configuration and @ref Utility::Arguments can now read and
     write @ref Containers::String and @ref Containers::StringView values,
     @ref Utility::ConfigurationValue can be implemented using those instead of
     @ref std::string as well
+-   @ref Utility::ConfigurationGroup gained an ability to iterate through its
+    values and subgroups using @relativeref{Utility::ConfigurationGroup,values()}
+    and @relativeref{Utility::ConfigurationGroup,groups()}
+-   Added @ref Utility::String::lowercaseInPlace() and @relativeref{Utility::String,uppercaseInPlace()}
+    together with @ref Utility::String::lowercase() and
+    @relativeref{Utility::String,uppercase()} overloads taking a
+    @ref Containers::StringView
 -   New @ref CORRADE_INTERNAL_ASSERT_EXPRESSION() macro for assertions that can
     be evaluated directly inside larger expressions
 -   New @ref CORRADE_LIKELY() and @ref CORRADE_UNLIKELY() macros for
@@ -114,6 +126,10 @@ namespace Corrade {
 -   @ref Containers::LinkedList destruction was changed in a way that makes
     @ref Containers::LinkedListItem::list() still accessible in a destructor
     of @ref Containers::LinkedListItem subclasses
+-   @ref Containers::Pointer, @ref Containers::Optional,
+    @ref Containers::Reference, @ref Containers::MoveReference and
+    @ref Containers::AnyReference gained a @relativeref{Containers::Pointer,Type}
+    member typedef for consistency with other containers
 
 @subsubsection corrade-changelog-latest-changes-testsuite TestSuite library
 
@@ -127,6 +143,9 @@ namespace Corrade {
     @ref CORRADE_EXPECT_FAIL_IF() macros now accept messages in the same form
     as @ref CORRADE_ASSERT(), that is anything that can be printed with
     @ref Utility::Debug as well as chaining the pieces with @cpp << @ce.
+-   Test executables now accept `-X` and `-S` as a shorthand to often used
+    `--abort-on-fail` and `--save-diagnostic`
+    @ref TestSuite-Tester-command-line "command-line options"
 
 @subsubsection corrade-changelog-latest-changes-utility Utility library
 
@@ -292,10 +311,19 @@ namespace Corrade {
     to it now requires an explicit @cpp #include <Corrade/Utility/DebugStl.h> @ce.
     Alternatively, if string concatenation was used, you can compose the
     message by chaining @ref Utility::Debug output operators instead.
+-   @ref Utility::String::lowercase() and @ref Utility::String::uppercase()
+    now has overloads for both @ref Containers::StringView and
+    @ref std::string, which may cause ambiguous overload errors for existing
+    code that passes @cpp const char* @ce to it. Given that either type is
+    valid now, the code has to be updated to explicitly pass that type to the
+    function.
 
 @subsection corrade-changelog-latest-documentation Documentation
 
--   Various fixes (see [mosra/corrade#108](https://github.com/mosra/corrade/pull/108))
+-   Added a @ref Containers-mapping "table mapping between STL and Corrade containers"
+-   Various fixes (see [mosra/corrade#108](https://github.com/mosra/corrade/pull/108),
+    [mosra/corrade#119](https://github.com/mosra/corrade/pull/119),
+    [mosra/corrade#120](https://github.com/mosra/corrade/pull/120))
 
 @section corrade-changelog-2020-06 2020.06
 
@@ -529,7 +557,7 @@ Released 2020-06-27, tagged as
     shared global state anymore, various corner cases and crashes on
     destruction are not happening anymore. In particular, it's now also
     possible to have two instances of the same manager type without the two
-    interferring with each other in any way.
+    interfering with each other in any way.
 
 @subsection corrade-changelog-2020-06-documentation Documentation
 
@@ -744,7 +772,7 @@ Released 2019-10-24, tagged as
 -   It's now possible to create @ref Containers::ScopeGuard without a handle
     in order to easily call a global function or lambda on scope end
 -   Implicit memory management of @ref Containers::LinkedList can be now
-    overriden by reimplementing @ref Containers::LinkedListItem::erase()
+    overridden by reimplementing @ref Containers::LinkedListItem::erase()
 -   The @ref CORRADE_ENUMSET_FRIEND_OPERATORS() macro now works with templated
     classes and doesn't need a corresponding @ref CORRADE_ENUMSET_OPERATORS()
     to be present anymore
@@ -810,7 +838,7 @@ Released 2019-10-24, tagged as
 -   @ref Utility::Configuration internals were rewritten to not use exceptions
     anymore
 -   The @ref CORRADE_AUTOMATIC_INITIALIZER() and
-    @ref CORRADE_AUTOMATIC_FINALIZER() macros can now be overriden for testing
+    @ref CORRADE_AUTOMATIC_FINALIZER() macros can now be overridden for testing
     purposes or when global constructors / destructors are not desired.
 -   @ref Utility::Resource internals now operate completely without heap
     access, its APIs now also have overloads taking plain C string literals
@@ -883,7 +911,7 @@ Released 2019-10-24, tagged as
     comparison for @cpp long double @ce
 -   Fixed @ref TestSuite::Compare::around() for types that don't have a total
     ordering (for example, for Magnum matrix and vector types, @cpp !(a < b) @ce
-    might not neccesarily imply that @cpp a >= b @ce).
+    might not necessarily imply that @cpp a >= b @ce).
 -   Fixed build on big-endian platforms (see
     [mosra/corrade#58](https://github.com/mosra/corrade/pull/58))
 -   Fixed @ref Utility::Sha1 calculation on big-endian platforms (see

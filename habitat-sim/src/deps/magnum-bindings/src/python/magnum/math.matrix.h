@@ -686,7 +686,7 @@ Overloaded function.
                so we create a scaling(*args, **kwargs) and dispatch ourselves. */
             .def_static("_sscaling", static_cast<Math::Matrix3<T>(*)(const Math::Vector2<T>&)>(&Math::Matrix3<T>::scaling))
             .def("_iscaling", static_cast<Math::Vector2<T>(Math::Matrix3<T>::*)() const>(&Math::Matrix3<T>::scaling))
-            .def("scaling", [matrix3](py::args args, py::kwargs kwargs) {
+            .def("scaling", [matrix3](const py::args& args, const py::kwargs& kwargs) {
                 if(py::len(args) && py::isinstance<Math::Matrix3<T>>(args[0])) {
                     return matrix3.attr("_iscaling")(*args, **kwargs);
                 } else {
@@ -700,7 +700,7 @@ Overloaded function.
                 return Math::Matrix3<T>::rotation(Math::Rad<T>(angle));
             })
             .def("_irotation", static_cast<Math::Matrix2x2<T>(Math::Matrix3<T>::*)() const>(&Math::Matrix3<T>::rotation))
-            .def("rotation", [matrix3](py::args args, py::kwargs kwargs) {
+            .def("rotation", [matrix3](const py::args& args, const py::kwargs& kwargs) {
                 if(py::len(args) && py::isinstance<Math::Matrix3<T>>(args[0])) {
                     return matrix3.attr("_irotation")(*args, **kwargs);
                 } else {
@@ -896,7 +896,7 @@ Overloaded function.
                so we create a scaling(*args, **kwargs) and dispatch ourselves. */
             .def_static("_sscaling", static_cast<Math::Matrix4<T>(*)(const Math::Vector3<T>&)>(&Math::Matrix4<T>::scaling))
             .def("_iscaling", static_cast<Math::Vector3<T>(Math::Matrix4<T>::*)() const>(&Math::Matrix4<T>::scaling))
-            .def("scaling", [matrix4](py::args args, py::kwargs kwargs) {
+            .def("scaling", [matrix4](const py::args& args, const py::kwargs& kwargs) {
                 if(py::len(args) && py::isinstance<Math::Matrix4<T>>(args[0])) {
                     return matrix4.attr("_iscaling")(*args, **kwargs);
                 } else {
@@ -910,7 +910,7 @@ Overloaded function.
                 return Math::Matrix4<T>::rotation(Math::Rad<T>(angle), axis);
             })
             .def("_irotation", static_cast<Math::Matrix3x3<T>(Math::Matrix4<T>::*)() const>(&Math::Matrix4<T>::rotation))
-            .def("rotation", [matrix4](py::args args, py::kwargs kwargs) {
+            .def("rotation", [matrix4](const py::args& args, const py::kwargs& kwargs) {
                 if(py::len(args) && py::isinstance<Math::Matrix4<T>>(args[0])) {
                     return matrix4.attr("_irotation")(*args, **kwargs);
                 } else {

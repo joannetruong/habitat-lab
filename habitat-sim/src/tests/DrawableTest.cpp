@@ -43,6 +43,7 @@ struct DrawableTest : Cr::TestSuite::Tester {
   void addRemoveDrawables();
 
  protected:
+  esp::logging::LoggingContext loggingContext_;
   esp::gfx::WindowlessContext::uptr context_ =
       esp::gfx::WindowlessContext::create_unique(0);
   // must declare these in this order due to avoid deallocation errors
@@ -55,6 +56,9 @@ struct DrawableTest : Cr::TestSuite::Tester {
 
 DrawableTest::DrawableTest() {
   auto cfg = esp::sim::SimulatorConfiguration{};
+  // setting values for stage load
+  cfg.loadSemanticMesh = false;
+  cfg.forceSeparateSemanticSceneGraph = false;
   auto MM = MetadataMediator::create(cfg);
   resourceManager_ = std::make_unique<ResourceManagerExtended>(MM);
   //clang-format off
@@ -70,8 +74,8 @@ DrawableTest::DrawableTest() {
   drawableGroup_ = &sceneGraph.getDrawables();
 
   std::vector<int> tempIDs{sceneID_, esp::ID_UNDEFINED};
-  bool result = resourceManager_->loadStage(stageAttributes, nullptr,
-                                            &sceneManager_, tempIDs, false);
+  bool result = resourceManager_->loadStage(stageAttributes, nullptr, nullptr,
+                                            &sceneManager_, tempIDs);
 }
 
 void DrawableTest::addRemoveDrawables() {
@@ -89,7 +93,7 @@ void DrawableTest::addRemoveDrawables() {
 
   // add a toy box here!
   node.addFeature<esp::gfx::GenericDrawable>(
-      box, meshAttributeFlags, resourceManager_->getShaderManager(),
+      &box, meshAttributeFlags, resourceManager_->getShaderManager(),
       esp::NO_LIGHT_KEY, esp::PER_VERTEX_OBJECT_ID_MATERIAL_KEY,
       drawableGroup_);
   // we already had 5 boxes in the scene, so the id for the above toy box must
@@ -99,7 +103,7 @@ void DrawableTest::addRemoveDrawables() {
   // step 1: basic tests
   esp::gfx::GenericDrawable* dr =
       new esp::gfx::GenericDrawable{node,
-                                    box,
+                                    &box,
                                     meshAttributeFlags,
                                     resourceManager_->getShaderManager(),
                                     esp::NO_LIGHT_KEY,
@@ -114,7 +118,7 @@ void DrawableTest::addRemoveDrawables() {
 
   // step 2: add a single drawable to a group
   dr = new esp::gfx::GenericDrawable{node,
-                                     box,
+                                     &box,
                                      meshAttributeFlags,
                                      resourceManager_->getShaderManager(),
                                      esp::NO_LIGHT_KEY,
@@ -140,7 +144,7 @@ void DrawableTest::addRemoveDrawables() {
 
   // step 5: remove a drawable, that is NOT in the group! should be fine!!
   dr = new esp::gfx::GenericDrawable{node,
-                                     box,
+                                     &box,
                                      meshAttributeFlags,
                                      resourceManager_->getShaderManager(),
                                      esp::NO_LIGHT_KEY,

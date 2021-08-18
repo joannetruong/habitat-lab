@@ -259,8 +259,8 @@ void BulletRigidObject::setCollisionFromBB() {
 
 void BulletRigidObject::setMotionType(MotionType mt) {
   if (mt == MotionType::UNDEFINED) {
-    LOG(WARNING) << "::setMotionType : Cannot set motion type "
-                    "to MotionType::UNDEFINED.  Aborting.";
+    ESP_WARNING() << "Cannot set motion type "
+                     "to MotionType::UNDEFINED.  Aborting.";
     return;
   }
   if (mt == objectMotionType_) {
@@ -332,7 +332,7 @@ void BulletRigidObject::constructAndAddRigidBody(MotionType mt) {
 
   double mass = 0;
   btVector3 bInertia = {0, 0, 0};
-  if (mt != MotionType::STATIC) {
+  if (mt == MotionType::DYNAMIC) {
     mass = tmpAttr->getMass();
     bInertia = btVector3(tmpAttr->getInertia());
     if (bInertia == btVector3{0, 0, 0}) {
@@ -394,7 +394,7 @@ void BulletRigidObject::constructAndAddRigidBody(MotionType mt) {
         bObjectRigidBody_->getCollisionFlags() |
         btCollisionObject::CF_KINEMATIC_OBJECT);
     CORRADE_INTERNAL_ASSERT(bObjectRigidBody_->isKinematicObject());
-    CORRADE_INTERNAL_ASSERT(!bObjectRigidBody_->isStaticObject());
+    CORRADE_INTERNAL_ASSERT(bObjectRigidBody_->isStaticObject());
     bWorld_->addRigidBody(
         bObjectRigidBody_.get(), int(CollisionGroup::Kinematic),
         uint32_t(
@@ -479,8 +479,8 @@ bool BulletRigidObject::contactTest() {
 
 void BulletRigidObject::overrideCollisionGroup(CollisionGroup group) {
   if (!bObjectRigidBody_->isInWorld()) {
-    LOG(ERROR) << "::overrideCollisionGroup failed because "
-                  "the Bullet body hasn't yet been added to the Bullet world.";
+    ESP_ERROR() << "Failed because "
+                   "the Bullet body hasn't yet been added to the Bullet world.";
   }
 
   bWorld_->removeRigidBody(bObjectRigidBody_.get());

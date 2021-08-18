@@ -136,8 +136,8 @@ struct StringTest: TestSuite::Tester {
     void slicePointer();
 
     void split();
-    void splitMultipleCharacters();
-    void splitMultipleCharactersWhitespace();
+    void splitOnAny();
+    void splitOnWhitespace();
 
     void partition();
 
@@ -228,8 +228,8 @@ StringTest::StringTest() {
               &StringTest::slicePointer,
 
               &StringTest::split,
-              &StringTest::splitMultipleCharacters,
-              &StringTest::splitMultipleCharactersWhitespace,
+              &StringTest::splitOnAny,
+              &StringTest::splitOnWhitespace,
 
               &StringTest::partition,
 
@@ -1062,7 +1062,7 @@ void StringTest::moveConstructLarge() {
         CORRADE_VERIFY(a.deleter());
 
         /* Everything including the deleter is moved */
-        String b = std::move(a);
+        String b = Utility::move(a);
         CORRADE_COMPARE(b, "Allocated hello for a verbose world"_s);
         CORRADE_VERIFY(b.data() == aData);
         CORRADE_VERIFY(!b.isSmall());
@@ -1093,7 +1093,7 @@ void StringTest::moveLargeToLarge() {
         CORRADE_VERIFY(b.deleter());
 
         /* The two are simply swapped */
-        b = std::move(a);
+        b = Utility::move(a);
         CORRADE_COMPARE(b, "Allocated hello for a verbose world"_s);
         CORRADE_VERIFY(b.data() == aData);
         CORRADE_VERIFY(!b.isSmall());
@@ -1125,7 +1125,7 @@ void StringTest::moveLargeToSmall() {
         CORRADE_VERIFY(b.isSmall());
 
         /* The two are simply swapped */
-        b = std::move(a);
+        b = Utility::move(a);
         CORRADE_COMPARE(b, "Allocated hello for a verbose world"_s);
         CORRADE_VERIFY(b.data() == aData);
         CORRADE_VERIFY(!b.isSmall());
@@ -1144,7 +1144,7 @@ void StringTest::moveConstructSmall() {
     CORRADE_VERIFY(a.isSmall());
 
     /* The two are simply swapped */
-    String b = std::move(a);
+    String b = Utility::move(a);
     CORRADE_COMPARE(b, "hello"_s);
     CORRADE_VERIFY(b.data() != a.data());
     CORRADE_VERIFY(b.isSmall());
@@ -1164,7 +1164,7 @@ void StringTest::moveSmallToLarge() {
         CORRADE_VERIFY(b.deleter());
 
         /* The two are simply swapped */
-        b = std::move(a);
+        b = Utility::move(a);
         CORRADE_COMPARE(b, "hello"_s);
         CORRADE_VERIFY(b.data() != a.data());
         CORRADE_VERIFY(b.isSmall());
@@ -1337,7 +1337,7 @@ void StringTest::split() {
     }
 }
 
-void StringTest::splitMultipleCharacters() {
+void StringTest::splitOnAny() {
     constexpr StringView delimiters = ".:;"_s;
 
     /* These rely on StringView conversion and then delegate there so we don't
@@ -1345,7 +1345,7 @@ void StringTest::splitMultipleCharacters() {
 
     const String ca = "ab.:c;def";
     {
-        Array<StringView> s = ca.splitWithoutEmptyParts(delimiters);
+        Array<StringView> s = ca.splitOnAnyWithoutEmptyParts(delimiters);
         CORRADE_COMPARE_AS(s, arrayView({"ab"_s, "c"_s, "def"_s}),
             TestSuite::Compare::Container);
         CORRADE_COMPARE(s[0].flags(), StringViewFlags{});
@@ -1359,19 +1359,19 @@ void StringTest::splitMultipleCharacters() {
         String s1 = "ab";
         String s2 = "c";
         String s3 = "def";
-        CORRADE_COMPARE_AS(a.splitWithoutEmptyParts(delimiters),
+        CORRADE_COMPARE_AS(a.splitOnAnyWithoutEmptyParts(delimiters),
             array<MutableStringView>({s1, s2, s3}),
             TestSuite::Compare::Container);
     }
 }
 
-void StringTest::splitMultipleCharactersWhitespace() {
+void StringTest::splitOnWhitespace() {
     /* These rely on StringView conversion and then delegate there so we don't
        need to verify SSO behavior, only the basics and flag propagation */
 
     const String ca = "ab\n  c\t\rdef";
     {
-        Array<StringView> s = ca.splitWithoutEmptyParts();
+        Array<StringView> s = ca.splitOnWhitespaceWithoutEmptyParts();
         CORRADE_COMPARE_AS(s, arrayView({"ab"_s, "c"_s, "def"_s}),
             TestSuite::Compare::Container);
         CORRADE_COMPARE(s[0].flags(), StringViewFlags{});
@@ -1385,7 +1385,7 @@ void StringTest::splitMultipleCharactersWhitespace() {
         String s1 = "ab";
         String s2 = "c";
         String s3 = "def";
-        CORRADE_COMPARE_AS(a.splitWithoutEmptyParts(),
+        CORRADE_COMPARE_AS(a.splitOnWhitespaceWithoutEmptyParts(),
             array<MutableStringView>({s1, s2, s3}),
             TestSuite::Compare::Container);
     }
@@ -1608,6 +1608,26 @@ template<class T> void StringTest::find() {
         CORRADE_VERIFY(!a.contains("cursed"));
 
         typename ConstTraits<T>::ViewType found = a.find("cursed");
+        CORRADE_VERIFY(found.isEmpty());
+        CORRADE_VERIFY(!static_cast<const void*>(found.data()));
+    } {
+        CORRADE_VERIFY(a.contains('h'));
+
+        typename ConstTraits<T>::ViewType found = a.find('h');
+        CORRADE_COMPARE(found, "h"_s);
+        CORRADE_COMPARE((static_cast<const void*>(found.data())), a.data());
+        CORRADE_COMPARE(found.flags(), StringViewFlags{});
+    } {
+        CORRADE_VERIFY(a.contains('d'));
+
+        typename ConstTraits<T>::ViewType found = a.find('d');
+        CORRADE_COMPARE(found, "d"_s);
+        CORRADE_COMPARE((static_cast<const void*>(found.data())), a.data() + 10);
+        CORRADE_COMPARE(found.flags(), StringViewFlag::NullTerminated);
+    } {
+        CORRADE_VERIFY(!a.contains('c'));
+
+        typename ConstTraits<T>::ViewType found = a.find('c');
         CORRADE_VERIFY(found.isEmpty());
         CORRADE_VERIFY(!static_cast<const void*>(found.data()));
     }

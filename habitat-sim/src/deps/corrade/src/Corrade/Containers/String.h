@@ -34,7 +34,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
-#include <utility>
 
 #include "Corrade/Containers/Containers.h"
 #include "Corrade/Containers/StringView.h" /* needs to be included for
@@ -369,7 +368,7 @@ class CORRADE_UTILITY_EXPORT String {
            returns a std::vector. Besides that, to simplify the implementation,
            there's no const-adding conversion. Instead, the implementer is
            supposed to add an ArrayViewConverter variant for that. */
-        template<class T, class = decltype(Implementation::StringConverter<typename std::decay<T&&>::type>::from(std::declval<T&&>()))> /*implicit*/ String(T&& other) noexcept: String{Implementation::StringConverter<typename std::decay<T&&>::type>::from(std::forward<T>(other))} {}
+        template<class T, class = decltype(Implementation::StringConverter<typename std::decay<T&&>::type>::from(std::declval<T&&>()))> /*implicit*/ String(T&& other) noexcept: String{Implementation::StringConverter<typename std::decay<T&&>::type>::from(Utility::forward<T>(other))} {}
 
         /**
          * @brief Destructor
@@ -570,8 +569,22 @@ class CORRADE_UTILITY_EXPORT String {
          * Not allowed to be called on a rvalue since the returned views would
          * become dangling.
          */
-        Array<MutableStringView> splitWithoutEmptyParts(StringView delimiters) &;
-        Array<StringView> splitWithoutEmptyParts(StringView delimiters) const &; /**< @overload */
+        Array<MutableStringView> splitOnAnyWithoutEmptyParts(StringView delimiters) &;
+        Array<StringView> splitOnAnyWithoutEmptyParts(StringView delimiters) const &; /**< @overload */
+
+        #ifdef CORRADE_BUILD_DEPRECATED
+        /** @brief @copybrief splitOnAnyWithoutEmptyParts()
+         * @m_deprecated_since_latest Use @ref splitOnAnyWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnAnyWithoutEmptyParts() instead") Array<MutableStringView> splitWithoutEmptyParts(StringView delimiters) &;
+
+        /** @overload
+         * @m_deprecated_since_latest Use @ref splitOnAnyWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnAnyWithoutEmptyParts() instead") Array<StringView> splitWithoutEmptyParts(StringView delimiters) const &;
+        #endif
 
         /**
          * @brief Split on whitespace, removing empty parts
@@ -580,8 +593,22 @@ class CORRADE_UTILITY_EXPORT String {
          * Not allowed to be called on a rvalue since the returned views would
          * become dangling.
          */
-        Array<MutableStringView> splitWithoutEmptyParts() &;
-        Array<StringView> splitWithoutEmptyParts() const &; /**< @overload */
+        Array<MutableStringView> splitOnWhitespaceWithoutEmptyParts() &;
+        Array<StringView> splitOnWhitespaceWithoutEmptyParts() const &; /**< @overload */
+
+        #ifdef CORRADE_BUILD_DEPRECATED
+        /** @brief @copybrief splitOnWhitespaceWithoutEmptyParts()
+         * @m_deprecated_since_latest Use @ref splitOnWhitespaceWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnWhitespaceWithoutEmptyParts() instead") Array<MutableStringView> splitWithoutEmptyParts() &;
+
+        /** @overload
+         * @m_deprecated_since_latest Use @ref splitOnWhitespaceWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnWhitespaceWithoutEmptyParts() instead") Array<StringView> splitWithoutEmptyParts() const &;
+        #endif
 
         /**
          * @brief Partition
@@ -765,19 +792,38 @@ class CORRADE_UTILITY_EXPORT String {
         /**
          * @brief Find a substring
          *
-         * Equivalent to @ref BasicStringView::find(). Not allowed to be called
-         * on a r-value since the returned view would become dangling.
+         * Equivalent to @ref BasicStringView::find(StringView) const. Not
+         * allowed to be called on a r-value since the returned view would
+         * become dangling.
          * @see @ref contains()
          */
         MutableStringView find(StringView substring) &;
         StringView find(StringView substring) const &; /**< @overload */
 
         /**
+         * @brief Find a substring
+         *
+         * Equivalent to @ref BasicStringView::find(char) const. Not allowed to
+         * be called on a r-value since the returned view would become
+         * dangling.
+         * @see @ref contains()
+         */
+        MutableStringView find(char character) &;
+        StringView find(char character) const &; /**< @overload */
+
+        /**
          * @brief Whether the view contains a substring
          *
-         * Equivalent to @ref BasicStringView::contains().
+         * Equivalent to @ref BasicStringView::contains(StringView) const.
          */
         bool contains(StringView substring) const;
+
+        /**
+         * @brief Whether the view contains a character
+         *
+         * Equivalent to @ref BasicStringView::contains(char) const.
+         */
+        bool contains(char character) const;
 
         /**
          * @brief Release data storage
@@ -796,7 +842,7 @@ class CORRADE_UTILITY_EXPORT String {
         CORRADE_UTILITY_LOCAL void construct(Corrade::NoInitT, std::size_t size);
         CORRADE_UTILITY_LOCAL void construct(const char* data, std::size_t size);
         CORRADE_UTILITY_LOCAL void destruct();
-        CORRADE_UTILITY_LOCAL std::pair<const char*, std::size_t> dataInternal() const;
+        CORRADE_UTILITY_LOCAL Containers::Pair<const char*, std::size_t> dataInternal() const;
 
         /* Small string optimization. Following size restrictions from
            StringView (which uses the top two bits for marking global and

@@ -82,8 +82,8 @@ class AttributesManagersTest : public testing::Test {
 
       return attrTemplate1;
     } catch (...) {
-      LOG(ERROR) << "testBuildAttributesFromJSONString : Failed to parse "
-                 << jsonString << " as JSON.";
+      ESP_ERROR() << "testBuildAttributesFromJSONString : Failed to parse"
+                  << jsonString << "as JSON.";
       return nullptr;
     }
 
@@ -112,6 +112,9 @@ class AttributesManagersTest : public testing::Test {
     auto attrTemplate1 = mgr->createObject(handle, true);
     // verify it exists
     ASSERT_NE(nullptr, attrTemplate1);
+    // verify ID exists
+    bool idIsPresent = mgr->getObjectLibHasID(attrTemplate1->getID());
+    ASSERT_EQ(idIsPresent, true);
     // retrieve a copy of the named attributes template
     auto attrTemplate2 = mgr->getObjectOrCopyByHandle(handle);
     // verify copy has same quantities and values as original
@@ -169,6 +172,9 @@ class AttributesManagersTest : public testing::Test {
     auto oldTemplate3 = mgr->removeObjectByHandle(handle);
     // verify deleted template  exists
     ASSERT_NE(nullptr, oldTemplate3);
+    // verify ID does not exist in library now
+    idIsPresent = mgr->getObjectLibHasID(oldTemplate3->getID());
+    ASSERT_EQ(idIsPresent, false);
     // verify there are same number of templates as when we started
     ASSERT_EQ(orignNumTemplates, mgr->getNumObjects());
 
@@ -409,15 +415,16 @@ class AttributesManagersTest : public testing::Test {
 
     // get synthesized handle
     std::string newHandle = defaultAttribs->getHandle();
-    LOG(INFO) << "Modified Template Handle : " << newHandle;
+    ESP_DEBUG() << "Modified Template Handle :" << newHandle;
     // register modified template
     assetAttributesManager_->registerObject(defaultAttribs);
 
     // verify new handle is in template library
-    // get template by handle
-    ASSERT(assetAttributesManager_->getObjectLibHasHandle(newHandle));
+    CORRADE_INTERNAL_ASSERT(
+        assetAttributesManager_->getObjectLibHasHandle(newHandle));
     // verify old template is still present as well
-    ASSERT(assetAttributesManager_->getObjectLibHasHandle(oldHandle));
+    CORRADE_INTERNAL_ASSERT(
+        assetAttributesManager_->getObjectLibHasHandle(oldHandle));
 
     // get new template
     std::shared_ptr<T> newAttribs =
@@ -465,6 +472,7 @@ class AttributesManagersTest : public testing::Test {
 
   }  // AttributesManagersTest::testAssetAttributesTemplateCreateFromHandle
 
+  esp::logging::LoggingContext loggingContext_;
   AttrMgrs::AssetAttributesManager::ptr assetAttributesManager_ = nullptr;
   AttrMgrs::LightLayoutAttributesManager::ptr lightLayoutAttributesManager_ =
       nullptr;
@@ -479,7 +487,7 @@ class AttributesManagersTest : public testing::Test {
  * loading process is working as expected.
  */
 TEST_F(AttributesManagersTest, AttributesManagers_PhysicsJSONLoadTest) {
-  LOG(INFO) << "Starting AttributesManagers_PhysicsJSONLoadTest";
+  ESP_DEBUG() << "Starting AttributesManagers_PhysicsJSONLoadTest";
   // build JSON sample config
   const std::string& jsonString = R"({
   "physics_simulator": "bullet_test",
@@ -522,7 +530,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_PhysicsJSONLoadTest) {
  * loading process is working as expected.
  */
 TEST_F(AttributesManagersTest, AttributesManagers_LightJSONLoadTest) {
-  LOG(INFO) << "Starting AttributesManagers_LightJSONLoadTest";
+  ESP_DEBUG() << "Starting AttributesManagers_LightJSONLoadTest";
   // build JSON sample config
   const std::string& jsonString = R"({
   "lights":{
@@ -554,7 +562,9 @@ TEST_F(AttributesManagersTest, AttributesManagers_LightJSONLoadTest) {
         "user_float" : 2.3,
         "user_vec3" : [1.1, 3.3, 5.5],
         "user_quat" : [0.5, 0.6, 0.7, 0.8]
-    }
+    },
+    "positive_intensity_scale" : 2.0,
+    "negative_intensity_scale" : 1.5
   })";
 
   auto lightLayoutAttr =
@@ -569,7 +579,8 @@ TEST_F(AttributesManagersTest, AttributesManagers_LightJSONLoadTest) {
                             "light attribs defined string", true, 23, 2.3f,
                             Magnum::Vector3(1.1, 3.3, 5.5),
                             Magnum::Quaternion({0.6f, 0.7f, 0.8f}, 0.5f));
-
+  ASSERT_EQ(lightLayoutAttr->getPositiveIntensityScale(), 2.0);
+  ASSERT_EQ(lightLayoutAttr->getNegativeIntensityScale(), 1.5);
   auto lightAttr = lightLayoutAttr->getLightInstance("test");
   // verify that lightAttr exists
   ASSERT_NE(nullptr, lightAttr);
@@ -579,6 +590,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_LightJSONLoadTest) {
   ASSERT_EQ(lightAttr->getPosition(), Magnum::Vector3(2.5, 0.1, 3.8));
   ASSERT_EQ(lightAttr->getDirection(), Magnum::Vector3(1.0, -1.0, 1.0));
   ASSERT_EQ(lightAttr->getColor(), Magnum::Vector3(2, 1, -1));
+
   ASSERT_EQ(lightAttr->getIntensity(), -0.1);
   ASSERT_EQ(lightAttr->getType(),
             static_cast<int>(esp::gfx::LightType::Directional));
@@ -600,7 +612,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_LightJSONLoadTest) {
  * JSON loading process is working as expected.
  */
 TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
-  LOG(INFO) << "Starting AttributesManagers_SceneInstanceJSONLoadTest";
+  ESP_DEBUG() << "Starting AttributesManagers_SceneInstanceJSONLoadTest";
   // build JSON sample config
   const std::string& jsonString = R"({
   "translation_origin" : "Asset_Local",
@@ -654,18 +666,40 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
               "template_name": "test_urdf_template0",
               "translation_origin": "COM",
               "fixed_base": false,
+              "auto_clamp_joint_limits" : true,
               "translation": [5,4,5],
               "rotation": [0.2, 0.3, 0.4, 0.5],
               "initial_joint_pose": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
               "initial_joint_velocities": [1.0, 2.1, 3.2, 4.3, 5.4, 6.5, 7.6],
-              "motion_type": "DYNAMIC"
+              "motion_type": "DYNAMIC",
+              "user_defined" : {
+                  "user_string" : "test_urdf_template0 instance defined string",
+                  "user_bool" : false,
+                  "user_int" : 2,
+                  "user_float" : 1.22,
+                  "user_vec3" : [120.3, 302.5, -25.07],
+                  "user_quat" : [1.23, 1.22, 1.26, 1.21],
+                  "user_def_obj" : {
+                      "position" : [0.1, 0.2, 0.3],
+                      "rotation" : [0.5, 0.3, 0.1]
+                  }
+              }
           },
           {
               "template_name": "test_urdf_template1",
               "fixed_base" : true,
+              "auto_clamp_joint_limits" : true,
               "translation": [3, 2, 1],
               "rotation": [0.5, 0.6, 0.7, 0.8],
-              "motion_type": "KINEMATIC"
+              "motion_type": "KINEMATIC",
+              "user_defined" : {
+                  "user_string" : "test_urdf_template1 instance defined string",
+                  "user_bool" : false,
+                  "user_int" : 21,
+                  "user_float" : 11.22,
+                  "user_vec3" : [190.3, 902.5, -95.07],
+                  "user_quat" : [1.25, 9.22, 9.26, 0.21]
+              }
           }
       ],
       "default_lighting":  "test_lighting_configuration",
@@ -692,7 +726,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
   // match values set in test JSON
   ASSERT_EQ(
       sceneAttr->getTranslationOrigin(),
-      static_cast<int>(AttrMgrs::SceneInstanceTranslationOrigin::AssetLocal));
+      static_cast<int>(Attrs::SceneInstanceTranslationOrigin::AssetLocal));
   ASSERT_EQ(sceneAttr->getLightingHandle(), "test_lighting_configuration");
   ASSERT_EQ(sceneAttr->getNavmeshHandle(), "test_navmesh_path1");
   ASSERT_EQ(sceneAttr->getSemanticSceneHandle(),
@@ -724,7 +758,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
   auto objInstance = objectInstanceList[0];
   ASSERT_EQ(objInstance->getHandle(), "test_object_template0");
   ASSERT_EQ(objInstance->getTranslationOrigin(),
-            static_cast<int>(AttrMgrs::SceneInstanceTranslationOrigin::COM));
+            static_cast<int>(Attrs::SceneInstanceTranslationOrigin::COM));
   ASSERT_EQ(objInstance->getTranslation(), Magnum::Vector3(0, 1, 2));
   ASSERT_EQ(objInstance->getRotation(),
             Magnum::Quaternion({0.3f, 0.4f, 0.5f}, 0.2f));
@@ -757,8 +791,10 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
   auto artObjInstance = artObjInstances[0];
   ASSERT_EQ(artObjInstance->getHandle(), "test_urdf_template0");
   ASSERT_EQ(artObjInstance->getTranslationOrigin(),
-            static_cast<int>(AttrMgrs::SceneInstanceTranslationOrigin::COM));
+            static_cast<int>(Attrs::SceneInstanceTranslationOrigin::COM));
   ASSERT_EQ(artObjInstance->getFixedBase(), false);
+  ASSERT_EQ(artObjInstance->getAutoClampJointLimits(), true);
+
   ASSERT_EQ(artObjInstance->getTranslation(), Magnum::Vector3(5, 4, 5));
   ASSERT_EQ(artObjInstance->getMotionType(),
             static_cast<int>(esp::physics::MotionType::DYNAMIC));
@@ -781,12 +817,38 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
     ASSERT_EQ(iter->second, jtVelVals[idx++]);
   }
 
+  // test test_urdf_template0 ao instance attributes-level user config vals
+  testUserDefinedConfigVals(artObjInstance->getUserConfiguration(),
+                            "test_urdf_template0 instance defined string",
+                            false, 2, 1.22f,
+                            Magnum::Vector3(120.3f, 302.5f, -25.07f),
+                            Magnum::Quaternion({1.22f, 1.26f, 1.21f}, 1.23f));
+
+  // test nested configuration
+  auto artObjNestedConfig =
+      artObjInstance->getUserConfiguration()->getConfigSubgroupAsPtr(
+          "user_def_obj");
+  ASSERT_NE(artObjNestedConfig, nullptr);
+  ASSERT_EQ(artObjNestedConfig->hasValues(), true);
+  ASSERT_EQ(artObjNestedConfig->getVec3("position"),
+            Magnum::Vector3(0.1f, 0.2f, 0.3f));
+  ASSERT_EQ(artObjNestedConfig->getVec3("rotation"),
+            Magnum::Vector3(0.5f, 0.3f, 0.1f));
+  ESP_WARNING() << "Articulated Object test 3";
+
   artObjInstance = artObjInstances[1];
   ASSERT_EQ(artObjInstance->getHandle(), "test_urdf_template1");
   ASSERT_EQ(artObjInstance->getFixedBase(), true);
+  ASSERT_EQ(artObjInstance->getAutoClampJointLimits(), true);
   ASSERT_EQ(artObjInstance->getTranslation(), Magnum::Vector3(3, 2, 1));
   ASSERT_EQ(artObjInstance->getMotionType(),
             static_cast<int>(esp::physics::MotionType::KINEMATIC));
+  // test test_urdf_template0 ao instance attributes-level user config vals
+  testUserDefinedConfigVals(artObjInstance->getUserConfiguration(),
+                            "test_urdf_template1 instance defined string",
+                            false, 21, 11.22f,
+                            Magnum::Vector3(190.3f, 902.5f, -95.07f),
+                            Magnum::Quaternion({9.22f, 9.26f, 0.21f}, 1.25f));
 
 }  // AttributesManagers_SceneInstanceJSONLoadTest
 
@@ -795,7 +857,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_SceneInstanceJSONLoadTest) {
  * loading process is working as expected.
  */
 TEST_F(AttributesManagersTest, AttributesManagers_StageJSONLoadTest) {
-  LOG(INFO) << "Starting AttributesManagers_StageJSONLoadTest";
+  ESP_DEBUG() << "Starting AttributesManagers_StageJSONLoadTest";
 
   // build JSON sample config
   const std::string& jsonString =
@@ -868,7 +930,7 @@ TEST_F(AttributesManagersTest, AttributesManagers_StageJSONLoadTest) {
  * loading process is working as expected.
  */
 TEST_F(AttributesManagersTest, AttributesManagers_ObjectJSONLoadTest) {
-  LOG(INFO) << "Starting AttributesManagers_ObjectJSONLoadTest";
+  ESP_DEBUG() << "Starting AttributesManagers_ObjectJSONLoadTest";
   // build JSON sample config
   const std::string& jsonString = R"({
   "scale":[2,3,4],
@@ -944,11 +1006,11 @@ TEST_F(AttributesManagersTest, AttributesManagers_ObjectJSONLoadTest) {
  * own tests.
  */
 TEST_F(AttributesManagersTest, PhysicsAttributesManagersCreate) {
-  LOG(INFO) << "Starting PhysicsAttributesManagersCreate";
+  ESP_DEBUG() << "Starting PhysicsAttributesManagersCreate";
 
-  LOG(INFO) << "Start Test : Create, Edit, Remove Attributes for "
-               "PhysicsAttributesManager @ "
-            << physicsConfigFile;
+  ESP_DEBUG() << "Start Test : Create, Edit, Remove Attributes for "
+                 "PhysicsAttributesManager @"
+              << physicsConfigFile;
 
   // physics attributes manager attributes verifcation
   testCreateAndRemove<AttrMgrs::PhysicsAttributesManager>(
@@ -970,9 +1032,9 @@ TEST_F(AttributesManagersTest, StageAttributesManagersCreate) {
   std::string stageConfigFile = Cr::Utility::Directory::join(
       DATA_DIR, "test_assets/scenes/simple_room.glb");
 
-  LOG(INFO) << "Start Test : Create, Edit, Remove Attributes for "
-               "StageAttributesManager @ "
-            << stageConfigFile;
+  ESP_DEBUG() << "Start Test : Create, Edit, Remove Attributes for "
+                 "StageAttributesManager @"
+              << stageConfigFile;
 
   // scene attributes manager attributes verifcation
   testCreateAndRemove<AttrMgrs::StageAttributesManager>(stageAttributesManager_,
@@ -995,9 +1057,9 @@ TEST_F(AttributesManagersTest, ObjectAttributesManagersCreate) {
   std::string objectConfigFile = Cr::Utility::Directory::join(
       DATA_DIR, "test_assets/objects/chair.object_config.json");
 
-  LOG(INFO) << "Start Test : Create, Edit, Remove Attributes for "
-               "ObjectAttributesManager @ "
-            << objectConfigFile;
+  ESP_DEBUG() << "Start Test : Create, Edit, Remove Attributes for "
+                 "ObjectAttributesManager @"
+              << objectConfigFile;
 
   int origNumFileBased = objectAttributesManager_->getNumFileTemplateObjects();
   int origNumPrimBased = objectAttributesManager_->getNumSynthTemplateObjects();
@@ -1032,14 +1094,14 @@ TEST_F(AttributesManagersTest, ObjectAttributesManagersCreate) {
 }  // AttributesManagersTest::ObjectAttributesManagersCreate test
 
 TEST_F(AttributesManagersTest, LightLayoutAttributesManagerTest) {
-  LOG(INFO) << "Starting LightLayoutAttributesManagerTest";
+  ESP_DEBUG() << "Starting LightLayoutAttributesManagerTest";
 
   std::string lightConfigFile = Cr::Utility::Directory::join(
       DATA_DIR, "test_assets/lights/test_lights.lighting_config.json");
 
-  LOG(INFO) << "Start Test : Create, Edit, Remove Attributes for "
-               "LightLayoutAttributesManager @ "
-            << lightConfigFile;
+  ESP_DEBUG() << "Start Test : Create, Edit, Remove Attributes for "
+                 "LightLayoutAttributesManager @"
+              << lightConfigFile;
   // light attributes manager attributes verifcation
   testCreateAndRemoveLights(lightLayoutAttributesManager_, lightConfigFile);
 
@@ -1051,7 +1113,7 @@ TEST_F(AttributesManagersTest, LightLayoutAttributesManagerTest) {
  * asset attributes are changed.
  */
 TEST_F(AttributesManagersTest, PrimitiveAssetAttributesTest) {
-  LOG(INFO) << "Starting PrimitiveAssetAttributesTest";
+  ESP_DEBUG() << "Starting PrimitiveAssetAttributesTest";
   /**
    * Primitive asset attributes require slightly different testing since a
    * default set of attributes (matching the default Magnum::Primitive
@@ -1091,7 +1153,7 @@ TEST_F(AttributesManagersTest, PrimitiveAssetAttributesTest) {
   //////////////////////////
   // get default template for solid capsule
   {
-    LOG(INFO) << "Starting CapsulePrimitiveAttributes";
+    ESP_DEBUG() << "Starting CapsulePrimitiveAttributes";
     CapsulePrimitiveAttributes::ptr dfltCapsAttribs =
         assetAttributesManager_->getDefaultCapsuleTemplate(false);
     // verify it exists
@@ -1117,7 +1179,7 @@ TEST_F(AttributesManagersTest, PrimitiveAssetAttributesTest) {
   //////////////////////////
   // get default template for solid cone
   {
-    LOG(INFO) << "Starting ConePrimitiveAttributes";
+    ESP_DEBUG() << "Starting ConePrimitiveAttributes";
 
     ConePrimitiveAttributes::ptr dfltConeAttribs =
         assetAttributesManager_->getDefaultConeTemplate(false);
@@ -1145,7 +1207,7 @@ TEST_F(AttributesManagersTest, PrimitiveAssetAttributesTest) {
   //////////////////////////
   // get default template for solid cylinder
   {
-    LOG(INFO) << "Starting CylinderPrimitiveAttributes";
+    ESP_DEBUG() << "Starting CylinderPrimitiveAttributes";
 
     CylinderPrimitiveAttributes::ptr dfltCylAttribs =
         assetAttributesManager_->getDefaultCylinderTemplate(false);
@@ -1172,7 +1234,7 @@ TEST_F(AttributesManagersTest, PrimitiveAssetAttributesTest) {
   //////////////////////////
   // get default template for solid UV Sphere
   {
-    LOG(INFO) << "Starting UVSpherePrimitiveAttributes";
+    ESP_DEBUG() << "Starting UVSpherePrimitiveAttributes";
 
     UVSpherePrimitiveAttributes::ptr dfltUVSphereAttribs =
         assetAttributesManager_->getDefaultUVSphereTemplate(false);

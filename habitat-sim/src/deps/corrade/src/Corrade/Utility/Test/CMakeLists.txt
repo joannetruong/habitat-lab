@@ -139,6 +139,8 @@ corrade_add_test(UtilityConfigurationTest ConfigurationTest.cpp
         ConfigurationTestFiles/hierarchic-shortcuts.conf
         ConfigurationTestFiles/hierarchic-shortcuts-modified.conf
         ConfigurationTestFiles/hýždě.conf
+        ConfigurationTestFiles/iterate.conf
+        ConfigurationTestFiles/iterate-modified.conf
         ConfigurationTestFiles/missing-equals.conf
         ConfigurationTestFiles/missing-quote.conf
         ConfigurationTestFiles/missing-multiline-quote.conf
@@ -193,6 +195,8 @@ set_tests_properties(UtilityFatalTest PROPERTIES WILL_FAIL ON)
 corrade_add_test(UtilityMemoryTest MemoryTest.cpp)
 target_compile_definitions(UtilityMemoryTest PRIVATE "CORRADE_GRACEFUL_ASSERT")
 
+corrade_add_test(UtilityMoveTest MoveTest.cpp)
+
 set(UtilityDirectoryTest_SRCS DirectoryTest.cpp)
 if(CORRADE_TARGET_IOS)
     set_source_files_properties(DirectoryTestFiles PROPERTIES
@@ -234,6 +238,7 @@ if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND NOT CMAKE_CXX_COMPILER_VERSION VERS
 endif()
 
 corrade_add_test(UtilityStringTest StringTest.cpp LIBRARIES CorradeUtilityTestLib)
+corrade_add_test(UtilityStringBenchmark StringBenchmark.cpp)
 corrade_add_test(UtilitySystemTest SystemTest.cpp)
 corrade_add_test(UtilityTweakableParserTest TweakableParserTest.cpp)
 corrade_add_test(UtilityTypeTraitsTest TypeTraitsTest.cpp)
@@ -269,10 +274,10 @@ corrade_add_test(UtilityResourceTest
         ResourceTestFiles/resources-no-group.conf
         ResourceTestFiles/resources-nonexistent.conf
         ResourceTestFiles/resources-nothing.conf
-        ResourceTestFiles/resources-overriden.conf
-        ResourceTestFiles/resources-overriden-different.conf
-        ResourceTestFiles/resources-overriden-none.conf
-        ResourceTestFiles/resources-overriden-nonexistent-file.conf)
+        ResourceTestFiles/resources-overridden.conf
+        ResourceTestFiles/resources-overridden-different.conf
+        ResourceTestFiles/resources-overridden-none.conf
+        ResourceTestFiles/resources-overridden-nonexistent-file.conf)
 target_include_directories(UtilityResourceTest PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
 # Static lib resource test
@@ -302,6 +307,7 @@ set_target_properties(
     UtilityHashDigestTest
     UtilityMacrosTest
     UtilityMemoryTest
+    UtilityMoveTest
     UtilityResourceTest
     UtilityResourceStaticTest
     UtilitySha1Test
@@ -309,6 +315,7 @@ set_target_properties(
     UtilityStlForwardTupleTest
     UtilityStlForwardVectorTest
     UtilityStringTest
+    UtilityStringBenchmark
     UtilitySystemTest
     UtilityTypeTraitsTest
     UtilityUnicodeTest

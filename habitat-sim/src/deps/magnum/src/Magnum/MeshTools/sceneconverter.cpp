@@ -45,6 +45,7 @@
 #include "Magnum/Trade/MaterialData.h"
 #include "Magnum/Trade/MeshData.h"
 #include "Magnum/Trade/MeshObjectData3D.h"
+#include "Magnum/Trade/SkinData.h"
 #include "Magnum/Trade/TextureData.h"
 #include "Magnum/Trade/AbstractSceneConverter.h"
 #include "Magnum/Trade/Implementation/converterUtilities.h"
@@ -263,7 +264,7 @@ used.)")
 
     /* Set options, if passed */
     if(args.isSet("verbose")) importer->addFlags(Trade::ImporterFlag::Verbose);
-    Implementation::setOptions(*importer, args.value("importer-options"));
+    Implementation::setOptions(*importer, "AnySceneImporter", args.value("importer-options"));
 
     std::chrono::high_resolution_clock::duration importTime;
 
@@ -286,6 +287,13 @@ used.)")
         struct AnimationInfo {
             UnsignedInt animation;
             Trade::AnimationData data{{}, {}};
+            std::string name;
+        };
+
+        struct SkinInfo {
+            UnsignedInt skin;
+            UnsignedInt references;
+            Trade::SkinData3D data{{}, {}};
             std::string name;
         };
 
@@ -338,6 +346,7 @@ used.)")
         Containers::Array<UnsignedInt> materialReferenceCount{importer->materialCount()};
         Containers::Array<UnsignedInt> lightReferenceCount{importer->lightCount()};
         Containers::Array<UnsignedInt> meshReferenceCount{importer->meshCount()};
+        Containers::Array<UnsignedInt> skinReferenceCount{importer->skin3DCount()};
         for(UnsignedInt i = 0; i != importer->object3DCount(); ++i) {
             Containers::Pointer<Trade::ObjectData3D> object = importer->object3D(i);
             if(!object) continue;
@@ -347,6 +356,8 @@ used.)")
                     ++meshReferenceCount[meshObject.instance()];
                 if(std::size_t(meshObject.material()) < materialReferenceCount.size())
                     ++materialReferenceCount[meshObject.material()];
+                if(std::size_t(meshObject.skin()) < skinReferenceCount.size())
+                    ++skinReferenceCount[meshObject.skin()];
             } else if(object->instanceType() == Trade::ObjectInstanceType3D::Light) {
                 if(std::size_t(object->instance()) < lightReferenceCount.size())
                     ++lightReferenceCount[object->instance()];
@@ -372,6 +383,27 @@ used.)")
             info.data = *std::move(animation);
 
             arrayAppend(animationInfos, std::move(info));
+        }
+
+        /* Skin properties */
+        Containers::Array<SkinInfo> skinInfos;
+        for(UnsignedInt i = 0; i != importer->skin3DCount(); ++i) {
+            Containers::Optional<Trade::SkinData3D> skin;
+            {
+                Duration d{importTime};
+                if(!(skin = importer->skin3D(i))) {
+                    error = true;
+                    continue;
+                }
+            }
+
+            SkinInfo info{};
+            info.skin = i;
+            info.name = importer->skin3DName(i);
+            info.references = skinReferenceCount[i];
+            info.data = *std::move(skin);
+
+            arrayAppend(skinInfos, std::move(info));
         }
 
         /* Light properties */
@@ -569,6 +601,19 @@ used.)")
                     not so much for things like complex numbers or quats */
             }
         }
+        for(const SkinInfo& info: skinInfos) {
+            Debug d;
+            d << "Skin" << info.skin;
+            /* Print reference count only if there actually is a scene,
+               otherwise this information is useless */
+            if(importer->object3DCount())
+                d << Utility::formatString("(referenced by {} objects)", info.references);
+            d << Debug::nospace << ":";
+            if(!info.name.empty()) d << info.name;
+
+            d << Debug::newline << "  Joints:" << info.data.joints();
+        }
+
         for(const LightInfo& info: lightInfos) {
             Debug d;
             d << "Light" << info.light;
@@ -823,7 +868,7 @@ used.)")
         /* Set options, if passed */
         if(args.isSet("verbose")) converter->addFlags(Trade::SceneConverterFlag::Verbose);
         if(i < args.arrayValueCount("converter-options"))
-            Implementation::setOptions(*converter, args.arrayValue("converter-options", i));
+            Implementation::setOptions(*converter, "AnySceneConverter", args.arrayValue("converter-options", i));
 
         /* This is the last --converter (or the implicit AnySceneConverter at
            the end), output to a file and exit the loop */

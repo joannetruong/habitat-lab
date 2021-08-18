@@ -625,6 +625,11 @@ static_cast<void>(radians);
 }
 
 {
+#if defined(CORRADE_TARGET_GCC) && __GNUC__ >= 11
+#pragma GCC diagnostic push
+/* Stupid thing. YES I WANT THIS TO BE A FUNCTION, CAN YOU SHUT UP */
+#pragma GCC diagnostic ignored "-Wvexing-parse"
+#endif
 /* [Deg-usage-convert] */
 Double foo();
 
@@ -634,6 +639,9 @@ Radd radians{foo()};
 /* [Deg-usage-convert] */
 static_cast<void>(degrees);
 static_cast<void>(radians);
+#if defined(CORRADE_TARGET_GCC) && __GNUC__ >= 11
+#pragma GCC diagnostic pop
+#endif
 }
 
 {
@@ -646,6 +654,11 @@ static_cast<void>(b);
 }
 
 {
+#if defined(CORRADE_TARGET_GCC) && __GNUC__ >= 11
+#pragma GCC diagnostic push
+/* Stupid thing. YES I WANT THIS TO BE A FUNCTION, CAN YOU SHUT UP */
+#pragma GCC diagnostic ignored "-Wvexing-parse"
+#endif
 Double foo();
 /* [Deg-usage-comparison] */
 Rad angle();
@@ -654,6 +667,9 @@ Deg x = angle();                // convert to degrees for easier comparison
 if(x < 30.0_degf) foo();
 //if(x > 1.57_radf) bar();      // error, both need to be of the same type
 /* [Deg-usage-comparison] */
+#if defined(CORRADE_TARGET_GCC) && __GNUC__ >= 11
+#pragma GCC diagnostic pop
+#endif
 }
 
 {
@@ -1003,6 +1019,30 @@ static_cast<void>(tanAngleSqPlusOne);
 Matrix2x2 floatingPoint{Vector2{1.3f, 2.7f}, Vector2{-15.0f, 7.0f}};
 Math::Matrix2x2<Byte> integral{floatingPoint}; // {{1, 2}, {-15, 7}}
 /* [Matrix-conversion] */
+}
+
+{
+/* [Matrix3-usage] */
+using namespace Math::Literals;
+
+Matrix3 transformation =
+    Matrix3::rotation(15.0_degf)*
+    Matrix3::translation({100.0f, -30.0f})*
+    Matrix3::scaling(Vector2::yScale(2.0f));
+/* [Matrix3-usage] */
+static_cast<void>(transformation);
+}
+
+{
+/* [Matrix4-usage] */
+using namespace Math::Literals;
+
+Matrix4 transformation =
+    Matrix4::rotationZ(15.0_degf)*
+    Matrix4::translation({10.0f, 3.0f, -1.5f})*
+    Matrix4::scaling(Vector3::yScale(2.0f));
+/* [Matrix4-usage] */
+static_cast<void>(transformation);
 }
 
 {

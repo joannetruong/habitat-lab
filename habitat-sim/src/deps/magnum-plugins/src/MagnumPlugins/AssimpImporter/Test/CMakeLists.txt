@@ -3,6 +3,7 @@
 #
 #   Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
 #               2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
+#   Copyright © 2021 Pablo Escobar <mail@rvrs.in>
 #
 #   Permission is hereby granted, free of charge, to any person obtaining a
 #   copy of this software and associated documentation files (the "Software"),
@@ -24,9 +25,11 @@
 #
 
 if(CORRADE_TARGET_EMSCRIPTEN OR CORRADE_TARGET_ANDROID)
+    set(TINYGLTFIMPORTER_TEST_DIR ".")
     set(ASSIMPIMPORTER_TEST_DIR ".")
 else()
-    set(ASSIMPIMPORTER_TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    set(TINYGLTFIMPORTER_TEST_DIR ${PROJECT_SOURCE_DIR}/src/MagnumPlugins/TinyGltfImporter/Test)
+    set(ASSIMPIMPORTER_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
 # CMake before 3.8 has broken $<TARGET_FILE*> expressions for iOS (see
@@ -43,14 +46,6 @@ if(NOT MAGNUM_ASSIMPIMPORTER_BUILD_STATIC)
     endif()
 endif()
 
-# Assimp 5. Of all the things that could break, this version reports itself as
-# 4.1. Since some of the insane awful bugs got fixed in version 5, the test has
-# to check against the version in order to adjust expectations. The only way I
-# could make this work is checking for the getEpsilon() function added in
-# https://github.com/assimp/assimp/commit/8b95479bb00b4bf8fb875f2c5b0605ddfd203b7f
-# Related bug: https://github.com/assimp/assimp/issues/2693
-try_compile(ASSIMP_IS_VERSION_5 ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/CheckAssimpVersion5.cpp LINK_LIBRARIES Assimp::Assimp)
-
 # First replace ${} variables, then $<> generator expressions
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/configure.h.cmake
                ${CMAKE_CURRENT_BINARY_DIR}/configure.h.in)
@@ -61,12 +56,21 @@ corrade_add_test(AssimpImporterTest AssimpImporterTest.cpp
     LIBRARIES Magnum::Trade
     FILES
         empty.dae
-        empty.gltf
+        animation.gltf # Same as in TinyGltfImporterTest, but added a scene
+        animation.bin
+        animation-no-scene.gltf
+        animation-patching.bin
+        animation-patching.gltf
         camera.dae
         diffuse_texture.png
         embedded-texture.blend
+        exported-animation.dae # Converted from exported-animation.blend
+        exported-animation.fbx
+        exported-animation.gltf
         image-filename-trailing-space.mtl
         image-filename-trailing-space.obj
+        image-filename-backslash.mtl
+        image-filename-backslash.obj
         image-mips.mtl
         image-mips.obj
         light.dae
@@ -81,13 +85,29 @@ corrade_add_test(AssimpImporterTest AssimpImporterTest.cpp
         multiple-textures.mtl r.png g.png b.png y.png
         points.obj
         scene.dae
+        scene+mesh.dae
+        skin.dae # Converted from skin.blend
+        skin.fbx
+        skin.gltf
+        skin-dummy-weights.bin
+        skin-dummy-weights.gltf
+        skin-multiple-sets.dae
+        skin-multiple-sets.bin
+        skin-multiple-sets.gltf
+        skin-shared.gltf
+        skin-shared.bin
         texture-ambient.obj
         texture-ambient.mtl
         quad.stl
         y-up.dae
         z-up.dae)
 target_link_libraries(AssimpImporterTest PRIVATE Assimp::Assimp)
-target_include_directories(AssimpImporterTest PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>)
+target_include_directories(AssimpImporterTest PRIVATE
+    ${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>
+    # The test needs access to configureInternal.h written by
+    # AssimpImporter. The dynamic library doesn't get linked to
+    # and hence doesn't get the binary dir in the include dirs.
+    ${PROJECT_BINARY_DIR}/src)
 if(MAGNUM_ASSIMPIMPORTER_BUILD_STATIC)
     target_link_libraries(AssimpImporterTest PRIVATE
         AssimpImporter Magnum::AnyImageImporter)

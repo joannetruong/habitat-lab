@@ -32,7 +32,7 @@
     both from and to Python objects supporting the Buffer Protocol, with one
     dimension and stride of :py:`1`. See :ref:`StridedArrayView1D` and others
     for more generic views. :ref:`ArrayView` is immutable, see
-    :ref:`MutableArrayView` for the mutable alterantive. All slicing operations
+    :ref:`MutableArrayView` for the mutable alternative. All slicing operations
     are supported, specifying a non-trivial stride will return
     :ref:`StridedArrayView1D` instead of :ref:`ArrayView`. Example usage:
 

@@ -14,9 +14,13 @@ class WindowlessContext {
  public:
   explicit WindowlessContext(int gpuDevice = 0);
 
-  ~WindowlessContext() { LOG(INFO) << "Deconstructing WindowlessContext"; }
+  ~WindowlessContext() { ESP_DEBUG() << "Deconstructing WindowlessContext"; }
 
   void makeCurrent();
+  void makeCurrentPlatform();
+
+  void release();
+  void releasePlatform();
 
   int gpuDevice() const;
 

@@ -27,6 +27,7 @@
 
 /** @file
  * @brief Class @ref Magnum::Trade::AnySceneConverter
+ * @m_since{2020,06}
  */
 
 #include "Magnum/Trade/AbstractSceneConverter.h"
@@ -52,6 +53,7 @@ namespace Magnum { namespace Trade {
 
 /**
 @brief Any scene converter plugin
+@m_since{2020,06}
 
 Detects file type based on file extension, loads corresponding plugin and then
 tries to convert the file with it. Supported formats:
@@ -91,6 +93,17 @@ target_link_libraries(your-app PRIVATE Magnum::AnySceneConverter)
 
 See @ref building, @ref cmake, @ref plugins and @ref file-formats for more
 information.
+
+@section Trade-AnySceneConverter-proxy Interface proxying and option propagation
+
+On a call to @ref convertToFile(), a target file format is detected from the
+extension and a corresponding plugin is loaded. After that, flags set via
+@ref setFlags() and options set through @ref configuration() are propagated to
+the concrete implementation, with a warning emitted in case given option is not
+present in the default configuration of the target plugin.
+
+The output of the @ref convertToFile() function called on the concrete
+implementation is then proxied back.
 */
 class MAGNUM_ANYSCENECONVERTER_EXPORT AnySceneConverter: public AbstractSceneConverter {
     public:

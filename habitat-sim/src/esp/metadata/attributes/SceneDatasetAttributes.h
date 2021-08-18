@@ -123,8 +123,7 @@ class SceneDatasetAttributes : public AbstractAttributes {
       const std::string& key,
       const std::string& path,
       bool overwrite = false) {
-    return addNewValToMap(key, path, overwrite, navmeshMap_,
-                          "::addNavmeshPathEntry");
+    return addNewValToMap(key, path, overwrite, navmeshMap_, "<navmesh>");
   }  // addNavmeshPathEntry
 
   /**
@@ -141,7 +140,7 @@ class SceneDatasetAttributes : public AbstractAttributes {
       const std::string& path,
       bool overwrite = false) {
     return addNewValToMap(key, path, overwrite, semanticSceneDescrMap_,
-                          "::addSemanticSceneDescrPathEntry");
+                          "<semanticSceneDescriptor");
   }  // addNavmeshPathEntry
 
   /**
@@ -264,9 +263,8 @@ class SceneDatasetAttributes : public AbstractAttributes {
   inline std::string getArticulatedObjModelFullHandle(
       const std::string& artObjModelName) {
     if (articulatedObjPaths.count(artObjModelName) == 0) {
-      LOG(ERROR) << "SceneDatasetAttributes::getArticulatedObjModelFullHandle "
-                    ": No Articulatd Model with name "
-                 << artObjModelName << " could be found.  Aborting.";
+      ESP_ERROR() << "No Articulatd Model with name" << artObjModelName
+                  << "could be found.  Aborting.";
       return "";
     }
     return articulatedObjPaths.at(artObjModelName);
@@ -283,11 +281,9 @@ class SceneDatasetAttributes : public AbstractAttributes {
   void setArticulatedObjectModelFilename(const std::string& key,
                                          const std::string& val) {
     if (articulatedObjPaths.count(key) != 0) {
-      LOG(WARNING)
-          << "SceneDatasetAttributes::setArticulatedObjectModelFilename "
-             ": Articulated model filepath named "
-          << key << " already exists (" << articulatedObjPaths.at(key)
-          << "), so this is being overwritten by " << val << ".";
+      ESP_WARNING() << "Articulated model filepath named" << key
+                    << "already exists (" << articulatedObjPaths.at(key)
+                    << "), so this is being overwritten by" << val << ".";
     }
     articulatedObjPaths[key] = val;
   }
@@ -322,7 +318,31 @@ class SceneDatasetAttributes : public AbstractAttributes {
                                   lightLayoutAttributesManager_);
   }  // getLightSetupFullHandle
 
+  /**
+   * @brief return a summary of this dataset
+   */
+  std::string getDatasetSummary() const;
+
+  /**
+   * @brief returns the header row of the summary string.
+   */
+  static std::string getDatasetSummaryHeader();
+
  protected:
+  /**
+   * @brief Retrieve a comma-separated string holding the header values for the
+   * info returned for this managed object, type-specific.  Individual
+   * components handle this.
+   */
+
+  std::string getObjectInfoHeaderInternal() const override { return ","; }
+
+  /**
+   * @brief Retrieve a comma-separated informational string about the contents
+   * of this managed object.
+   */
+  std::string getObjectInfoInternal() const override;
+
   /**
    * @brief Returns actual attributes handle containing @p attrName as a
    * substring, or the empty string if none exists, from passed @p attrMgr .

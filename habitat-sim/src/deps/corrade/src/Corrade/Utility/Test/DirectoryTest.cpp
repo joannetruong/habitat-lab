@@ -855,7 +855,7 @@ void DirectoryTest::home() {
     /* On other Unixes (except Android, which is shit) verify that the home dir
        contains `.local` directory or is /root. Ugly and hacky, but it's the
        best I came up with. Can't test for e.g. `/home/` substring, as that can
-       be overriden. */
+       be overridden. */
     #elif defined(CORRADE_TARGET_UNIX) && !defined(CORRADE_TARGET_ANDROID)
     CORRADE_VERIFY(Directory::exists(home));
     CORRADE_VERIFY(Directory::exists(Directory::join(home, ".local")) || home == "/root");
@@ -866,7 +866,7 @@ void DirectoryTest::home() {
 
     /* On Windows verify that the home dir contains `desktop.ini` file. Ugly
        and hacky, but it's the best I came up with. Can't test for e.g.
-       `/Users/` substring, as that can be overriden. */
+       `/Users/` substring, as that can be overridden. */
     #elif defined(CORRADE_TARGET_WINDOWS)
     CORRADE_VERIFY(Directory::exists(Directory::join(home, "desktop.ini")));
 
@@ -902,7 +902,7 @@ void DirectoryTest::configurationDir() {
     /* On Linux verify that the parent dir contains `autostart` directory,
        something from GTK or something from Qt. Ugly and hacky, but it's the
        best I could come up with. Can't test for e.g. `/home/` substring, as
-       that can be overriden. */
+       that can be overridden. */
     #elif defined(__linux__) && !defined(CORRADE_TARGET_ANDROID)
     CORRADE_COMPARE(dir.substr(dir.size()-7), "corrade");
     CORRADE_VERIFY(Directory::exists(Directory::join(Directory::path(dir), "autostart")) ||
@@ -915,7 +915,7 @@ void DirectoryTest::configurationDir() {
 
     /* On Windows verify that the parent dir contains `Microsoft` subdirectory.
        Ugly and hacky, but it's the best I came up with. Can't test for e.g.
-       `/Users/` substring, as that can be overriden. */
+       `/Users/` substring, as that can be overridden. */
     #elif defined(CORRADE_TARGET_WINDOWS)
     CORRADE_COMPARE(dir.substr(dir.size()-7), "Corrade");
     CORRADE_VERIFY(Directory::exists(Directory::join(Directory::path(dir), "Microsoft")));
@@ -1162,7 +1162,7 @@ void DirectoryTest::fileSizeEarlyEof() {
     #ifdef __linux__
     constexpr const char* file = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
     if(!Directory::exists(file))
-        CORRADE_SKIP(file + std::string{" doesn't exist, can't test"});
+        CORRADE_SKIP(file << "doesn't exist, can't test");
     Containers::Optional<std::size_t> size = Directory::fileSize(file);
     CORRADE_VERIFY(size);
     CORRADE_COMPARE_AS(*size, Directory::read(file).size(),

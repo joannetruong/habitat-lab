@@ -88,6 +88,8 @@ namespace assets {
  */
 class ResourceManager {
  public:
+  bool getCreateRenderer() const;
+
   /** @brief Stores references to a set of drawable elements */
   using DrawableGroup = gfx::DrawableGroup;
   /** @brief Convenience typedef for Importer class */
@@ -150,8 +152,6 @@ class ResourceManager {
    * attributes
    * @param physicsManager The currently defined @ref physics::PhysicsManager.
    * Will be reseated to the specified physics implementation.
-   * @param isEnabled Whether this PhysicsManager is enabled or not.  Takes the
-   * place of old checks for nullptr.
    * @param parent The @ref scene::SceneNode of which the scene mesh will be
    * added as a child. Typically near the root of the scene. Expected to be
    * static.
@@ -160,7 +160,6 @@ class ResourceManager {
    */
   void initPhysicsManager(
       std::shared_ptr<physics::PhysicsManager>& physicsManager,
-      bool isEnabled,
       scene::SceneNode* parent,
       const metadata::attributes::PhysicsManagerAttributes::ptr&
           physicsManagerAttributes);
@@ -172,28 +171,25 @@ class ResourceManager {
    * If parent and drawables are not specified, the assets are loaded, but no
    * new @ref gfx::Drawable is added for the scene (i.e. it will not be
    * rendered).
-   * @param sceneAttributes The @ref StageAttributes that describes the
-   * scene
+   * @param stageAttributes The @ref StageAttributes that describes the
+   * stage
+   * @param stageInstanceAttributes The @ref SceneObjectInstanceAttributes that
+   * describes this particular instance of the stage.  If nullptr then not
+   * created by SceneInstanceAttributes.
    * @param _physicsManager The currently defined @ref physics::PhysicsManager.
    * @param sceneManagerPtr Pointer to scene manager, to fetch drawables and
    * parent node.
    * @param [out] activeSceneIDs active scene ID is in idx 0, if semantic scene
    * is made, its activeID should be pushed onto vector
-   * @param createSemanticMesh If the semantic mesh should be created, based on
-   * @ref SimulatorConfiguration
-   * @param forceSeparateSemanticSceneGraph Force creation of a separate
-   * semantic scene graph, even when no semantic mesh is loaded for the stage.
-   * This is required to support playback of any replay that includes a
-   * semantic-only render asset instance.
    * @return Whether or not the scene load succeeded.
    */
   bool loadStage(
-      metadata::attributes::StageAttributes::ptr& sceneAttributes,
+      const metadata::attributes::StageAttributes::ptr& stageAttributes,
+      const metadata::attributes::SceneObjectInstanceAttributes::ptr&
+          stageInstanceAttributes,
       const std::shared_ptr<physics::PhysicsManager>& _physicsManager,
       esp::scene::SceneManager* sceneManagerPtr,
-      std::vector<int>& activeSceneIDs,
-      bool createSemanticMesh,
-      bool forceSeparateSemanticSceneGraph = false);
+      std::vector<int>& activeSceneIDs);
 
   /**
    * @brief Construct scene collision mesh group based on name and type of
@@ -235,7 +231,8 @@ class ResourceManager {
    */
   const std::vector<assets::CollisionMeshData>& getCollisionMesh(
       const std::string& collisionAssetHandle) const {
-    CHECK(collisionMeshGroups_.count(collisionAssetHandle) > 0);
+    CORRADE_INTERNAL_ASSERT(collisionMeshGroups_.count(collisionAssetHandle) >
+                            0);
     return collisionMeshGroups_.at(collisionAssetHandle);
   }
 
@@ -310,7 +307,7 @@ class ResourceManager {
    * @return The asset's @ref MeshMetaData object.
    */
   const MeshMetaData& getMeshMetaData(const std::string& metaDataName) const {
-    CHECK(resourceDict_.count(metaDataName) > 0);
+    CORRADE_INTERNAL_ASSERT(resourceDict_.count(metaDataName) > 0);
     return resourceDict_.at(metaDataName).meshMetaData;
   }
 
@@ -333,7 +330,7 @@ class ResourceManager {
    */
   std::shared_ptr<esp::geo::VoxelGrid> getVoxelGrid(
       const std::string& voxelGridName) const {
-    CHECK(voxelGridDict_.count(voxelGridName) > 0);
+    CORRADE_INTERNAL_ASSERT(voxelGridDict_.count(voxelGridName) > 0);
     return voxelGridDict_.at(voxelGridName);
   }
 
@@ -428,7 +425,7 @@ class ResourceManager {
       const std::string& filename,
       const std::string& chdFilename,
       const VHACDParameters& params = VHACDParameters(),
-      const bool saveChdToObj = false);
+      bool saveChdToObj = false);
 #endif
   /**
    * @brief Add an object from a specified object template handle to the
@@ -488,7 +485,7 @@ class ResourceManager {
    * gfx::Drawable.
    */
 
-  void createDrawable(Mn::GL::Mesh& mesh,
+  void createDrawable(Mn::GL::Mesh* mesh,
                       gfx::Drawable::Flags& meshAttributeFlags,
                       scene::SceneNode& node,
                       const Mn::ResourceKey& lightSetupKey,
@@ -545,7 +542,7 @@ class ResourceManager {
    * and return it
    *
    * @param attribs the attributes to query for the information.
-   * @param origin Either the origin of the sceneAttributes or the COM value of
+   * @param origin Either the origin of the stageAttributes or the COM value of
    * the objectAttributes.
    * @return the coordinate frame of the assets the passed attributes describes.
    */
@@ -637,7 +634,7 @@ class ResourceManager {
       const std::string& filename,
       const metadata::attributes::ObjectAttributes::ptr& objectAttributes,
       const std::string& meshType,
-      const bool requiresLighting);
+      bool requiresLighting);
 
   /**
    * @brief Build a primitive asset based on passed template parameters.  If

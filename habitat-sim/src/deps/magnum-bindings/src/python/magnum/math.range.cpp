@@ -52,8 +52,8 @@ template<class T> void range(py::module_& m, py::class_<T>& c) {
             return T{Math::ZeroInit};
         }, "Construct a zero range")
         .def(py::init(), "Default constructor")
-        .def(py::init<typename T::VectorType, typename T::VectorType>(), "Construct a range from minimal and maximal coordiantes")
-        .def(py::init<std::pair<typename T::VectorType, typename T::VectorType>>(), "Construct a range from minimal and maximal coordiantes")
+        .def(py::init<typename T::VectorType, typename T::VectorType>(), "Construct a range from minimal and maximal coordinates")
+        .def(py::init<std::pair<typename T::VectorType, typename T::VectorType>>(), "Construct a range from minimal and maximal coordinates")
 
         /* Comparison */
         .def(py::self == py::self, "Equality comparison")
@@ -166,8 +166,8 @@ template<class T> void range2D(py::class_<T>& c) {
         .def("y", &T::y, "Range in the Y axis")
         .def("size_x", &T::sizeX, "Range width")
         .def("size_y", &T::sizeY, "Range height")
-        .def("center_x", &T::sizeX, "Range center on X axis")
-        .def("center_y", &T::sizeY, "Range center on Y axis");
+        .def("center_x", &T::centerX, "Range center on X axis")
+        .def("center_y", &T::centerY, "Range center on Y axis");
 }
 
 template<class T> void range3D(py::class_<T>& c) {
@@ -282,14 +282,14 @@ template<class T> void range3D(py::class_<T>& c) {
         /* Methods */
         .def("x", &T::x, "Range in the X axis")
         .def("y", &T::y, "Range in the Y axis")
-        .def("z", &T::y, "Range in the Z axis")
+        .def("z", &T::z, "Range in the Z axis")
         .def("xy", &T::xy, "Range in the XY plane")
         .def("size_x", &T::sizeX, "Range width")
         .def("size_y", &T::sizeY, "Range height")
         .def("size_z", &T::sizeZ, "Range depth")
-        .def("center_x", &T::sizeX, "Range center on X axis")
-        .def("center_y", &T::sizeY, "Range center on Y axis")
-        .def("center_z", &T::sizeY, "Range center on Z axis");
+        .def("center_x", &T::centerX, "Range center on X axis")
+        .def("center_y", &T::centerY, "Range center on Y axis")
+        .def("center_z", &T::centerZ, "Range center on Z axis");
 }
 
 template<class U, template<UnsignedInt, class> class Type, UnsignedInt dimensions, class T, class ...Args> void convertibleImplementation(py::class_<Type<dimensions, T>, Args...>& c, std::false_type) {

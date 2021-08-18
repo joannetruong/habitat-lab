@@ -576,8 +576,11 @@ void MeshDataTest::constructAttribute() {
     CORRADE_COMPARE(positions.offset(positionData), 0);
     CORRADE_COMPARE(positions.stride(), sizeof(Vector2));
     CORRADE_VERIFY(positions.data().data() == positionData);
-    /* This is allowed too for simplicity, it just ignores the parameter */
-    CORRADE_VERIFY(positions.data(positionData).data() == positionData);
+
+    /* This is allowed too for simplicity, the parameter has to be large enough
+       tho */
+    char someArray[3*sizeof(Vector2)];
+    CORRADE_VERIFY(positions.data(someArray).data() == positionData);
 
     constexpr MeshAttributeData cpositions{MeshAttribute::Position, Containers::arrayView(Positions)};
     constexpr bool isOffsetOnly = cpositions.isOffsetOnly();
@@ -605,6 +608,9 @@ void MeshDataTest::constructAttributeDefault() {
 }
 
 void MeshDataTest::constructAttributeCustom() {
+    /* Verifying it doesn't hit any assertion about disallowed type for given
+       attribute */
+
     const Short idData[3]{};
     MeshAttributeData ids{meshAttributeCustom(13), Containers::arrayView(idData)};
     CORRADE_COMPARE(ids.name(), meshAttributeCustom(13));
@@ -789,11 +795,13 @@ void MeshDataTest::constructAttributeWrongDataAccess() {
     CORRADE_VERIFY(!a.isOffsetOnly());
     CORRADE_VERIFY(b.isOffsetOnly());
 
+    a.data(positionData); /* This is fine, no asserts */
+
     std::ostringstream out;
     Error redirectError{&out};
     b.data();
     CORRADE_COMPARE(out.str(),
-        "Trade::MeshAttributeData::data(): the attribute is a relative offset, supply a data array\n");
+        "Trade::MeshAttributeData::data(): the attribute is offset-only, supply a data array\n");
 }
 
 constexpr Vector2 ArrayVertexData[3*4]
@@ -886,7 +894,7 @@ void MeshDataTest::constructArrayAttribute2DNonContiguous() {
 void MeshDataTest::constructArrayAttributeTypeErased() {
     Vector2 vertexData[3*4];
     Containers::StridedArrayView1D<Vector2> attribute{vertexData, 3, 4*sizeof(Vector2)};
-    MeshAttributeData data{meshAttributeCustom(35), VertexFormat::Vector2, attribute, 4};
+    MeshAttributeData data{meshAttributeCustom(35), VertexFormat::Vector2, Containers::arrayCast<const char>(attribute), 4};
     CORRADE_VERIFY(!data.isOffsetOnly());
     CORRADE_COMPARE(data.name(), meshAttributeCustom(35));
     CORRADE_COMPARE(data.format(), VertexFormat::Vector2);
@@ -1552,8 +1560,8 @@ void MeshDataTest::constructAttributelessNotOwned() {
 }
 
 void MeshDataTest::constructIndexlessAttributeless() {
-    int importerState;
-    MeshData data{MeshPrimitive::TriangleStrip, 37, &importerState};
+    int state{}; /* GCC 11 complains that "maybe uninitialized" w/o the {} */
+    MeshData data{MeshPrimitive::TriangleStrip, 37, &state};
     /* These are both empty so it doesn't matter, but this is a nice
        non-restrictive default */
     CORRADE_COMPARE(data.indexDataFlags(), DataFlag::Owned|DataFlag::Mutable);
@@ -1562,7 +1570,7 @@ void MeshDataTest::constructIndexlessAttributeless() {
     CORRADE_VERIFY(!data.attributeData());
     CORRADE_COMPARE(data.indexData(), nullptr);
     CORRADE_COMPARE(data.vertexData(), nullptr);
-    CORRADE_COMPARE(data.importerState(), &importerState);
+    CORRADE_COMPARE(data.importerState(), &state);
 
     CORRADE_VERIFY(!data.isIndexed());
     CORRADE_COMPARE(data.vertexCount(), 37);
@@ -1570,13 +1578,13 @@ void MeshDataTest::constructIndexlessAttributeless() {
 }
 
 void MeshDataTest::constructIndexlessAttributelessZeroVertices() {
-    int importerState;
-    MeshData data{MeshPrimitive::TriangleStrip, 0, &importerState};
+    int state{}; /* GCC 11 complains that "maybe uninitialized" w/o the {} */
+    MeshData data{MeshPrimitive::TriangleStrip, 0, &state};
     CORRADE_COMPARE(data.primitive(), MeshPrimitive::TriangleStrip);
     CORRADE_VERIFY(!data.attributeData());
     CORRADE_COMPARE(data.indexData(), nullptr);
     CORRADE_COMPARE(data.vertexData(), nullptr);
-    CORRADE_COMPARE(data.importerState(), &importerState);
+    CORRADE_COMPARE(data.importerState(), &state);
 
     CORRADE_VERIFY(!data.isIndexed());
     CORRADE_COMPARE(data.vertexCount(), 0);

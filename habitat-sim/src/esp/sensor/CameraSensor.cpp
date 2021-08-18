@@ -109,11 +109,9 @@ gfx::RenderCamera* CameraSensor::getRenderCamera() const {
 
 void CameraSensor::draw(scene::SceneGraph& sceneGraph,
                         gfx::RenderCamera::Flags flags) {
-  for (auto& it : sceneGraph.getDrawableGroups()) {
-    if (it.second.prepareForDraw(*renderCamera_)) {
-      renderCamera_->draw(it.second, flags);
-    }
-  }
+  gfx::DrawableGroup& defaultRenderingGroup = sceneGraph.getDrawables();
+  defaultRenderingGroup.prepareForDraw(*renderCamera_);
+  renderCamera_->draw(defaultRenderingGroup, flags);
 }
 
 bool CameraSensor::drawObservation(sim::Simulator& sim) {
@@ -147,6 +145,17 @@ bool CameraSensor::drawObservation(sim::Simulator& sim) {
   } else {
     // SensorType is Color, Depth or any other type
     draw(sim.getActiveSceneGraph(), flags);
+
+    // include DebugLineRender in Color sensors
+    if (cameraSensorSpec_->sensorType == SensorType::Color) {
+      const auto debugLineRender = sim.getDebugLineRender();
+      // debugLineRender is generally null (unless the user drew lines)
+      if (debugLineRender) {
+        debugLineRender->flushLines(renderCamera_->cameraMatrix(),
+                                    renderCamera_->projectionMatrix(),
+                                    renderCamera_->viewport());
+      }
+    }
   }
 
   renderTarget().renderExit();

@@ -182,7 +182,7 @@ Equivalent to calling @ref trim(std::string, const char(&)[size]) with
 CORRADE_UTILITY_EXPORT std::string trim(std::string string);
 
 /**
-@brief Trim leading characters from string, in place
+@brief Trim leading characters from a string, in place
 @param string       String to be trimmed in place
 @param characters   Characters which will be trimmed
 
@@ -199,7 +199,7 @@ template<std::size_t size> inline void ltrimInPlace(std::string& string, const c
 }
 
 /**
-@brief Trim leading whitespace from string
+@brief Trim leading whitespace from a string, in place
 
 Equivalent to calling @ref ltrimInPlace(std::string&, const char(&)[size]) with
 @cpp " \t\f\v\r\n" @ce as second parameter.
@@ -209,7 +209,7 @@ Equivalent to calling @ref ltrimInPlace(std::string&, const char(&)[size]) with
 CORRADE_UTILITY_EXPORT void ltrimInPlace(std::string& string);
 
 /**
-@brief Trim trailing characters from string
+@brief Trim trailing characters from a string, in place
 @param string       String to be trimmed
 @param characters   Characters which will be trimmed
 
@@ -226,7 +226,7 @@ template<std::size_t size> inline void rtrimInPlace(std::string& string, const c
 }
 
 /**
-@brief Trim trailing whitespace from string
+@brief Trim trailing whitespace from a string, in place
 
 Equivalent to calling @ref rtrimInPlace(std::string&, const char(&)[size]) with
 @cpp " \t\f\v\r\n" @ce as second parameter.
@@ -236,7 +236,7 @@ Equivalent to calling @ref rtrimInPlace(std::string&, const char(&)[size]) with
 CORRADE_UTILITY_EXPORT void rtrimInPlace(std::string& string);
 
 /**
-@brief Trim leading and trailing characters from string
+@brief Trim leading and trailing characters from a string, in place
 @param string       String to be trimmed
 @param characters   Characters which will be trimmed
 
@@ -253,7 +253,7 @@ template<std::size_t size> inline void trimInPlace(std::string& string, const ch
 }
 
 /**
-@brief Trim leading and trailing whitespace from string
+@brief Trim leading and trailing whitespace from a string, in place
 
 Equivalent to calling @ref trimInPlace(std::string&, const char(&)[size]) with
 @cpp " \t\f\v\r\n" @ce as second parameter.
@@ -262,7 +262,7 @@ Equivalent to calling @ref trimInPlace(std::string&, const char(&)[size]) with
 CORRADE_UTILITY_EXPORT void trimInPlace(std::string& string);
 
 /**
-@brief Split string on given character
+@brief Split a string on given character
 @param string       String to split
 @param delimiter    Delimiter
 
@@ -280,7 +280,7 @@ CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::split() i
 #endif
 
 /**
-@brief Split string on given character and remove empty parts
+@brief Split a string on given character and remove empty parts
 @param string       String to split
 @param delimiter    Delimiter
 
@@ -298,11 +298,11 @@ CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitWith
 #endif
 
 /**
-@brief Split string on any character from given set and remove empty parts
+@brief Split a string on any character from given set and remove empty parts
 @param string       String to split
 @param delimiters   Delimiter characters
 
-@see @ref Containers::StringView::splitWithoutEmptyParts(StringView) const
+@see @ref Containers::StringView::splitOnAnyWithoutEmptyParts(StringView) const
 */
 CORRADE_UTILITY_EXPORT std::vector<std::string> splitWithoutEmptyParts(const std::string& string, const std::string& delimiters);
 
@@ -310,19 +310,19 @@ CORRADE_UTILITY_EXPORT std::vector<std::string> splitWithoutEmptyParts(const std
 /**
 @overload
 @m_deprecated_since_latest Use
-    @ref Containers::StringView::splitWithoutEmptyParts(StringView) const
+    @ref Containers::StringView::splitOnAnyWithoutEmptyParts(StringView) const
     instead.
 */
-CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitWithoutEmptyParts() instead") Containers::Array<Containers::StringView> splitWithoutEmptyParts(Containers::StringView string, Containers::StringView delimiters);
+CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitOnAnyWithoutEmptyParts() instead") Containers::Array<Containers::StringView> splitWithoutEmptyParts(Containers::StringView string, Containers::StringView delimiters);
 #endif
 
 /**
-@brief Split string on whitespaces and remove empty parts
+@brief Split a string on whitespace and remove empty parts
 
 Equivalent to calling @ref splitWithoutEmptyParts(const std::string&, const std::string&)
 with @cpp " \t\f\v\r\n" @ce as second parameter.
 
-@see @ref Containers::StringView::splitWithoutEmptyParts() const
+@see @ref Containers::StringView::splitOnAnyWithoutEmptyParts()
 */
 CORRADE_UTILITY_EXPORT std::vector<std::string> splitWithoutEmptyParts(const std::string& string);
 
@@ -330,9 +330,10 @@ CORRADE_UTILITY_EXPORT std::vector<std::string> splitWithoutEmptyParts(const std
 /**
 @overload
 @m_deprecated_since_latest Use
-    @ref Containers::StringView::splitWithoutEmptyParts() const instead.
+    @ref Containers::StringView::splitOnWhitespaceWithoutEmptyParts() const
+    instead.
 */
-CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitWithoutEmptyParts() instead") Containers::Array<Containers::StringView> splitWithoutEmptyParts(const Containers::StringView string);
+CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitOnWhitespaceWithoutEmptyParts() instead") Containers::Array<Containers::StringView> splitWithoutEmptyParts(const Containers::StringView string);
 #endif
 
 /**
@@ -340,7 +341,7 @@ CORRADE_UTILITY_EXPORT CORRADE_DEPRECATED("use Containers::StringView::splitWith
 @m_since{2019,10}
 
 Equivalent to Python's @m_class{m-doc-external} [str.partition()](https://docs.python.org/3/library/stdtypes.html#str.partition).
-Splits @p string at the first occurence of @p separator. First returned value
+Splits @p string at the first occurrence of @p separator. First returned value
 is the part before the separator, second the separator, third a part after the
 separator. If the separator is not found, returns the input string followed by
 two empty strings.
@@ -360,7 +361,7 @@ CORRADE_UTILITY_EXPORT Containers::StaticArray<3, std::string> partition(const s
 @m_since{2019,10}
 
 Equivalent to Python's @m_class{m-doc-external} [str.rpartition()](https://docs.python.org/3/library/stdtypes.html#str.rpartition).
-Splits @p string at the last occurence of @p separator. First returned value is
+Splits @p string at the last occurrence of @p separator. First returned value is
 the part before the separator, second the separator, third a part after the
 separator. If the separator is not found, returns two empty strings followed by
 the input string.
@@ -423,17 +424,55 @@ inline std::string joinWithoutEmptyParts(const std::vector<std::string>& strings
 }
 
 /**
-@brief Convert string to lowercase
+@brief Convert ASCII characters in a string to lowercase, in place
+@m_since_latest
 
-@attention Doesn't work with UTF-8.
+Replaces any character from `ABCDEFGHIJKLMNOPQRSTUVWXYZ` with a corresponding
+character from `abcdefghijklmnopqrstuvwxyz`. Deliberately supports only ASCII
+as Unicode-aware case conversion is a much more complex topic.
+@see @ref lowercase()
 */
+CORRADE_UTILITY_EXPORT void lowercaseInPlace(Containers::MutableStringView string);
+
+/**
+@brief Convert ASCII characters in a string to lowercase
+@m_since_latest
+
+Allocates a copy and replaces any character from `ABCDEFGHIJKLMNOPQRSTUVWXYZ`
+with a corresponding character from `abcdefghijklmnopqrstuvwxyz`. Deliberately
+supports only ASCII as Unicode-aware case conversion is a much more complex
+topic.
+@see @ref lowercaseInPlace()
+*/
+CORRADE_UTILITY_EXPORT Containers::String lowercase(Containers::StringView string);
+
+/** @overload */
 CORRADE_UTILITY_EXPORT std::string lowercase(std::string string);
 
 /**
-@brief Convert string to uppercase
+@brief Convert ASCII characters in a string to uppercase, in place
+@m_since_latest
 
-@attention Doesn't work with UTF-8.
+Replaces any character from `abcdefghijklmnopqrstuvwxyz` with a corresponding
+character from `ABCDEFGHIJKLMNOPQRSTUVWXYZ`. Deliberately supports only ASCII
+as Unicode-aware case conversion is a much more complex topic.
+@see @ref uppercase()
 */
+CORRADE_UTILITY_EXPORT void uppercaseInPlace(Containers::MutableStringView string);
+
+/**
+@brief Convert ASCII characters in a string to uppercase, in place
+@m_since_latest
+
+Allocates a copy and replaces any character from `abcdefghijklmnopqrstuvwxyz`
+with a corresponding character from `ABCDEFGHIJKLMNOPQRSTUVWXYZ`. Deliberately
+supports only ASCII as Unicode-aware case conversion is a much more complex
+topic.
+@see @ref uppercaseInPlace()
+*/
+CORRADE_UTILITY_EXPORT Containers::String uppercase(Containers::StringView string);
+
+/** @overload */
 CORRADE_UTILITY_EXPORT std::string uppercase(std::string string);
 
 /**
@@ -561,7 +600,7 @@ inline std::string stripSuffix(std::string string, char suffix) {
 }
 
 /**
-@brief Replace first occurence in a string
+@brief Replace first occurrence in a string
 
 Returns @p string unmodified if it doesn't contain @p search. Having empty
 @p search causes @p replace to be prepended to @p string.
@@ -587,7 +626,7 @@ template<std::size_t replaceSize> inline std::string replaceFirst(std::string st
 }
 
 /**
-@brief Replace all occurences in a string
+@brief Replace all occurrences in a string
 
 Returns @p string unmodified if it doesn't contain @p search. Expects that
 @p search is not empty, as that would cause an infinite loop.

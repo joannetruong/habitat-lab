@@ -109,10 +109,10 @@ template<class T> void vectorsIntegralSigned(py::class_<Math::Vector2<T>>& vecto
 
 void mathVectorIntegral(py::module_& root, py::module_& m) {
     py::class_<Vector2i> vector2i{root, "Vector2i", "Two-component signed integer vector", py::buffer_protocol{}};
-    py::class_<Vector3i> vector3i{root, "Vector3i", "Threee-component signed integral vector", py::buffer_protocol{}};
+    py::class_<Vector3i> vector3i{root, "Vector3i", "Three-component signed integral vector", py::buffer_protocol{}};
     py::class_<Vector4i> vector4i{root, "Vector4i", "Four-component signed integral vector", py::buffer_protocol{}};
     py::class_<Vector2ui> vector2ui{root, "Vector2ui", "Two-component unsigned integral vector", py::buffer_protocol{}};
-    py::class_<Vector3ui> vector3ui{root, "Vector3ui", "Threee-component unsigned integral vector", py::buffer_protocol{}};
+    py::class_<Vector3ui> vector3ui{root, "Vector3ui", "Three-component unsigned integral vector", py::buffer_protocol{}};
     py::class_<Vector4ui> vector4ui{root, "Vector4ui", "Four-component unsigned integral vector", py::buffer_protocol{}};
 
     /* First register type conversions as those should have a priority over

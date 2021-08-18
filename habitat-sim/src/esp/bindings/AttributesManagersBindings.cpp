@@ -74,12 +74,26 @@ void declareBaseAttributesManager(py::module& m,
           "handle"_a)
       .def("get_template_handles",
            static_cast<std::vector<std::string> (MgrClass::*)(
-               const std::string&, bool) const>(
+               const std::string&, bool, bool) const>(
                &MgrClass::getObjectHandlesBySubstring),
-           ("Returns a list of " + attrType +
+           ("Returns a potentially sorted list of " + attrType +
             " template handles that either contain or "
             "explicitly do not contain the passed search_str, based on the "
             "value of boolean contains.")
+               .c_str(),
+           "search_str"_a = "", "contains"_a = true, "sorted"_a = true)
+      .def("get_templates_info", &MgrClass::getObjectInfoStrings,
+           ("Returns a list of CSV strings describing each " + attrType +
+            " template whose handles either contain or explicitly do not "
+            "contain the passed search_str, based on the value of boolean "
+            "contains.")
+               .c_str(),
+           "search_str"_a = "", "contains"_a = true)
+      .def("get_templates_CSV_info", &MgrClass::getObjectInfoCSVString,
+           ("Returns a comma-separated string describing each " + attrType +
+            " template whose handles either contain or explicitly do not "
+            "contain the passed search_str, based on the value of boolean "
+            "contains.  Each template's info is separated by a newline.")
                .c_str(),
            "search_str"_a = "", "contains"_a = true)
       .def(
@@ -143,6 +157,11 @@ void declareBaseAttributesManager(py::module& m,
             attrType + " template in the library.")
                .c_str(),
            "handle"_a)
+      .def("get_library_has_id", &MgrClass::getObjectLibHasID,
+           ("Returns whether the passed template ID describes an existing " +
+            attrType + " template in the library.")
+               .c_str(),
+           "template_id"_a)
       .def("set_template_lock", &MgrClass::setLock,
            ("This sets the lock state for the " + attrType +
             " template that has the passed name. Lock == True makes the " +
@@ -216,7 +235,17 @@ void declareBaseAttributesManager(py::module& m,
             " template specified by the passed handle if it exists, and NULL "
             "if it does not.")
                .c_str(),
-           "handle"_a);
+           "handle"_a)
+      .def("get_templates_by_handle_substring",
+           static_cast<std::unordered_map<std::string, AttribsPtr> (
+               MgrClass::*)(const std::string&, bool)>(
+               &MgrClass::getObjectsByHandleSubstring),
+           ("Returns a dictionary of " + attrType +
+            " templates, keyed by their handles, for all handles that either "
+            "contain or explicitly do not contain the passed search_str, based "
+            "on the value of boolean contains.")
+               .c_str(),
+           "search_str"_a = "", "contains"_a = true);
 }  // declareBaseAttributesManager
 
 void initAttributesManagersBindings(py::module& m) {
@@ -357,12 +386,12 @@ void initAttributesManagersBindings(py::module& m) {
       .def(
           "get_file_template_handles",
           static_cast<std::vector<std::string> (ObjectAttributesManager::*)(
-              const std::string&, bool) const>(
+              const std::string&, bool, bool) const>(
               &ObjectAttributesManager::getFileTemplateHandlesBySubstring),
-          R"(Returns a list of file-based ObjectAttributes template handles that either contain or
-          explicitly do not contain the passed search_str, based on the value of
+          R"(Returns a potentially sorted list of file-based ObjectAttributes template handles
+          that either contain or explicitly do not contain the passed search_str, based on the value of
           contains.)",
-          "search_str"_a = "", "contains"_a = true)
+          "search_str"_a = "", "contains"_a = true, "sorted"_a = true)
       .def(
           "get_random_file_template_handle",
           &ObjectAttributesManager::getRandomFileTemplateHandle,
@@ -377,12 +406,12 @@ void initAttributesManagersBindings(py::module& m) {
       .def(
           "get_synth_template_handles",
           static_cast<std::vector<std::string> (ObjectAttributesManager::*)(
-              const std::string&, bool) const>(
+              const std::string&, bool, bool) const>(
               &ObjectAttributesManager::getSynthTemplateHandlesBySubstring),
-          R"(Returns a list of synthesized(primitive asset)-based ObjectAttributes template handles
-            that either contain or explicitly do not contain the passed search_str,
+          R"(Returns a potentially sorted list of synthesized(primitive asset)-based ObjectAttributes
+            template handles that either contain or explicitly do not contain the passed search_str,
             based on the value of contains.)",
-          "search_str"_a = "", "contains"_a = true)
+          "search_str"_a = "", "contains"_a = true, "sorted"_a = true)
       .def("get_random_synth_template_handle",
            &ObjectAttributesManager::getRandomSynthTemplateHandle,
            R"(Returns the handle for a random synthesized(primitive asset)-based

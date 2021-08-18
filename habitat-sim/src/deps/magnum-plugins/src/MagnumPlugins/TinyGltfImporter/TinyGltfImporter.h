@@ -131,9 +131,9 @@ calls with @ref InputFileCallbackPolicy::LoadTemporary and
 @ref InputFileCallbackPolicy::Close is emitted right after the file is fully
 read.
 
-Import of skeleton, skin and morph data is not supported at the moment.
+Import of morph data is not supported at the moment.
 
-@subsection Trade-TinyGltfImporter-behavior-animation Animation import
+@subsection Trade-TinyGltfImporter-behavior-animation Animation and skin import
 
 -   Linear quaternion rotation tracks are postprocessed in order to make it
     possible to use the faster
@@ -301,8 +301,8 @@ fail.
 @subsection Trade-TinyGltfImporter-behavior-textures Texture and image import
 
 <ul>
-<li>Texture type is always @ref Trade::TextureData::Type::Texture2D, as glTF
-doesn't support anything else</li>
+<li>Texture type is always @ref Trade::TextureType::Texture2D, as glTF doesn't
+support anything else</li>
 <li>Z coordinate of @ref Trade::TextureData::wrapping() is always
 @ref SamplerWrapping::Repeat, as glTF doesn't support 3D textures</li>
 <li>
@@ -374,6 +374,9 @@ below for all options and their default values.
 
 @snippet MagnumPlugins/TinyGltfImporter/TinyGltfImporter.conf config
 
+See @ref plugins-configuration for more information and an example showing how
+to edit the configuration values.
+
 @section Trade-TinyGltfImporter-state Access to internal importer state
 
 Access to the underlying TinyGLTF structures it is provided through
@@ -399,6 +402,8 @@ importer-specific data accessors:
     structure
 -   @ref TextureData::importerState() returns pointer to the
     `tinygltf::Texture` structure
+-   @ref AnimationData::importerState() returns pointer to the
+    `tinygltf::Animation` structure
 
 The TinyGLTF header is installed alsongside the plugin and accessible like
 this:

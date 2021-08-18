@@ -121,15 +121,6 @@ carBumpTexture.setStorage(5, GL::TextureFormat::RGB8, {256, 256})
 #endif
 
 {
-auto importSomeMesh() -> std::tuple<GL::Mesh, GL::Buffer, GL::Buffer>;
-/* [opengl-wrapping-nocreate] */
-GL::Mesh mesh{NoCreate};
-GL::Buffer vertices{NoCreate}, indices{NoCreate};
-std::tie(mesh, vertices, indices) = importSomeMesh();
-/* [opengl-wrapping-nocreate] */
-}
-
-{
 struct Foo {
     void setSomeBuffer(GLuint) {}
     GLuint someBuffer() { return {}; }

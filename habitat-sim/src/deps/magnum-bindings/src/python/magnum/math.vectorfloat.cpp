@@ -83,10 +83,10 @@ template<class T> void vectorsFloat(py::module_& m, py::class_<Math::Vector2<T>>
 
 void mathVectorFloat(py::module_& root, py::module_& m) {
     py::class_<Vector2> vector2{root, "Vector2", "Two-component float vector", py::buffer_protocol{}};
-    py::class_<Vector3> vector3{root, "Vector3", "Threee-component float vector", py::buffer_protocol{}};
+    py::class_<Vector3> vector3{root, "Vector3", "Three-component float vector", py::buffer_protocol{}};
     py::class_<Vector4> vector4{root, "Vector4", "Four-component float vector", py::buffer_protocol{}};
     py::class_<Vector2d> vector2d{root, "Vector2d", "Two-component double vector", py::buffer_protocol{}};
-    py::class_<Vector3d> vector3d{root, "Vector3d", "Threee-component double vector", py::buffer_protocol{}};
+    py::class_<Vector3d> vector3d{root, "Vector3d", "Three-component double vector", py::buffer_protocol{}};
     py::class_<Vector4d> vector4d{root, "Vector4d", "Four-component double vector", py::buffer_protocol{}};
 
     /* The subclasses don't have buffer protocol enabled, as that's already

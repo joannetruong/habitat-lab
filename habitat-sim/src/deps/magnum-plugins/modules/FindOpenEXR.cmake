@@ -52,16 +52,42 @@
 #   DEALINGS IN THE SOFTWARE.
 #
 
-# Try to find OpenEXR via its config files. These are available only since 2.5
-# (2.4?), for older versions we'll have to fall back to finding ourselves. Also
-# do that only on CMake 3.9 and greater, because the config files call
-# find_dependency() from CMakeFindDependencyMacro with 3 arguments, which isn't
-# supported before: https://github.com/Kitware/CMake/commit/ab358d6a859d8b7e257ed1e06ca000e097a32ef6
+# OpenEXR as a CMake subproject. Nothing left to do here (we can't do anything
+# with it (such as fixing the include path) until CMake 3.13 as the alias is
+# defined in another source dir).
+if(TARGET OpenEXR::OpenEXR)
+    # Just to make FPHSA print some meaningful location, nothing else
+    get_target_property(_OPENEXR_DIRECTORY OpenEXR::OpenEXR SOURCE_DIR)
+    get_filename_component(_OPENEXR_DIRECTORY ${_OPENEXR_DIRECTORY} DIRECTORY)
+    get_filename_component(_OPENEXR_DIRECTORY ${_OPENEXR_DIRECTORY} DIRECTORY)
+    get_filename_component(_OPENEXR_DIRECTORY ${_OPENEXR_DIRECTORY} DIRECTORY)
+    include(FindPackageHandleStandardArgs)
+    find_package_handle_standard_args(OpenEXR DEFAULT_MSG _OPENEXR_DIRECTORY)
+
+    return()
+endif()
+
+# If OpenEXR is not a CMake subproject already, try to find it via its config
+# files. These are available only since 2.5 (2.4?), for older versions we'll
+# have to fall back to finding ourselves. Also do that only on CMake 3.9 and
+# greater, because the config files call find_dependency() from
+# CMakeFindDependencyMacro with 3 arguments, which isn't supported before:
+# https://github.com/Kitware/CMake/commit/ab358d6a859d8b7e257ed1e06ca000e097a32ef6
 if(NOT CMAKE_VERSION VERSION_LESS 3.9.0)
     find_package(OpenEXR CONFIG QUIET)
     if(OpenEXR_FOUND)
+        # OpenEXR before version 3.0 has some REALLY WEIRD target names. Alias
+        # them to the saner new targets.
+        if(NOT TARGET OpenEXR::OpenEXR)
+            add_library(OpenEXR::OpenEXR INTERFACE IMPORTED)
+            set_target_properties(OpenEXR::OpenEXR PROPERTIES
+                INTERFACE_LINK_LIBRARIES OpenEXR::IlmImf)
+            get_target_property(_OPENEXR_INTERFACE_INCLUDE_DIRECTORIES OpenEXR::IlmImf INTERFACE_INCLUDE_DIRECTORIES)
+        else()
+            get_target_property(_OPENEXR_INTERFACE_INCLUDE_DIRECTORIES OpenEXR::OpenEXR INTERFACE_INCLUDE_DIRECTORIES)
+        endif()
+
         # Just to make FPHSA print some meaningful location, nothing else
-        get_target_property(_OPENEXR_INTERFACE_INCLUDE_DIRECTORIES OpenEXR::IlmImf INTERFACE_INCLUDE_DIRECTORIES)
         include(FindPackageHandleStandardArgs)
         find_package_handle_standard_args(OpenEXR DEFAULT_MSG
             _OPENEXR_INTERFACE_INCLUDE_DIRECTORIES)
@@ -132,8 +158,12 @@ find_library(ILMBASE_IMATH_LIBRARY NAMES
     Imath-2_3
     Imath-2_2)
 
-# Include dir
-find_path(OPENEXR_INCLUDE_DIR NAMES OpenEXR/ImfHeader.h)
+# Include dir. Unfortunately we can't use #include <OpenEXR/blah> because in
+# case of OpenEXR being a CMake subproject, OpenEXR::OpenEXR defines the
+# include dirs *inside* the subdirectories and there's no way to change that
+# from outside until CMake 3.13. This means one extra hurdle for 3rd party
+# buildsystems where they have to add OpenEXR/ to include path. Sorry.
+find_path(OPENEXR_INCLUDE_DIR NAMES ImfHeader.h PATH_SUFFIXES OpenEXR)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(OpenEXR DEFAULT_MSG
@@ -154,7 +184,7 @@ mark_as_advanced(FORCE
     ILMBASE_IMATH_LIBRARY)
 
 # Dependency treee reverse-engineered from the 2.5 config files. They also have
-# OpenEXR::IlmInfConfig / IlmBase::IlmBaseConfig which do just an include path
+# OpenEXR::IlmImfConfig / IlmBase::IlmBaseConfig which do just an include path
 # setup, I find that unnecessary, the include path gets added to the Half / Iex
 # libraries instead, which are needed by everything else.
 
@@ -194,4 +224,11 @@ if(NOT TARGET OpenEXR::IlmImf)
     set_target_properties(OpenEXR::IlmImf PROPERTIES
         IMPORTED_LOCATION ${OPENEXR_ILMIMF_LIBRARY}
         INTERFACE_LINK_LIBRARIES "IlmBase::Half;IlmBase::Iex;IlmBase::IlmThread;IlmBase::Imath;ZLIB::ZLIB")
+endif()
+
+# OpenEXR 3.0 compatible alias for versions 2.5 and below
+if(NOT TARGET OpenEXR::OpenEXR)
+    add_library(OpenEXR::OpenEXR INTERFACE IMPORTED)
+    set_target_properties(OpenEXR::OpenEXR PROPERTIES
+        INTERFACE_LINK_LIBRARIES OpenEXR::IlmImf)
 endif()

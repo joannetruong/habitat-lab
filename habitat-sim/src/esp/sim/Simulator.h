@@ -12,6 +12,7 @@
 #include "esp/assets/ResourceManager.h"
 #include "esp/core/esp.h"
 #include "esp/core/random.h"
+#include "esp/gfx/DebugLineRender.h"
 #include "esp/gfx/RenderTarget.h"
 #include "esp/gfx/WindowlessContext.h"
 #include "esp/metadata/MetadataMediator.h"
@@ -61,14 +62,18 @@ class Simulator {
    * set back to nullptr, any members set to their default values, etc.  If this
    * is not done correctly, the pattern for @ref `close` then @ref `reconfigure`
    * to create a "fresh" instance of the simulator may not work correctly
+   *
+   * @param destroy When set, destroy the background rendering thread and gl
+   * context also. Otherwise these persist if the background rendering thread
+   * was used. This is done because the OpenGL driver leaks memory on thread
+   * destroy on some systems.
    */
-  void close();
+  void close(bool destroy = true);
 
   virtual void reconfigure(const SimulatorConfiguration& cfg);
 
   virtual void reset();
 
- public:
   virtual void seed(uint32_t newSeed);
 
   std::shared_ptr<gfx::Renderer> getRenderer() { return renderer_; }
@@ -101,7 +106,10 @@ class Simulator {
    * --headless mode on linux
    */
   int gpuDevice() const {
-    CORRADE_ASSERT(context_ != nullptr, "::gpuDevice: no OpenGL context.", 0);
+    CORRADE_ASSERT(config_.createRenderer,
+                   "Simulator::gpuDevice() : cannot get gpu device when "
+                   "createRenderer flag is false",
+                   0);
     return context_->gpuDevice();
   }
 
@@ -620,6 +628,8 @@ class Simulator {
    */
   void setObjectBBDraw(bool drawBB, int objectId, int sceneID = 0) {
     if (sceneHasPhysics(sceneID)) {
+      if (renderer_)
+        renderer_->acquireGlContext();
       auto& drawables = getDrawableGroup(sceneID);
       physicsManager_->setObjectBBDraw(objectId, &drawables, drawBB);
     }
@@ -909,6 +919,14 @@ class Simulator {
     return Magnum::Vector3();
   }
 
+  std::shared_ptr<esp::gfx::DebugLineRender> getDebugLineRender() {
+    // We only create this if/when used (lazy creation)
+    if (!debugLineRender_) {
+      debugLineRender_ = std::make_shared<esp::gfx::DebugLineRender>();
+    }
+    return debugLineRender_;
+  }
+
   /**
    * @brief Compute the navmesh for the simulator's current active scene and
    * assign it to the referenced @ref nav::PathFinder.
@@ -984,8 +1002,8 @@ class Simulator {
    */
   bool removeTrajVisByName(const std::string& trajVisName) {
     if (trajVisIDByName.count(trajVisName) == 0) {
-      LOG(INFO) << "::removeTrajVisByName : No trajectory named " << trajVisName
-                << " exists.  Ignoring.";
+      ESP_DEBUG() << "No trajectory named" << trajVisName
+                  << "exists.  Ignoring.";
       return false;
     }
     return removeTrajVisObjectAndAssets(trajVisIDByName.at(trajVisName),
@@ -1000,8 +1018,8 @@ class Simulator {
    */
   bool removeTrajVisByID(int trajVisObjID) {
     if (trajVisNameByID.count(trajVisObjID) == 0) {
-      LOG(INFO) << "::removeTrajVisByName : No trajectory object with ID: "
-                << trajVisObjID << " exists.  Ignoring.";
+      ESP_DEBUG() << "No trajectory object with ID:" << trajVisObjID
+                  << "exists.  Ignoring.";
       return false;
     }
     return removeTrajVisObjectAndAssets(trajVisObjID,
@@ -1009,6 +1027,17 @@ class Simulator {
   }
 
  protected:
+  /**
+   * @brief if Navemesh visualization is active, reset the visualization.
+   */
+  void resetNavMeshVisIfActive() {
+    if (isNavMeshVisualizationActive()) {
+      // if updating pathfinder_ instance, refresh the visualization.
+      setNavMeshVisualization(false);  // first clear the old instance
+      setNavMeshVisualization(true);
+    }
+  }
+
   /**
    * @brief Internal use only. Remove a trajectory object, its mesh, and all
    * references to it.
@@ -1043,7 +1072,7 @@ class Simulator {
    *
    */
   esp::sensor::Sensor& addSensorToObject(
-      const int objectId,
+      int objectId,
       const esp::sensor::SensorSpec::ptr& sensorSpec);
 
   /**
@@ -1144,6 +1173,15 @@ class Simulator {
   }
 
   /**
+   * @brief Get a copy of the currently set existing @ref gfx::LightSetup.
+   *
+   * @param key The string key of the @ref gfx::LightSetup.
+   */
+  gfx::LightSetup getCurrentLightSetup() {
+    return *resourceManager_->getLightSetup(config_.sceneLightSetup);
+  }
+
+  /**
    * @brief Register a @ref gfx::LightSetup with a key name.
    *
    * If this name already exists, the @ref gfx::LightSetup is updated and all
@@ -1173,6 +1211,62 @@ class Simulator {
       obj->setLightSetup(lightSetupKey);
     }
   }
+
+  //============= Object Rigid Constraint API =============
+
+  /**
+   * @brief Create a rigid constraint between two objects or an object and the
+   * world.
+   *
+   * Note: requires Bullet physics to be enabled.
+   *
+   * @param settings The datastructure defining the constraint parameters.
+   *
+   * @return The id of the newly created constraint or ID_UNDEFINED if failed.
+   */
+  int createRigidConstraint(const physics::RigidConstraintSettings& settings) {
+    return physicsManager_->createRigidConstraint(settings);
+  }
+
+  /**
+   * @brief Update the settings of a rigid constraint.
+   *
+   * Note: requires Bullet physics to be enabled.
+   *
+   * @param constraintId The id of the constraint to update.
+   * @param settings The new settings of the constraint.
+   */
+  void updateRigidConstraint(int constraintId,
+                             const physics::RigidConstraintSettings& settings) {
+    physicsManager_->updateRigidConstraint(constraintId, settings);
+  }
+
+  /**
+   * @brief Remove a rigid constraint by id.
+   *
+   * Note: requires Bullet physics to be enabled.
+   *
+   * @param constraintId The id of the constraint to remove.
+   */
+  void removeRigidConstraint(int constraintId) {
+    physicsManager_->removeRigidConstraint(constraintId);
+  }
+
+  /**
+   * @brief Get a copy of the settings for an existing rigid constraint.
+   *
+   * Note: requires Bullet physics to be enabled.
+   *
+   * @param constraintId The id of the constraint.
+   *
+   * @return The settings of the constraint.
+   */
+  physics::RigidConstraintSettings getRigidConstraintSettings(
+      int constraintId) const {
+    return physicsManager_->getRigidConstraintSettings(constraintId);
+  }
+
+  //============= END - Object Rigid Constraint API =============
 
   /**
    * @brief Getter for PRNG.
@@ -1243,16 +1337,6 @@ class Simulator {
   bool createSceneInstance(const std::string& activeSceneName);
 
   /**
-   * @brief Builds a scene instance based on @ref
-   * esp::metadata::attributes::SceneAttributes referenced by @p activeSceneName
-   * . This function is specifically for cases where no renderer is desired.
-   * @param activeSceneName The name of the desired SceneAttributes to use to
-   * instantiate a scene.
-   * @return Whether successful or not.
-   */
-  bool createSceneInstanceNoRenderer(const std::string& activeSceneName);
-
-  /**
    * @brief Shared initial functionality for creating/setting the current scene
    * instance attributes corresponding to activeSceneName, regardless of desired
    * renderer state.
@@ -1264,19 +1348,38 @@ class Simulator {
       const std::string& activeSceneName);
 
   /**
+   * @brief Instance the stage for the current scene based on the current active
+   * schene's scene instance configuration.
+   * @param curSceneInstanceAttributes The attributes describing the current
+   * scene instance.
+   * @return whether stage creation is completed successfully
+   */
+  bool instanceStageForActiveScene(
+      const metadata::attributes::SceneAttributes::cptr&
+          curSceneInstanceAttributes);
+
+  /**
    * @brief Instance all the objects in the scene based on the current active
    * schene's scene instance configuration.
+   * @param curSceneInstanceAttributes The attributes describing the current
+   * scene instance.
    * @return whether object creation and placement is completed successfully
    */
-  bool instanceObjectsForActiveScene();
+  bool instanceObjectsForActiveScene(
+      const metadata::attributes::SceneAttributes::cptr&
+          curSceneInstanceAttributes);
 
   /**
    * @brief Instance all the articulated objects in the scene based on the
    * current active schene's scene instance configuration.
+   * @param curSceneInstanceAttributes The attributes describing the current
+   * scene instance.
    * @return whether articulated object creation and placement is completed
    * successfully
    */
-  bool instanceArticulatedObjectsForActiveScene();
+  bool instanceArticulatedObjectsForActiveScene(
+      const metadata::attributes::SceneAttributes::cptr&
+          curSceneInstanceAttributes);
 
   /**
    * @brief sample a random valid AgentState in passed agentState
@@ -1388,6 +1491,8 @@ class Simulator {
    * *not* be changed without calling close() first
    */
   Corrade::Containers::Optional<bool> requiresTextures_;
+
+  std::shared_ptr<esp::gfx::DebugLineRender> debugLineRender_;
 
   ESP_SMART_POINTERS(Simulator)
 };

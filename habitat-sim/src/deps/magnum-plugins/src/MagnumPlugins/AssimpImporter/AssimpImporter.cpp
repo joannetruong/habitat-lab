@@ -3,9 +3,10 @@
 
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
                 2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
-    Copyright © 2017, 2020 Jonathan Hale <squareys@googlemail.com>
+    Copyright © 2017, 2020, 2021 Jonathan Hale <squareys@googlemail.com>
     Copyright © 2018 Konstantinos Chatzilygeroudis <costashatz@gmail.com>
     Copyright © 2019, 2020 Max Schwarz <max.schwarz@ais.uni-bonn.de>
+    Copyright © 2021 Pablo Escobar <mail@rvrs.in>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -30,19 +31,24 @@
 
 #include <unordered_map>
 #include <Corrade/Containers/ArrayView.h>
+#include <Corrade/Containers/ArrayViewStl.h>
+#include <Corrade/Containers/BigEnumSet.h>
 #include <Corrade/Containers/GrowableArray.h>
 #include <Corrade/Containers/Optional.h>
 #include <Corrade/Utility/Algorithms.h>
 #include <Corrade/Utility/ConfigurationGroup.h>
 #include <Corrade/Utility/DebugStl.h>
 #include <Corrade/Utility/Directory.h>
+#include <Corrade/Utility/FormatStl.h>
 #include <Corrade/Utility/String.h>
 #include <Magnum/FileCallback.h>
 #include <Magnum/Mesh.h>
 #include <Magnum/Math/Matrix3.h>
+#include <Magnum/Math/Quaternion.h>
 #include <Magnum/Math/Vector.h>
 #include <Magnum/PixelFormat.h>
 #include <Magnum/PixelStorage.h>
+#include <Magnum/Trade/AnimationData.h>
 #include <Magnum/Trade/ArrayAllocator.h>
 #include <Magnum/Trade/CameraData.h>
 #include <Magnum/Trade/ImageData.h>
@@ -51,16 +57,20 @@
 #include <Magnum/Trade/MeshObjectData3D.h>
 #include <Magnum/Trade/PhongMaterialData.h>
 #include <Magnum/Trade/SceneData.h>
+#include <Magnum/Trade/SkinData.h>
 #include <Magnum/Trade/TextureData.h>
 #include <MagnumPlugins/AnyImageImporter/AnyImageImporter.h>
 
-#include <assimp/postprocess.h>
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/Importer.hpp>
+#include <assimp/importerdesc.h>
 #include <assimp/IOStream.hpp>
 #include <assimp/IOSystem.hpp>
 #include <assimp/Logger.hpp>
+#include <assimp/postprocess.h>
 #include <assimp/scene.h>
+
+#include "configureInternal.h"
 
 namespace Magnum { namespace Math { namespace Implementation {
 
@@ -80,8 +90,12 @@ template<> struct VectorConverter<4, Float, aiColor4D> {
 
 namespace Magnum { namespace Trade {
 
+using namespace Containers::Literals;
+
 struct AssimpImporter::File {
     Containers::Optional<std::string> filePath;
+    const char* importerName = nullptr;
+    bool importerIsGltf = false;
     const aiScene* scene = nullptr;
     std::vector<aiNode*> nodes;
     /* (materialPointer, propertyIndexInsideMaterial, imageIndex) tuple,
@@ -95,6 +109,26 @@ struct AssimpImporter::File {
     std::unordered_map<const aiNode*, std::pair<Trade::ObjectInstanceType3D, UnsignedInt>> nodeInstances;
     std::unordered_map<std::string, UnsignedInt> materialIndicesForName;
     std::unordered_map<const aiMaterial*, UnsignedInt> textureIndices;
+
+    Containers::Optional<std::unordered_map<std::string, Int>>
+        animationsForName,
+        meshesForName,
+        skinsForName;
+
+    /* Joint ids and weights are the only custom attributes in this importer */
+    std::unordered_map<std::string, MeshAttribute> meshAttributesForName{
+        {"JOINTS", meshAttributeCustom(0)},
+        {"WEIGHTS", meshAttributeCustom(1)}
+    };
+    std::vector<std::string> meshAttributeNames{"JOINTS", "WEIGHTS"};
+
+    std::vector<std::size_t> meshesWithBones;
+    /* For each mesh: the index of its skin (before any merging), or -1 */
+    std::vector<Int> meshSkins;
+    bool mergeSkins = false;
+    /* For each mesh, map from mesh-relative bones to merged bone list */
+    std::vector<std::vector<UnsignedInt>> boneMap;
+    std::vector<const aiBone*> mergedBones;
 
     /* Mapping for multi-mesh nodes:
        (in the following, "node" is an aiNode,
@@ -128,6 +162,13 @@ void fillDefaultConfiguration(Utility::ConfigurationGroup& conf) {
 
     conf.setValue("forceWhiteAmbientToBlack", true);
 
+    conf.setValue("optimizeQuaternionShortestPath", true);
+    conf.setValue("normalizeQuaternions", true);
+    conf.setValue("mergeAnimationClips", false);
+    conf.setValue("removeDummyAnimationTracks", true);
+    conf.setValue("maxJointWeights", 4);
+    conf.setValue("mergeSkins", false);
+
     conf.setValue("ImportColladaIgnoreUpDirection", false);
 
     Utility::ConfigurationGroup& postprocess = *conf.addGroup("postprocess");
@@ -139,10 +180,25 @@ void fillDefaultConfiguration(Utility::ConfigurationGroup& conf) {
 Containers::Pointer<Assimp::Importer> createImporter(Utility::ConfigurationGroup& conf) {
     Containers::Pointer<Assimp::Importer> importer{InPlaceInit};
 
+    /* Without this setting, Assimp adds bogus skeleton visualization meshes
+       to files that don't have any meshes. It claims to only do this when
+       there is animation data, but at least for Collada it always does it. */
+    importer->SetPropertyBool(AI_CONFIG_IMPORT_NO_SKELETON_MESHES, true);
+
     importer->SetPropertyBool(AI_CONFIG_IMPORT_COLLADA_IGNORE_UP_DIRECTION,
         conf.value<bool>("ImportColladaIgnoreUpDirection"));
+    importer->SetPropertyInteger(AI_CONFIG_PP_LBW_MAX_WEIGHTS,
+        conf.value<int>("maxJointWeights"));
 
     return importer;
+}
+
+bool isDummyBone(const aiBone* bone) {
+    /* Dummy bone weights inserted by Assimp:
+       https://github.com/assimp/assimp/blob/1d33131e902ff3f6b571ee3964c666698a99eb0f/code/AssetLib/glTF2/glTF2Importer.cpp#L1099 */
+    return bone->mNumWeights == 1 &&
+        bone->mWeights[0].mVertexId == 0 &&
+        Math::equal(bone->mWeights[0].mWeight, 0.0f);
 }
 
 }
@@ -284,6 +340,9 @@ namespace {
 
 UnsignedInt flagsFromConfiguration(Utility::ConfigurationGroup& conf) {
     UnsignedInt flags = 0;
+    if(conf.value<UnsignedInt>("maxJointWeights"))
+        flags |= aiProcess_LimitBoneWeights;
+
     const Utility::ConfigurationGroup& postprocess = *conf.group("postprocess");
     #define _c(val) if(postprocess.value<bool>(#val)) flags |= aiProcess_ ## val;
     /* Without aiProcess_JoinIdenticalVertices all meshes are deindexed (wtf?) */
@@ -328,9 +387,12 @@ Containers::StringView materialPropertyString(const aiMaterialProperty& property
 }
 
 void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
-    if(!_importer) _importer = createImporter(configuration());
-
+    /* If we already have the file, we got delegated from doOpenFile() or
+       doOpenState(). If we got called from doOpenState(), we don't even have
+       the _importer. No need to create it. */
     if(!_f) {
+        if(!_importer) _importer = createImporter(configuration());
+
         _f.reset(new File);
         /* File callbacks are set up in doSetFileCallbacks() */
         if(!(_f->scene = _importer->ReadFileFromMemory(data.data(), data.size(), flagsFromConfiguration(configuration())))) {
@@ -341,11 +403,24 @@ void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
 
     CORRADE_INTERNAL_ASSERT(_f->scene);
 
+    /* Get name of importer. Useful for workarounds based on importer/file
+       type. If the _importer isn't populated, we got called from doOpenState()
+       and we can't really do much here. */
+    _f->importerName = "unknown";
+    if(_importer) {
+        const int importerIndex = _importer->GetPropertyInteger("importerIndex", -1);
+        if(importerIndex != -1) {
+            const aiImporterDesc* info = _importer->GetImporterInfo(importerIndex);
+            if(info) _f->importerName = info->mName;
+        }
+
+        _f->importerIsGltf = _f->importerName == "glTF2 Importer"_s;
+    }
+
     /* Fill hashmaps for index lookup for materials/textures/meshes/nodes */
     _f->materialIndicesForName.reserve(_f->scene->mNumMaterials);
 
     aiString matName;
-    aiString texturePath;
     UnsignedInt textureIndex = 0;
     std::unordered_map<std::string, UnsignedInt> uniqueImages;
     for(std::size_t i = 0; i < _f->scene->mNumMaterials; ++i) {
@@ -359,22 +434,22 @@ void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
         /* Store first possible texture index for this material, next textures
            use successive indices. */
         _f->textureIndices[mat] = textureIndex;
-        for(std::size_t i = 0; i != mat->mNumProperties; ++i) {
+        for(std::size_t j = 0; j != mat->mNumProperties; ++j) {
             /* We're only interested in AI_MATKEY_TEXTURE_* properties */
-            const aiMaterialProperty& property = *mat->mProperties[i];
+            const aiMaterialProperty& property = *mat->mProperties[j];
             if(Containers::StringView{property.mKey.C_Str(), property.mKey.length} != _AI_MATKEY_TEXTURE_BASE) continue;
 
             /* For images ensure we have an unique path so each file isn't
-               imported more than once. Each image then points to i-th property
+               imported more than once. Each image then points to j-th property
                of the material, which is then used to retrieve its path again. */
             Containers::StringView texturePath = materialPropertyString(property);
             auto uniqueImage = uniqueImages.emplace(texturePath, _f->images.size());
-            if(uniqueImage.second) _f->images.emplace_back(mat, i);
+            if(uniqueImage.second) _f->images.emplace_back(mat, j);
 
-            /* Each texture points to i-th property of the material, which is
+            /* Each texture points to j-th property of the material, which is
                then used to retrieve related info, plus an index into the
                unique images array */
-            _f->textures.emplace_back(mat, i, uniqueImage.first->second);
+            _f->textures.emplace_back(mat, j, uniqueImage.first->second);
             ++textureIndex;
         }
     }
@@ -385,27 +460,34 @@ void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
        that's not the documented behavior. */
     aiNode* const root = _f->scene->mRootNode;
     if(root) {
-        /* I would assert here on !root->mNumMeshes to verify I didn't miss
-           anything in the root node, but at least for COLLADA, if the file has
-           no meshes, it adds some bogus one, thinking it's a skeleton-only
-           file and trying to be helpful. Ugh.
-           https://github.com/assimp/assimp/blob/92078bc47c462d5b643aab3742a8864802263700/code/ColladaLoader.cpp#L225 */
-
         /* If there is more than just a root node, extract children of the root
            node, as we treat the root node as the scene here. In some cases
            (for example for a COLLADA file with Z_UP defined) the root node can
            contain a transformation, save it. This root transformation is then
-           applied to all direct children of mRootNode inside doObject3D(). */
+           applied to all direct children of mRootNode inside doObject3D().
+           Apart from that it shouldn't contain anything else. */
         if(root->mNumChildren) {
+            /* In case of openState() (which is when _importer isn't populated)
+               it might happen that AI_CONFIG_IMPORT_NO_SKELETON_MESHES was not
+               enabled, in which case, and at least for COLLADA, if the file
+               has no meshes, it adds some bogus one, thinking it's a
+               skeleton-only file and trying to be helpful. Ugh.
+                https://github.com/assimp/assimp/blob/92078bc47c462d5b643aab3742a8864802263700/code/ColladaLoader.cpp#L225
+               Don't die on the assert in this case, but otherwise check that
+               we didn't miss anything in the root node. */
+            CORRADE_INTERNAL_ASSERT(!_importer || !root->mNumMeshes);
+
             _f->nodes.reserve(root->mNumChildren);
             _f->nodes.insert(_f->nodes.end(), root->mChildren, root->mChildren + root->mNumChildren);
             _f->nodeIndices.reserve(root->mNumChildren);
             _f->rootTransformation = Matrix4::from(reinterpret_cast<const float*>(&root->mTransformation)).transposed();
 
-        /* In some pathological cases there's just one root node --- for
-           example the DART integration depends on that. Import it as a single
-           node. In this case applying the root transformation is not desired,
-           so set it to identity. */
+        /* In various cases (PreTransformVertices enabled when the file has a
+           mesh, COLLADA files with Z-up patching not set, STL files...)
+           there's just one root node, and the DART integration depends on
+           that. Import it as a single node. In this case applying the root
+           transformation is not desired, so set it to identity. This branch is
+           explicitly verified in the sceneCollapsedNode() test case. */
         } else {
             _f->nodes.push_back(root);
             _f->nodeIndices.reserve(1);
@@ -448,6 +530,62 @@ void AssimpImporter::doOpenData(const Containers::ArrayView<const char> data) {
             }
         }
     }
+
+    /* Before https://github.com/assimp/assimp/commit/e3083c21f0a7beae6c37a2265b7919a02cbf83c4
+       Assimp incorrectly read spline tangents as values in glTF animation
+       tracks. Quick and dirty check to see if we're dealing with a possibly
+       affected file and Assimp version. This might produce false-positives on
+       files without spline-interpolated animations, but for doOpenState and
+       doOpenFile we have no access to the file content to check if the file
+       contains "CUBICSPLINE". */
+    if(_f->scene->HasAnimations() && _f->importerIsGltf && ASSIMP_HAS_BROKEN_GLTF_SPLINES) {
+        Warning{} << "Trade::AssimpImporter::openData(): spline-interpolated animations imported "
+            "from this file are most likely broken using this version of Assimp. Consult the "
+            "importer documentation for more information.";
+    }
+
+    /* Find meshes with bone data, those are our skins */
+    _f->meshSkins.reserve(_f->scene->mNumMeshes);
+    for(std::size_t i = 0; i != _f->scene->mNumMeshes; ++i) {
+        Int skin = -1;
+        if(_f->scene->mMeshes[i]->HasBones()) {
+            skin = _f->meshesWithBones.size();
+            _f->meshesWithBones.push_back(i);
+        }
+        _f->meshSkins.push_back(skin);
+    }
+
+    /* Can't be changed per skin-import because it affects joint id vertex
+       attributes during doMesh */
+    _f->mergeSkins = configuration().value<bool>("mergeSkins");
+
+    /* De-duplicate bones across all skinned meshes */
+    if(_f->mergeSkins) {
+        _f->boneMap.resize(_f->meshesWithBones.size());
+        for(std::size_t s = 0; s < _f->meshesWithBones.size(); ++s) {
+            const UnsignedInt id = _f->meshesWithBones[s];
+            const aiMesh* mesh = _f->scene->mMeshes[id];
+            auto& map = _f->boneMap[s];
+            map.reserve(mesh->mNumBones);
+            for(const aiBone* bone: Containers::arrayView(mesh->mBones, mesh->mNumBones)) {
+                Int index = -1;
+                for(std::size_t i = 0; i != _f->mergedBones.size(); ++i) {
+                    const aiBone* other = _f->mergedBones[i];
+                    if(bone->mName == other->mName &&
+                        bone->mOffsetMatrix.Equal(other->mOffsetMatrix))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                if(index == -1) {
+                    index = _f->mergedBones.size();
+                    _f->mergedBones.push_back(bone);
+                }
+                map.push_back(index);
+            }
+        }
+    }
 }
 
 void AssimpImporter::doOpenState(const void* state, const std::string& filePath) {
@@ -474,7 +612,9 @@ void AssimpImporter::doOpenFile(const std::string& filename) {
 }
 
 void AssimpImporter::doClose() {
-    _importer->FreeScene();
+    /* In case of doOpenState(), the _importer isn't populated at all and
+       the scene is owned by the caller */
+    if(_importer) _importer->FreeScene();
     _f.reset();
 }
 
@@ -529,8 +669,6 @@ Containers::Pointer<ObjectData3D> AssimpImporter::doObject3D(const UnsignedInt i
 
     /* Is this the first mesh of the aiNode? */
     if(spec.second == 0) {
-        /** @todo support for bone nodes */
-
         /* Object children: first add extra objects caused by multi-mesh nodes,
            after that the usual children. */
         std::vector<UnsignedInt> children;
@@ -556,10 +694,14 @@ Containers::Pointer<ObjectData3D> AssimpImporter::doObject3D(const UnsignedInt i
         auto instance = _f->nodeInstances.find(node);
         if(instance != _f->nodeInstances.end()) {
             const ObjectInstanceType3D type = (*instance).second.first;
-            const int index = (*instance).second.second;
+            const Int index = (*instance).second.second;
             if(type == ObjectInstanceType3D::Mesh) {
                 const aiMesh* mesh = _f->scene->mMeshes[index];
-                return Containers::pointer(new MeshObjectData3D(children, transformation, index, mesh->mMaterialIndex, -1, node));
+                Int skin = _f->meshSkins[index];
+                if(_f->mergeSkins && skin != -1)
+                    skin = 0;
+                return Containers::pointer(new MeshObjectData3D(children, transformation, index,
+                    mesh->mMaterialIndex, skin, node));
             }
 
             return Containers::pointer(new ObjectData3D(children, transformation, type, index, node));
@@ -570,15 +712,17 @@ Containers::Pointer<ObjectData3D> AssimpImporter::doObject3D(const UnsignedInt i
         /* Additional mesh for the referenced node. This is represented as a
            child of the referenced node with identity transformation */
 
-        const aiMesh* mesh = _f->scene->mMeshes[node->mMeshes[spec.second]];
-
+        const Int index = node->mMeshes[spec.second];
+        const aiMesh* mesh = _f->scene->mMeshes[index];
+        Int skin = _f->meshSkins[index];
+        if(_f->mergeSkins && skin != -1)
+            skin = 0;
         Vector3 translation{};
         Quaternion rotation{};
         Vector3 scaling{1.0};
         return Containers::pointer(new MeshObjectData3D(
             {},
-            translation, rotation, scaling,
-            node->mMeshes[spec.second], mesh->mMaterialIndex, -1, node)
+            translation, rotation, scaling, index, mesh->mMaterialIndex, skin, node)
         );
     }
 }
@@ -622,6 +766,23 @@ UnsignedInt AssimpImporter::doMeshCount() const {
     return _f->scene->mNumMeshes;
 }
 
+Int AssimpImporter::doMeshForName(const std::string& name) {
+    if(!_f->meshesForName) {
+        _f->meshesForName.emplace();
+        _f->meshesForName->reserve(_f->scene->mNumMeshes);
+        for(std::size_t i = 0; i != _f->scene->mNumMeshes; ++i) {
+            _f->meshesForName->emplace(_f->scene->mMeshes[i]->mName.C_Str(), i);
+        }
+    }
+
+    const auto found = _f->meshesForName->find(name);
+    return found == _f->meshesForName->end() ? -1 : found->second;
+}
+
+std::string AssimpImporter::doMeshName(const UnsignedInt id) {
+    return _f->scene->mMeshes[id]->mName.C_Str();
+}
+
 Containers::Optional<MeshData> AssimpImporter::doMesh(const UnsignedInt id, UnsignedInt) {
     const aiMesh* mesh = _f->scene->mMeshes[id];
 
@@ -639,17 +800,21 @@ Containers::Optional<MeshData> AssimpImporter::doMesh(const UnsignedInt id, Unsi
     }
 
     /* Gather all attributes. Position is there always, others are optional */
+    const UnsignedInt vertexCount = mesh->mNumVertices;
     std::size_t attributeCount = 1;
     std::ptrdiff_t stride = sizeof(Vector3);
+
     if(mesh->HasNormals()) {
         ++attributeCount;
         stride += sizeof(Vector3);
     }
+
     /* Assimp provides either none or both, never just one of these */
     if(mesh->HasTangentsAndBitangents()) {
         attributeCount += 2;
         stride += 2*sizeof(Vector3);
     }
+
     for(std::size_t layer = 0; layer < mesh->GetNumUVChannels(); ++layer) {
         if(mesh->mNumUVComponents[layer] != 2) {
             Warning() << "Trade::AssimpImporter::mesh(): skipping texture coordinate layer" << layer << "which has" << mesh->mNumUVComponents[layer] << "components per coordinate. Only two dimensional texture coordinates are supported.";
@@ -659,11 +824,43 @@ Containers::Optional<MeshData> AssimpImporter::doMesh(const UnsignedInt id, Unsi
         ++attributeCount;
         stride += sizeof(Vector2);
     }
+
     attributeCount += mesh->GetNumColorChannels();
     stride += mesh->GetNumColorChannels()*sizeof(Color4);
 
+    /* Determine the number of joint weight layers */
+    std::size_t jointLayerCount = 0;
+    Containers::Array<UnsignedByte> jointCounts{ValueInit, vertexCount};
+    if(mesh->HasBones()) {
+        /* Assimp does things the roundabout way of storing per-vertex weights
+           in the bones affecting the mesh, we have to undo that */
+        std::size_t maxJointCount = 0;
+        for(const aiBone* bone: Containers::arrayView(mesh->mBones, mesh->mNumBones)) {
+            if(isDummyBone(bone))
+                continue;
+            for(const aiVertexWeight& weight: Containers::arrayView(bone->mWeights, bone->mNumWeights)) {
+                /* Without IMPORT_NO_SKELETON_MESHES Assimp produces bogus
+                   meshes with bones that have invalid vertex ids. We enable
+                   that setting but who knows what other rogue settings produce invalid data... */
+                CORRADE_ASSERT(weight.mVertexId < vertexCount,
+                    "Trade::AssimpImporter::mesh(): invalid vertex id in bone data", {});
+                UnsignedByte& jointCount = jointCounts[weight.mVertexId];
+                CORRADE_ASSERT(jointCount != std::numeric_limits<UnsignedByte>::max(),
+                    "Trade::AssimpImporter::mesh(): too many joint weights", {});
+                jointCount++;
+                maxJointCount = Math::max<std::size_t>(jointCount, maxJointCount);
+            }
+        }
+
+        const UnsignedInt jointCountLimit = configuration().value<UnsignedInt>("maxJointWeights");
+        CORRADE_INTERNAL_ASSERT(jointCountLimit == 0 || maxJointCount <= jointCountLimit);
+
+        jointLayerCount = (maxJointCount + 3)/4;
+        attributeCount += jointLayerCount*2;
+        stride += jointLayerCount*(sizeof(Vector4ui) + sizeof(Vector4));
+    }
+
     /* Allocate vertex data, fill in the attributes */
-    const UnsignedInt vertexCount = mesh->mNumVertices;
     Containers::Array<char> vertexData{NoInit, std::size_t(stride)*vertexCount};
     Containers::Array<MeshAttributeData> attributeData{attributeCount};
     std::size_t attributeIndex = 0;
@@ -748,6 +945,79 @@ Containers::Optional<MeshData> AssimpImporter::doMesh(const UnsignedInt id, Unsi
         attributeOffset += sizeof(Color4);
     }
 
+    /* Joints and joint weights */
+    if(mesh->HasBones()) {
+        const MeshAttribute jointsAttribute = _f->meshAttributesForName["JOINTS"];
+        const MeshAttribute weightsAttribute = _f->meshAttributesForName["WEIGHTS"];
+
+        Containers::Array<Containers::StridedArrayView1D<Vector4ui>> jointIds{jointLayerCount};
+        Containers::Array<Containers::StridedArrayView1D<Vector4>> jointWeights{jointLayerCount};
+        for(std::size_t layer = 0; layer < jointLayerCount; ++layer) {
+            jointIds[layer] = {vertexData, reinterpret_cast<Vector4ui*>(vertexData + attributeOffset),
+                vertexCount, stride};
+            attributeData[attributeIndex++] = MeshAttributeData{jointsAttribute, jointIds[layer]};
+            attributeOffset += sizeof(Vector4ui);
+
+            jointWeights[layer] = {vertexData, reinterpret_cast<Vector4*>(vertexData + attributeOffset),
+                vertexCount, stride};
+            attributeData[attributeIndex++] = MeshAttributeData{weightsAttribute, jointWeights[layer]};
+            attributeOffset += sizeof(Vector4);
+
+            /* zero-fill, single vertices can have less than the max joint
+               count */
+            for(std::size_t i = 0; i < vertexCount; ++i) {
+                jointIds[layer][i] = {};
+                jointWeights[layer][i] = {};
+            }
+        }
+
+        const Int skin = _f->meshSkins[id];
+        CORRADE_INTERNAL_ASSERT(skin != -1);
+        std::fill(jointCounts.begin(), jointCounts.end(), 0);
+
+        for(std::size_t b = 0; b != mesh->mNumBones; ++b) {
+            const UnsignedInt boneIndex = _f->mergeSkins ? _f->boneMap[skin][b] : b;
+            /* Use the original weights, we only need the remapping to patch
+               the joint id */
+            const aiBone* bone = mesh->mBones[b];
+            for(const aiVertexWeight& weight: Containers::arrayView(bone->mWeights, bone->mNumWeights)) {
+                if(isDummyBone(bone))
+                    continue;
+                UnsignedByte& jointCount = jointCounts[weight.mVertexId];
+                const UnsignedByte layer = jointCount / 4;
+                const UnsignedByte element = jointCount % 4;
+                jointIds[layer][weight.mVertexId][element] = boneIndex;
+                jointWeights[layer][weight.mVertexId][element] = weight.mWeight;
+                jointCount++;
+            }
+        }
+
+        /* Assimp glTF 2 importer only reads one set of joint weight
+           attributes:
+            https://github.com/assimp/assimp/blob/1d33131e902ff3f6b571ee3964c666698a99eb0f/code/AssetLib/glTF2/glTF2Importer.cpp#L940
+           Even worse, it's the last(!!) set because they're getting the
+           attribute name wrong (JOINT instead of JOINTS) which breaks their
+           index extraction:
+            https://github.com/assimp/assimp/blob/1d33131e902ff3f6b571ee3964c666698a99eb0f/code/AssetLib/glTF2/glTF2Asset.inl#L1499
+        */
+        if(_f->importerIsGltf && jointLayerCount == 1) {
+            for(const Vector4& weight: jointWeights[0]) {
+                const Float sum = weight.sum();
+                /* Be very lenient here for shitty exporters. This should still
+                   catch most cases of the first set of weights being
+                   discarded. */
+                constexpr Float Epsilon = 0.1f;
+                if(!Math::equal(sum, 0.0f) && Math::abs(1.0f - sum) > Epsilon) {
+                    Warning{} <<
+                        "Trade::AssimpImporter::mesh(): found non-normalized " "joint weights, possibly a result of Assimp reading "
+                        "joint weights incorrectly. Consult the importer "
+                        "documentation for more information";
+                    break;
+                }
+            }
+        }
+    }
+
     /* Check we pre-calculated well */
     CORRADE_INTERNAL_ASSERT(attributeOffset == std::size_t(stride));
     CORRADE_INTERNAL_ASSERT(attributeIndex == attributeCount);
@@ -769,6 +1039,15 @@ Containers::Optional<MeshData> AssimpImporter::doMesh(const UnsignedInt id, Unsi
         indices,
         std::move(vertexData), std::move(attributeData),
         MeshData::ImplicitVertexCount, mesh};
+}
+
+std::string AssimpImporter::doMeshAttributeName(UnsignedShort name) {
+    return _f && name < _f->meshAttributeNames.size() ?
+        _f->meshAttributeNames[name] : "";
+}
+
+MeshAttribute AssimpImporter::doMeshAttributeForName(const std::string& name) {
+    return _f ? _f->meshAttributesForName[name] : MeshAttribute{};
 }
 
 UnsignedInt AssimpImporter::doMaterialCount() const { return _f->scene->mNumMaterials; }
@@ -1021,7 +1300,7 @@ Containers::Optional<TextureData> AssimpImporter::doTexture(const UnsignedInt id
     if(mat->Get(AI_MATKEY_MAPPINGMODE_V(type, 0), mapMode) == AI_SUCCESS)
         wrappingV = toWrapping(mapMode);
 
-    return TextureData{TextureData::Type::Texture2D,
+    return TextureData{TextureType::Texture2D,
         SamplerFilter::Linear, SamplerFilter::Linear, SamplerMipmap::Linear,
         {wrappingU, wrappingV, SamplerWrapping::ClampToEdge}, std::get<2>(_f->textures[id]), &_f->textures[id]};
 }
@@ -1090,6 +1369,8 @@ AbstractImporter* AssimpImporter::setupOrReuseImporterForImage(const UnsignedInt
 
         AnyImageImporter importer{*manager()};
         if(fileCallback()) importer.setFileCallback(fileCallback(), fileCallbackUserData());
+        /* Assimp loads image path references as-is. It might contain windows path separators if the exporter didn't normalize */
+        std::replace(path.begin(), path.end(), '\\', '/');
         /* Assimp doesn't trim spaces from the end of image paths in OBJ
            materials so we have to. See the image-filename-space.mtl test. */
         if(!importer.openFile(Utility::String::trim(Utility::Directory::join(_f->filePath ? *_f->filePath : "", path))))
@@ -1116,6 +1397,386 @@ Containers::Optional<ImageData2D> AssimpImporter::doImage2D(const UnsignedInt id
     if(!importer) return Containers::NullOpt;
 
     return importer->image2D(0, level);
+}
+
+UnsignedInt AssimpImporter::doAnimationCount() const {
+    /* If the animations are merged, there's at most one */
+    if(configuration().value<bool>("mergeAnimationClips"))
+        return _f->scene->mNumAnimations ? 1 : 0;
+
+    return _f->scene->mNumAnimations;
+}
+
+Int AssimpImporter::doAnimationForName(const std::string& name) {
+    /* If the animations are merged, don't report any names */
+    if(configuration().value<bool>("mergeAnimationClips")) return -1;
+
+    if(!_f->animationsForName) {
+        _f->animationsForName.emplace();
+        _f->animationsForName->reserve(_f->scene->mNumAnimations);
+        for(std::size_t i = 0; i != _f->scene->mNumAnimations; ++i)
+            _f->animationsForName->emplace(std::string(_f->scene->mAnimations[i]->mName.C_Str()), i);
+    }
+
+    const auto found = _f->animationsForName->find(name);
+    return found == _f->animationsForName->end() ? -1 : found->second;
+}
+
+std::string AssimpImporter::doAnimationName(UnsignedInt id) {
+    /* If the animations are merged, don't report any names */
+    if(configuration().value<bool>("mergeAnimationClips")) return {};
+    return _f->scene->mAnimations[id]->mName.C_Str();
+}
+
+namespace {
+
+Animation::Extrapolation extrapolationFor(aiAnimBehaviour behaviour) {
+    /* This code is not covered by tests since there is currently
+       no code in Assimp that sets this except for the .irr importer.
+       So it'll be aiAnimBehaviour_DEFAULT for 99.99% of users,
+       and there are tests that check that this becomes
+       Extrapolation::Constant. */
+    switch(behaviour) {
+        case aiAnimBehaviour_DEFAULT:
+            /** @todo emulate this correctly by inserting keyframes
+                with the default node transformation */
+            return Animation::Extrapolation::Constant;
+        case aiAnimBehaviour_CONSTANT:
+            return Animation::Extrapolation::Constant;
+        case aiAnimBehaviour_LINEAR:
+            return Animation::Extrapolation::Extrapolated;
+        case aiAnimBehaviour_REPEAT:
+            return Animation::Extrapolation::Constant;
+        default: CORRADE_INTERNAL_ASSERT_UNREACHABLE(); /* LCOV_EXCL_LINE */
+    }
+}
+
+}
+
+Containers::Optional<AnimationData> AssimpImporter::doAnimation(UnsignedInt id) {
+    const bool verbose{flags() & ImporterFlag::Verbose};
+    const bool removeDummyAnimationTracks = configuration().value<bool>("removeDummyAnimationTracks");
+    const bool mergeAnimationClips = configuration().value<bool>("mergeAnimationClips");
+
+    /* Import either a single animation or all of them together. At the moment,
+       Blender doesn't really support cinematic animations (affecting multiple
+       objects): https://blender.stackexchange.com/q/5689. And since
+       https://github.com/KhronosGroup/glTF-Blender-Exporter/pull/166, these
+       are exported as a set of object-specific clips, which may not be wanted,
+       so we give the users an option to merge them all together. */
+    const std::size_t animationBegin = mergeAnimationClips ? 0 : id;
+    const std::size_t animationEnd = mergeAnimationClips ? _f->scene->mNumAnimations : id + 1;
+
+    /* Calculate total channel count */
+    std::size_t channelCount = 0;
+    for(std::size_t a = animationBegin; a != animationEnd; ++a) {
+        channelCount += _f->scene->mAnimations[a]->mNumChannels;
+    }
+
+    /* Presence of translation/rotation/scaling keys for each channel. We might
+       skip certain tracks (see comments in the next loop) but we need to know
+       the correct track count and data array size up front, so determine this
+       and remember it for the actual loop that extracts the tracks. BigEnumSet
+       because EnumSet requires binary-exclusive enum values. */
+    typedef Containers::BigEnumSet<AnimationTrackTargetType> TargetTypes;
+    Containers::Array<TargetTypes> channelTargetTypes{channelCount};
+
+    /* Calculate total data size and track count. If merging all animations
+       together, this is the sum of all clip track counts. */
+    std::size_t dataSize = 0;
+    std::size_t trackCount = 0;
+    std::size_t currentChannel = 0;
+    for(std::size_t a = animationBegin; a != animationEnd; ++a) {
+        const aiAnimation* animation = _f->scene->mAnimations[a];
+        for(std::size_t c = 0; c != animation->mNumChannels; ++c) {
+            const aiNodeAnim* channel = animation->mChannels[c];
+
+            UnsignedInt translationKeyCount = channel->mNumPositionKeys;
+            UnsignedInt rotationKeyCount = channel->mNumRotationKeys;
+            UnsignedInt scalingKeyCount = channel->mNumScalingKeys;
+
+            /* Assimp adds useless 1-key tracks with default node translation/
+               rotation/scale if the channel doesn't target all 3 of them.
+               Ignore those. */
+            if(removeDummyAnimationTracks &&
+                (translationKeyCount == 1 || rotationKeyCount == 1 || scalingKeyCount == 1))
+            {
+                const aiNode* node = _f->scene->mRootNode->FindNode(channel->mNodeName);
+                CORRADE_INTERNAL_ASSERT(node);
+
+                aiVector3D nodeTranslation;
+                aiQuaternion nodeRotation;
+                aiVector3D nodeScaling;
+                /* This might not perfectly restore the T/R/S components, but
+                   it's okay if the comparison fails, this whole fix is a
+                   best-effort attempt */
+                node->mTransformation.Decompose(nodeScaling, nodeRotation, nodeTranslation);
+
+                if(translationKeyCount == 1 && channel->mPositionKeys[0].mTime == 0.0) {
+                    const Vector3 value = Vector3::from(&channel->mPositionKeys[0].mValue[0]);
+                    const Vector3 nodeValue = Vector3::from(&nodeTranslation[0]);
+                    if(value == nodeValue) {
+                        if(verbose) Debug{}
+                            << "Trade::AssimpImporter::animation(): ignoring "
+                               "dummy translation track in animation"
+                            << a << Debug::nospace << ", channel" << c;
+                        translationKeyCount = 0;
+                    }
+                }
+                if(rotationKeyCount == 1 && channel->mRotationKeys[0].mTime == 0.0) {
+                    const aiQuaternion& valueQuat = channel->mRotationKeys[0].mValue;
+                    const Quaternion value{{valueQuat.x, valueQuat.y, valueQuat.z}, valueQuat.w};
+                    const aiQuaternion& nodeQuat = nodeRotation;
+                    const Quaternion nodeValue{{nodeQuat.x, nodeQuat.y, nodeQuat.z}, nodeQuat.w};
+                    if(value == nodeValue) {
+                        if(verbose) Debug{}
+                            << "Trade::AssimpImporter::animation(): ignoring "
+                               "dummy rotation track in animation"
+                            << a << Debug::nospace << ", channel" << c;
+                        rotationKeyCount = 0;
+                    }
+                }
+                if(scalingKeyCount == 1 && channel->mScalingKeys[0].mTime == 0.0) {
+                    const Vector3 value = Vector3::from(&channel->mScalingKeys[0].mValue[0]);
+                    const Vector3 nodeValue = Vector3::from(&nodeScaling[0]);
+                    if(value == nodeValue) {
+                        if(verbose) Debug{}
+                            << "Trade::AssimpImporter::animation(): ignoring "
+                               "dummy scaling track in animation"
+                            << a << Debug::nospace << ", channel" << c;
+                        scalingKeyCount = 0;
+                    }
+                }
+            }
+
+            TargetTypes targetTypes;
+            if(translationKeyCount > 0)
+                targetTypes |= AnimationTrackTargetType::Translation3D;
+            if(rotationKeyCount > 0)
+                targetTypes |= AnimationTrackTargetType::Rotation3D;
+            if(scalingKeyCount > 0)
+                targetTypes |= AnimationTrackTargetType::Scaling3D;
+            channelTargetTypes[currentChannel++] = targetTypes;
+
+            /** @todo handle alignment once we do more than just four-byte types */
+            dataSize += translationKeyCount*(sizeof(Float) + sizeof(Vector3)) +
+                rotationKeyCount*(sizeof(Float) + sizeof(Quaternion)) +
+                scalingKeyCount*(sizeof(Float) + sizeof(Vector3));
+
+            trackCount += (translationKeyCount > 0 ? 1 : 0) +
+                (rotationKeyCount > 0 ? 1 : 0) +
+                (scalingKeyCount > 0 ? 1 : 0);
+        }
+    }
+
+    /* Populate the data array */
+    Containers::Array<char> data{dataSize};
+
+    const bool optimizeQuaternionShortestPath = configuration().value<bool>("optimizeQuaternionShortestPath");
+    const bool normalizeQuaternions = configuration().value<bool>("normalizeQuaternions");
+
+    /* Import all tracks */
+    bool hadToRenormalize = false;
+    std::size_t dataOffset = 0;
+    std::size_t trackId = 0;
+    currentChannel = 0;
+    Containers::Array<Trade::AnimationTrackData> tracks{trackCount};
+    for(std::size_t a = animationBegin; a != animationEnd; ++a) {
+        const aiAnimation* animation = _f->scene->mAnimations[a];
+        for(std::size_t c = 0; c != animation->mNumChannels; ++c) {
+            const aiNodeAnim* channel = animation->mChannels[c];
+            const Int target = doObject3DForName(channel->mNodeName.C_Str());
+            CORRADE_INTERNAL_ASSERT(target != -1);
+
+            /* Assimp only supports linear interpolation. For glTF splines
+               it simply uses the spline control points. */
+            constexpr Animation::Interpolation interpolation = Animation::Interpolation::Linear;
+
+            /* Extrapolation modes */
+            const Animation::Extrapolation extrapolationBefore = extrapolationFor(channel->mPreState);
+            const Animation::Extrapolation extrapolationAfter = extrapolationFor(channel->mPostState);
+
+            /* Key times are given as ticks, convert to milliseconds. Default
+               value of 25 is taken from the assimp_view tool. */
+            double ticksPerSecond = animation->mTicksPerSecond != 0.0 ? animation->mTicksPerSecond : 25.0;
+
+            /* For glTF files mTicksPerSecond is completely useless before
+               https://github.com/assimp/assimp/commit/09d80ff478d825a80bce6fb787e8b19df9f321a8
+               but can be assumed to always be 1000. */
+            constexpr Double GltfTicksPerSecond = 1000.0;
+            if(_f->importerIsGltf && !Math::equal(ticksPerSecond, GltfTicksPerSecond)) {
+                if(verbose) Debug{}
+                    << "Trade::AssimpImporter::animation():" << Float(ticksPerSecond)
+                    << "ticks per second is incorrect for glTF, patching to"
+                    << Float(GltfTicksPerSecond);
+                ticksPerSecond = GltfTicksPerSecond;
+            }
+
+            const TargetTypes targetTypes = channelTargetTypes[currentChannel++];
+
+            /* Translation */
+            if(targetTypes & AnimationTrackTargetType::Translation3D) {
+                const size_t keyCount = channel->mNumPositionKeys;
+                const auto keys = Containers::arrayCast<Float>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Float)));
+                dataOffset += keys.size()*sizeof(keys[0]);
+                const auto values = Containers::arrayCast<Vector3>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Vector3)));
+                dataOffset += values.size()*sizeof(values[0]);
+
+                for(size_t k = 0; k < channel->mNumPositionKeys; ++k) {
+                    /* Convert double to float keys */
+                    keys[k] = channel->mPositionKeys[k].mTime / ticksPerSecond;
+                    values[k] = Vector3::from(&channel->mPositionKeys[k].mValue[0]);
+                }
+
+                const auto track = Animation::TrackView<const Float, const Vector3>{
+                    keys, values, interpolation,
+                    animationInterpolatorFor<Vector3>(interpolation),
+                    extrapolationBefore, extrapolationAfter};
+
+                tracks[trackId++] = AnimationTrackData{AnimationTrackType::Vector3,
+                    AnimationTrackType::Vector3, AnimationTrackTargetType::Translation3D,
+                    static_cast<UnsignedInt>(target), track };
+            }
+
+            /* Rotation */
+            if(targetTypes & AnimationTrackTargetType::Rotation3D) {
+                const size_t keyCount = channel->mNumRotationKeys;
+                const auto keys = Containers::arrayCast<Float>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Float)));
+                dataOffset += keys.size()*sizeof(keys[0]);
+                const auto values = Containers::arrayCast<Quaternion>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Quaternion)));
+                dataOffset += values.size()*sizeof(values[0]);
+
+                for(size_t k = 0; k < channel->mNumRotationKeys; ++k) {
+                    keys[k] = channel->mRotationKeys[k].mTime / ticksPerSecond;
+                    const aiQuaternion& quat = channel->mRotationKeys[k].mValue;
+                    values[k] = Quaternion{{quat.x, quat.y, quat.z}, quat.w};
+                }
+
+                /* Ensure shortest path is always chosen. */
+                if(optimizeQuaternionShortestPath) {
+                    Float flip = 1.0f;
+                    for(std::size_t i = 0; i != values.size() - 1; ++i) {
+                        if(Math::dot(values[i], values[i + 1]*flip) < 0) flip = -flip;
+                        values[i + 1] *= flip;
+                    }
+                }
+
+                /* Normalize the quaternions if not already. Don't attempt to
+                   normalize every time to avoid tiny differences, only when
+                   the quaternion looks to be off. */
+                if(normalizeQuaternions) {
+                    for(auto& i: values) if(!i.isNormalized()) {
+                        i = i.normalized();
+                        hadToRenormalize = true;
+                    }
+                }
+
+                const auto track = Animation::TrackView<const Float, const Quaternion>{
+                    keys, values, interpolation,
+                    animationInterpolatorFor<Quaternion>(interpolation),
+                    extrapolationBefore, extrapolationAfter};
+
+                tracks[trackId++] = AnimationTrackData{AnimationTrackType::Quaternion,
+                    AnimationTrackType::Quaternion, AnimationTrackTargetType::Rotation3D,
+                    static_cast<UnsignedInt>(target), track};
+            }
+
+            /* Scale */
+            if(targetTypes & AnimationTrackTargetType::Scaling3D) {
+                const std::size_t keyCount = channel->mNumScalingKeys;
+                const auto keys = Containers::arrayCast<Float>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Float)));
+                dataOffset += keys.size()*sizeof(keys[0]);
+                const auto values = Containers::arrayCast<Vector3>(
+                    data.suffix(dataOffset).prefix(keyCount*sizeof(Vector3)));
+                dataOffset += values.size()*sizeof(values[0]);
+
+                for(std::size_t k = 0; k < channel->mNumScalingKeys; ++k) {
+                    keys[k] = channel->mScalingKeys[k].mTime / ticksPerSecond;
+                    values[k] = Vector3::from(&channel->mScalingKeys[k].mValue[0]);
+                }
+
+                const auto track = Animation::TrackView<const Float, const Vector3>{
+                    keys, values, interpolation,
+                    animationInterpolatorFor<Vector3>(interpolation),
+                    extrapolationBefore,
+                    extrapolationAfter};
+                tracks[trackId++] = AnimationTrackData{AnimationTrackType::Vector3,
+                    AnimationTrackType::Vector3, AnimationTrackTargetType::Scaling3D,
+                    static_cast<UnsignedInt>(target), track};
+            }
+        }
+    }
+
+    if(hadToRenormalize)
+        Warning{} << "Trade::AssimpImporter::animation(): quaternions in some rotation tracks were renormalized";
+
+    return AnimationData{std::move(data), std::move(tracks),
+        mergeAnimationClips ? nullptr : _f->scene->mAnimations[id]};
+}
+
+UnsignedInt AssimpImporter::doSkin3DCount() const {
+    /* If the skins are merged, there's at most one */
+    if(_f->mergeSkins)
+        return _f->meshesWithBones.empty() ? 0 : 1;
+
+    return _f->meshesWithBones.size();
+}
+
+Int AssimpImporter::doSkin3DForName(const std::string& name) {
+    /* If the skins are merged, don't report any names */
+    if(_f->mergeSkins) return -1;
+
+    if(!_f->skinsForName) {
+        _f->skinsForName.emplace();
+        _f->skinsForName->reserve(_f->meshesWithBones.size());
+        for(std::size_t i = 0; i != _f->meshesWithBones.size(); ++i)
+            _f->skinsForName->emplace(
+                _f->scene->mMeshes[_f->meshesWithBones[i]]->mName.C_Str(), i);
+    }
+
+    const auto found = _f->skinsForName->find(name);
+    return found == _f->skinsForName->end() ? -1 : found->second;
+}
+
+std::string AssimpImporter::doSkin3DName(const UnsignedInt id) {
+    /* If the skins are merged, don't report any names */
+    if(_f->mergeSkins) return {};
+    return _f->scene->mMeshes[_f->meshesWithBones[id]]->mName.C_Str();
+}
+
+Containers::Optional<SkinData3D> AssimpImporter::doSkin3D(const UnsignedInt id) {
+    /* Import either a single mesh skin or all of them together. Since Assimp
+       gives us no way to enumerate the original skins and assumes that one
+       mesh = one skin, we give the users an option to merge them all
+       together. */
+    const aiMesh* mesh = nullptr;
+    Containers::ArrayView<const aiBone* const> bones;
+    if(_f->mergeSkins)
+        bones = Containers::arrayView(_f->mergedBones);
+    else {
+        mesh = _f->scene->mMeshes[_f->meshesWithBones[id]];
+        bones = Containers::arrayView(mesh->mBones, mesh->mNumBones);
+    }
+
+    Containers::Array<UnsignedInt> joints{NoInit, bones.size()};
+    /* NoInit for Matrix4 creates an array with a non-default deleter, we're
+       not allowed to return those */
+    Containers::Array<Matrix4> inverseBindMatrices{ValueInit, bones.size()};
+    for(std::size_t i = 0; i != bones.size(); ++i) {
+        const aiBone* bone = bones[i];
+        const Int node = doObject3DForName(bone->mName.C_Str());
+        CORRADE_INTERNAL_ASSERT(node != -1);
+        joints[i] = node;
+        inverseBindMatrices[i] = Matrix4::from(
+            reinterpret_cast<const float*>(&bone->mOffsetMatrix)).transposed();
+    }
+
+    return SkinData3D{std::move(joints), std::move(inverseBindMatrices), mesh};
 }
 
 const void* AssimpImporter::doImporterState() const {

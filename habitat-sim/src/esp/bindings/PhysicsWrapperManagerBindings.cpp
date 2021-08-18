@@ -61,13 +61,29 @@ void declareBaseWrapperManager(py::module& m,
           "handle"_a)
       .def("get_object_handles",
            static_cast<std::vector<std::string> (MgrClass::*)(
-               const std::string&, bool) const>(
+               const std::string&, bool, bool) const>(
                &MgrClass::getObjectHandlesBySubstring),
-           ("Returns a list of " + objType +
+           ("Returns a potentially sorted list of " + objType +
             " handles that either contain or explicitly do not contain the "
             "passed search_str, based on the value of boolean contains.")
                .c_str(),
+           "search_str"_a = "", "contains"_a = true, "sorted"_a = true)
+      .def("get_objects_info", &MgrClass::getObjectInfoStrings,
+           ("Returns a list of CSV strings describing each " + objType +
+            " whose handles either contain or explicitly do not contain the "
+            "passed search_str, based on the value of boolean contains.")
+               .c_str(),
            "search_str"_a = "", "contains"_a = true)
+
+      .def("get_objects_CSV_info", &MgrClass::getObjectInfoCSVString,
+           ("Returns a comma-separated string describing each " + objType +
+            " whose handles either contain or explicitly do not "
+            "contain the passed search_str, based on the value of boolean "
+            "contains.  Each " +
+            objType + "'s info is separated by a newline.")
+               .c_str(),
+           "search_str"_a = "", "contains"_a = true)
+
       .def("get_num_objects", &MgrClass::getNumObjects,
            ("Returns the number of existing " + objType + "s being managed.")
                .c_str())
@@ -91,6 +107,11 @@ void declareBaseWrapperManager(py::module& m,
             objType + " in the library.")
                .c_str(),
            "handle"_a)
+      .def("get_library_has_id", &MgrClass::getObjectLibHasID,
+           ("Returns whether the passed object ID describes an existing " +
+            objType + " in the library.")
+               .c_str(),
+           "object_id"_a)
       .def("set_object_lock", &MgrClass::setLock,
            ("This sets the lock state for the  " + objType +
             " that has the passed name. Lock == True makes the  " + objType +
@@ -155,7 +176,17 @@ void declareBaseWrapperManager(py::module& m,
             " specified by the passed handle if it exists, and NULL if it does "
             "not.")
                .c_str(),
-           "handle"_a);
+           "handle"_a)
+      .def("get_objects_by_handle_substring",
+           static_cast<std::unordered_map<std::string, WrapperPtr> (
+               MgrClass::*)(const std::string&, bool)>(
+               &MgrClass::template getObjectsByHandleSubstring<U>),
+           ("Returns a dictionary of " + objType +
+            " objects, keyed by their handles, for all handles that either "
+            "contain or explicitly do not contain the passed search_str, based "
+            "on the value of boolean contains.")
+               .c_str(),
+           "search_str"_a = "", "contains"_a = true);
 }  // declareBaseWrapperManager
 
 template <typename T>

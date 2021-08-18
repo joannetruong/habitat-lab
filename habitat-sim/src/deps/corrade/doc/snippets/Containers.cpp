@@ -38,6 +38,7 @@
 #include "Corrade/Containers/EnumSet.hpp"
 #include "Corrade/Containers/LinkedList.h"
 #include "Corrade/Containers/Optional.h"
+#include "Corrade/Containers/Pair.h"
 #include "Corrade/Containers/Pointer.h"
 #include "Corrade/Containers/Reference.h"
 #include "Corrade/Containers/ScopeGuard.h"
@@ -493,7 +494,7 @@ static_cast<void>(b);
 /* [arraySize] */
 int data[15];
 
-std::size_t size = Containers::arraySize(data); // size == 5
+std::size_t size = Containers::arraySize(data); // size == 15
 /* [arraySize] */
 static_cast<void>(size);
 }
@@ -736,6 +737,31 @@ auto b = Containers::optional(value);
 auto a = Containers::Optional<std::string>{InPlaceInit, 'a', 'b'};
 auto b = Containers::optional<std::string>('a', 'b');
 /* [optional-inplace] */
+}
+
+{
+/* [pair] */
+auto a = Containers::Pair<float, int>{35.0f, 7};
+auto b = Containers::pair(35.0f, 7);
+/* [pair] */
+static_cast<void>(a);
+static_cast<void>(b);
+}
+
+{
+/* [pointer] */
+std::string* ptr = DOXYGEN_IGNORE({});
+
+auto a = Containers::Pointer<std::string>{ptr};
+auto b = Containers::pointer(ptr);
+/* [pointer] */
+}
+
+{
+/* [pointer-inplace] */
+auto a = Containers::Pointer<std::string>{InPlaceInit, 'a', 'b'};
+auto b = Containers::pointer<std::string>('a', 'b');
+/* [pointer-inplace] */
 }
 
 #ifdef __linux__
@@ -1053,32 +1079,6 @@ Containers::StridedArrayView3D<std::uint8_t> rgb =
     Containers::arrayCast<3, std::uint8_t>(view);
 /* [arrayCast-StridedArrayView-inflate] */
 static_cast<void>(rgb);
-}
-
-#ifdef __clang__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuninitialized"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-#endif
-{
-/* [pointer] */
-std::string* ptr;
-
-auto a = Containers::Pointer<std::string>{ptr};
-auto b = Containers::pointer(ptr);
-/* [pointer] */
-}
-#if defined(__clang__) || defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
-{
-/* [pointer-inplace] */
-auto a = Containers::Pointer<std::string>{InPlaceInit, 'a', 'b'};
-auto b = Containers::pointer<std::string>('a', 'b');
-/* [pointer-inplace] */
 }
 
 {

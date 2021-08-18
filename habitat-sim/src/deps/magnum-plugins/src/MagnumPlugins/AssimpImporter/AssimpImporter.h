@@ -6,6 +6,7 @@
     Copyright © 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019,
                 2020, 2021 Vladimír Vondruš <mosra@centrum.cz>
     Copyright © 2017 Jonathan Hale <squareys@googlemail.com>
+    Copyright © 2021 Pablo Escobar <mail@rvrs.in>
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -111,7 +112,8 @@ Imports various formats using [Assimp](http://assimp.org), in particular:
 -   3D GameStudio (3DGS), 3D GameStudio (3DGS) Terrain (`*.mdl`, `*.hmp`)
 -   Izware Nendo (`*.ndo`)
 
-Supports importing of scene, object, camera, mesh, texture and image data.
+Supports importing of scene, object, camera, mesh, texture, image, animation
+and skin data.
 
 This plugin provides `3dsImporter`, `Ac3dImporter`, `BlenderImporter`,
 `BvhImporter`, `CsmImporter`, `ColladaImporter`, `DirectXImporter`,
@@ -185,8 +187,7 @@ See @ref building-plugins, @ref cmake-plugins, @ref plugins and
 
 @section Trade-AssimpImporter-behavior Behavior and limitations
 
-The plugin supports @ref ImporterFeature::OpenData and
-@ref ImporterFeature::FileCallback features. The Assimp library loads
+The plugin supports @ref ImporterFeature::OpenData, @relativeref{ImporterFeature,OpenState} and @relativeref{ImporterFeature,FileCallback} features. The Assimp library loads
 everything during initial import, meaning all external file loading callbacks
 are called with @ref InputFileCallbackPolicy::LoadTemporary and the resources
 can be safely freed right after the @ref openData() / @ref openFile() function
@@ -197,12 +198,68 @@ with @ref InputFileCallbackPolicy::LoadTemporary and
 @ref InputFileCallbackPolicy::Close is emitted right after the file is fully
 read.
 
-Import of animation data is not supported at the moment.
-
 The importer recognizes @ref ImporterFlag::Verbose, enabling verbose logging
 in Assimp when the flag is enabled. However please note that since Assimp
 handles logging through a global singleton, it's not possible to have different
 verbosity levels in each instance.
+
+@subsection Trade-AssimpImporter-behavior-animation Animation and skin import
+
+-   Assimp sometimes adds dummy animation tracks with a single key-value pair
+    and the default node transformation. If found, the importer removes these
+    dummy tracks and prints a message if verbose logging is enabled. Can be
+    disabled per-animation with the @cb{.ini} removeDummyAnimationTracks @ce
+    @ref Trade-AssimpImporter-configuration "configuration option".
+-   Channel order within animations is not always preserved
+    by Assimp, depending on file type and compiler. You may have to manually
+    order tracks by type and target after importing.
+-   Quaternion rotation tracks are postprocessed in order to make it
+    possible to use the faster
+    @ref Math::lerp(const Quaternion<T>&, const Quaternion<T>&, T) "Math::lerp()" /
+    @ref Math::slerp(const Quaternion<T>&, const Quaternion<T>&, T) "Math::slerp()"
+    functions instead of
+    @ref Math::lerpShortestPath(const Quaternion<T>&, const Quaternion<T>&, T) "Math::lerpShortestPath()" /
+    @ref Math::slerpShortestPath(const Quaternion<T>&, const Quaternion<T>&, T) "Math::slerpShortestPath()".
+    Can be disabled per-animation with the
+    @cb{.ini} optimizeQuaternionShortestPath @ce
+    @ref Trade-AssimpImporter-configuration "configuration option".
+-   If quaternion rotation tracks are not normalized, the importer
+    prints a warning and normalizes them. Can be disabled per-animation with
+    the @cb{.ini} normalizeQuaternions @ce
+    @ref Trade-AssimpImporter-configuration "configuration option".
+-   Morph targets are not supported
+-   Animation tracks are always imported with
+    @ref Animation::Interpolation::Linear, because Assimp doesn't expose any
+    interpolation modes
+-   Animation tracks using `aiAnimBehaviour_DEFAULT` or `aiAnimBehaviour_REPEAT`
+    are currently not implemented and fall back to using
+    @ref Animation::Extrapolation::Constant
+-   It's possible to request all animation clips to be merged into one using
+    the @cb{.ini} mergeAnimationClips @ce option in order to for example
+    preserve cinematic animations when using the Blender glTF exporter (as it
+    otherwise outputs a separate clip for each object). When this option is
+    enabled, @ref animationCount() always report either @cpp 0 @ce or
+    @cpp 1 @ce and the merged animation has no name. With this option enabled,
+    however, it can happen that multiple conflicting tracks affecting the same
+    node are merged in the same clip, causing the animation to misbehave.
+-   Assimp versions before commit [e3083c21f0a7beae6c37a2265b7919a02cbf83c4](https://github.com/assimp/assimp/commit/e3083c21f0a7beae6c37a2265b7919a02cbf83c4)
+    read spline-interpolated glTF animation tracks incorrectly and produce
+    broken animations. A warning is printed when importing glTF animations on
+    these versions.
+    Because it's impossible to detect the actual brokenness, the warning is
+    printed even if the imported data may be correct.
+-   Original skins are not exposed by Assimp, instead each mesh with joint
+    weights produces its own skin. Skin names will be equal to their
+    corresponding mesh names. A consequence of this is that Assimp only imports
+    joint weight attributes for one skin and ignores all other skins targetting
+    the same mesh.
+-   You can request to merge all mesh skins into one using the
+    @cb{.ini} mergeSkins @ce option. Duplicate joints (same object index and
+    inverse bind matrix) will be merged and joint ids in vertex attributes
+    adjusted accordingly. When this option is enabled, @ref skin3DCount()
+    always report either @cpp 0 @ce or @cpp 1 @ce and the merged skin has no
+    name. This option needs to be set before opening a file because it affects
+    skin as well as mesh loading.
 
 @subsection Trade-AssimpImporter-behavior-materials Material import
 
@@ -240,9 +297,6 @@ verbosity levels in each instance.
 -   Custom mesh attributes (such as `object_id` in Stanford PLY files) are
     not imported.
 -   Texture coordinate layers with other than two components are skipped
--   For some file formats (such as COLLADA), Assimp may create a dummy
-    "skeleton visualizer" mesh if the file has no mesh data. For others (such
-    as glTF) not.
 -   Per-face attributes in Stanford PLY files are not imported.
 -   Stanford PLY files that contain a comment before the format line fail to
     import.
@@ -255,6 +309,18 @@ verbosity levels in each instance.
 -   The imported model always has either both @ref MeshAttribute::Tangent
     @ref MeshAttribute::Bitangent or neither of them, tangents are always
     three-component with binormals separate.
+-   Joint IDs and weights for skinning are imported as custom vertex attributes
+    named "JOINTS" and "WEIGHTS" with formats @ref VertexFormat::Vector4ui and
+    @ref VertexFormat::Vector4, respectively. Imported meshes always have
+    either both or neither of them. Their mapping to/from a string can be
+    queried using @ref meshAttributeName() and @ref meshAttributeForName(). By
+    default, the number of weights per vertex is limited to 4, but you can
+    change this limit by setting the @cb{.ini} maxJointWeights @ce
+    @ref Trade-AssimpImporter-configuration "configuration option".
+-   Assimp doesn't correctly import glTF meshes with multiple sets of joint
+    weights, only the last set will be imported. A warning is printed when this
+    is detected, but it may misfire for other meshes with non-normalized
+    weights.
 -   Multi-mesh nodes and multi-primitive meshes are loaded as follows,
     consistently with the behavior of @link TinyGltfImporter @endlink:
     -   Multi-primitive meshes are split by Assimp into individual meshes
@@ -309,6 +375,9 @@ meaning a change in these will be always applied to the next opened file.
 
 @snippet MagnumPlugins/AssimpImporter/AssimpImporter.conf configuration_
 
+See @ref plugins-configuration for more information and an example showing how
+to edit the configuration values.
+
 @section Trade-AssimpImporter-state Access to internal importer state
 
 The Assimp structures used to import data from a file can be accessed through
@@ -326,6 +395,10 @@ importer state methods:
     -   @ref LightData::importerState() returns `aiLight`
     -   @ref ImageData2D::importerState() may return `aiTexture`, if texture was embedded
         into the loaded file.
+    -   @ref AnimationData::importerState() returns `aiAnimation`, or `nullptr` if the
+        @cb{.ini} mergeAnimationClips @ce option is enabled
+    -   @ref SkinData::importerState() returns `aiMesh`, or `nullptr` if the
+        @cb{.ini} mergeSkins @ce option is enabled
 -   @ref openState() expects a pointer to an Assimp scene (i.e., `const aiScene*`)
     and optionally a path (in order to be able to load textures, if needed)
 
@@ -385,7 +458,11 @@ class MAGNUM_ASSIMPIMPORTER_EXPORT AssimpImporter: public AbstractImporter {
         MAGNUM_ASSIMPIMPORTER_LOCAL Containers::Optional<LightData> doLight(UnsignedInt id) override;
 
         MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doMeshCount() const override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL Int doMeshForName(const std::string& name) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL std::string doMeshName(UnsignedInt id) override;
         MAGNUM_ASSIMPIMPORTER_LOCAL Containers::Optional<MeshData> doMesh(UnsignedInt id, UnsignedInt level) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL MeshAttribute doMeshAttributeForName(const std::string& name) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL std::string doMeshAttributeName(UnsignedShort name) override;
 
         MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doMaterialCount() const override;
         MAGNUM_ASSIMPIMPORTER_LOCAL Int doMaterialForName(const std::string& name) override;
@@ -400,6 +477,16 @@ class MAGNUM_ASSIMPIMPORTER_EXPORT AssimpImporter: public AbstractImporter {
         MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doImage2DCount() const override;
         MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doImage2DLevelCount(UnsignedInt id) override;
         MAGNUM_ASSIMPIMPORTER_LOCAL Containers::Optional<ImageData2D> doImage2D(UnsignedInt id, UnsignedInt level) override;
+
+        MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doAnimationCount() const override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL std::string doAnimationName(UnsignedInt id) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL Int doAnimationForName(const std::string& name) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL Containers::Optional<AnimationData> doAnimation(UnsignedInt id) override;
+
+        MAGNUM_ASSIMPIMPORTER_LOCAL UnsignedInt doSkin3DCount() const override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL Int doSkin3DForName(const std::string& name) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL std::string doSkin3DName(UnsignedInt id) override;
+        MAGNUM_ASSIMPIMPORTER_LOCAL Containers::Optional<SkinData3D> doSkin3D(UnsignedInt id) override;
 
         MAGNUM_ASSIMPIMPORTER_LOCAL const void* doImporterState() const override;
 

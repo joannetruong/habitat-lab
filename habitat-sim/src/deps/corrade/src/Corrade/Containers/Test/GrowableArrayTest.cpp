@@ -29,7 +29,9 @@
 #include <vector>
 
 #include "Corrade/Containers/GrowableArray.h"
+#include "Corrade/Containers/StringStl.h"
 #include "Corrade/TestSuite/Tester.h"
+#include "Corrade/TestSuite/Compare/Numeric.h"
 #include "Corrade/Utility/DebugStl.h"
 
 /* No __has_feature on GCC: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=60512
@@ -131,6 +133,8 @@ struct GrowableArrayTest: TestSuite::Tester {
     void emplaceConstructorExplicitInCopyInitialization();
     void copyConstructPlainStruct();
     void moveConstructPlainStruct();
+
+    template<template<class> class Allocator, std::size_t alignment> void allocationAlignment();
 
     void benchmarkAppendVector();
     void benchmarkAppendArray();
@@ -321,6 +325,18 @@ GrowableArrayTest::GrowableArrayTest() {
               &GrowableArrayTest::emplaceConstructorExplicitInCopyInitialization,
               &GrowableArrayTest::copyConstructPlainStruct,
               &GrowableArrayTest::moveConstructPlainStruct});
+
+    addRepeatedTests<GrowableArrayTest>({
+        &GrowableArrayTest::allocationAlignment<ArrayNewAllocator, 1>,
+        &GrowableArrayTest::allocationAlignment<ArrayNewAllocator, 2>,
+        &GrowableArrayTest::allocationAlignment<ArrayNewAllocator, 4>,
+        &GrowableArrayTest::allocationAlignment<ArrayNewAllocator, 8>,
+        &GrowableArrayTest::allocationAlignment<ArrayNewAllocator, 16>,
+        &GrowableArrayTest::allocationAlignment<ArrayMallocAllocator, 1>,
+        &GrowableArrayTest::allocationAlignment<ArrayMallocAllocator, 2>,
+        &GrowableArrayTest::allocationAlignment<ArrayMallocAllocator, 4>,
+        &GrowableArrayTest::allocationAlignment<ArrayMallocAllocator, 8>,
+        &GrowableArrayTest::allocationAlignment<ArrayMallocAllocator, 16>}, 100);
 
     addBenchmarks({
         &GrowableArrayTest::benchmarkAppendVector,
@@ -949,7 +965,7 @@ template<class T> void GrowableArrayTest::appendFromEmpty() {
         if(sizeof(std::size_t) == 8)
             CORRADE_COMPARE(arrayCapacity(a), 2);
         else {
-            /** @todo expose Implementation::MinAllocatedSize instead */
+            /** @todo expose Implementation::DefaultAllocationAlignment instead */
             #if !defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) || __STDCPP_DEFAULT_NEW_ALIGNMENT__ == 8 || defined(CORRADE_TARGET_EMSCRIPTEN)
             CORRADE_COMPARE(arrayCapacity(a), 1);
             #else
@@ -991,7 +1007,7 @@ template<class T> void GrowableArrayTest::appendFromNonGrowable() {
         if(sizeof(std::size_t) == 8)
             CORRADE_COMPARE(arrayCapacity(a), 2);
         else {
-            /** @todo expose Implementation::MinAllocatedSize instead */
+            /** @todo expose Implementation::DefaultAllocationAlignment instead */
             #if !defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) || __STDCPP_DEFAULT_NEW_ALIGNMENT__ == 8 || defined(CORRADE_TARGET_EMSCRIPTEN)
             CORRADE_COMPARE(arrayCapacity(a), 2);
             #else
@@ -1113,7 +1129,7 @@ void GrowableArrayTest::appendCopy() {
     if(sizeof(std::size_t) == 8)
         CORRADE_COMPARE(arrayCapacity(a), 2);
     else {
-        /** @todo expose Implementation::MinAllocatedSize instead */
+        /** @todo expose Implementation::DefaultAllocationAlignment instead */
         #if !defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) || __STDCPP_DEFAULT_NEW_ALIGNMENT__ == 8 || defined(CORRADE_TARGET_EMSCRIPTEN)
         CORRADE_COMPARE(arrayCapacity(a), 1);
         #else
@@ -1133,7 +1149,7 @@ void GrowableArrayTest::appendMove() {
         if(sizeof(std::size_t) == 8)
             CORRADE_COMPARE(arrayCapacity(a), 2);
         else {
-            /** @todo expose Implementation::MinAllocatedSize instead */
+            /** @todo expose Implementation::DefaultAllocationAlignment instead */
             #if !defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) || __STDCPP_DEFAULT_NEW_ALIGNMENT__ == 8 || defined(CORRADE_TARGET_EMSCRIPTEN)
             CORRADE_COMPARE(arrayCapacity(a), 1);
             #else
@@ -1241,7 +1257,7 @@ void GrowableArrayTest::appendGrowRatio() {
     } else {
         /* Double the size (minus sizeof(T)) until 64 bytes */
         arrayAppend(a, 1);
-        /** @todo expose Implementation::MinAllocatedSize instead */
+        /** @todo expose Implementation::DefaultAllocationAlignment instead */
         #if !defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__) || __STDCPP_DEFAULT_NEW_ALIGNMENT__ == 8 || defined(CORRADE_TARGET_EMSCRIPTEN)
         CORRADE_COMPARE(arrayCapacity(a), 1);
         #else
@@ -1650,7 +1666,7 @@ template<class T> void GrowableArrayTest::move() {
         CORRADE_COMPARE(Movable::destructed, 0);
     }
 
-    Array<T> b = std::move(a);
+    Array<T> b = Utility::move(a);
     CORRADE_VERIFY(arrayIsGrowable(b));
     CORRADE_VERIFY(!arrayIsGrowable(a));
     if(std::is_same<T, Movable>::value) {
@@ -1661,7 +1677,7 @@ template<class T> void GrowableArrayTest::move() {
     }
 
     Array<T> c{10};
-    c = std::move(b);
+    c = Utility::move(b);
     CORRADE_VERIFY(arrayIsGrowable(c));
     CORRADE_VERIFY(!arrayIsGrowable(b));
     if(std::is_same<T, Movable>::value) {
@@ -1676,7 +1692,7 @@ void GrowableArrayTest::cast() {
     Array<char> a;
     arrayResize(a, 10);
 
-    auto b = arrayAllocatorCast<std::uint16_t>(std::move(a));
+    auto b = arrayAllocatorCast<std::uint16_t>(Utility::move(a));
     CORRADE_COMPARE(b.size(), 5);
     CORRADE_COMPARE(a.data(), nullptr);
 }
@@ -1685,7 +1701,7 @@ void GrowableArrayTest::castEmpty() {
     Array<char> a;
 
     /* Shouldn't complain about any allocator, we're empty anyway */
-    auto b = arrayAllocatorCast<std::uint16_t>(std::move(a));
+    auto b = arrayAllocatorCast<std::uint16_t>(Utility::move(a));
     CORRADE_COMPARE(b.size(), 0);
 }
 
@@ -1699,7 +1715,7 @@ void GrowableArrayTest::castNonTrivial() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    arrayAllocatorCast<std::uint16_t>(std::move(a));
+    arrayAllocatorCast<std::uint16_t>(Utility::move(a));
     CORRADE_COMPARE(out.str(),
         "Containers::arrayAllocatorCast(): the array has to use the ArrayMallocAllocator or a derivative\n");
 }
@@ -1713,7 +1729,7 @@ void GrowableArrayTest::castNonGrowable() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    arrayAllocatorCast<std::uint16_t>(std::move(a));
+    arrayAllocatorCast<std::uint16_t>(Utility::move(a));
     CORRADE_COMPARE(out.str(),
         "Containers::arrayAllocatorCast(): the array has to use the ArrayMallocAllocator or a derivative\n");
 }
@@ -1728,7 +1744,7 @@ void GrowableArrayTest::castInvalid() {
 
     std::ostringstream out;
     Error redirectError{&out};
-    arrayAllocatorCast<std::uint32_t>(std::move(a));
+    arrayAllocatorCast<std::uint32_t>(Utility::move(a));
     CORRADE_COMPARE(out.str(),
         "Containers::arrayAllocatorCast(): can't reinterpret 10 1-byte items into a 4-byte type\n");
 }
@@ -1860,6 +1876,45 @@ void GrowableArrayTest::moveConstructPlainStruct() {
     CORRADE_COMPARE(a.size(), 16);
 }
 
+template<template<class> class> struct AllocatorName;
+template<> struct AllocatorName<ArrayNewAllocator> {
+    static const char* name() { return "ArrayNewAllocator"; }
+};
+template<> struct AllocatorName<ArrayMallocAllocator> {
+    static const char* name() { return "ArrayMallocAllocator"; }
+};
+
+template<std::size_t alignment> struct alignas(alignment) Aligned {
+    char foo;
+};
+
+template<template<class> class Allocator, std::size_t alignment> void GrowableArrayTest::allocationAlignment() {
+    setTestCaseTemplateName({AllocatorName<Allocator>::name(), std::to_string(alignment)});
+
+    if(alignment > Implementation::DefaultAllocationAlignment)
+        CORRADE_SKIP(alignment << Debug::nospace << "-byte alignment is larger than platform default allocation alignment, skipping");
+
+    /* Should always fit std::size_t, at least */
+    CORRADE_COMPARE_AS(Allocator<Aligned<alignment>>::AllocationOffset, sizeof(std::size_t),
+        TestSuite::Compare::GreaterOrEqual);
+
+    /* Offset should be aligned for the type */
+    CORRADE_COMPARE_AS(Allocator<Aligned<alignment>>::AllocationOffset, alignment,
+        TestSuite::Compare::Divisible);
+
+    /* We're not stupid with the assumptions, hopefully */
+    CORRADE_COMPARE(sizeof(Aligned<alignment>), alignof(Aligned<alignment>));
+
+    /* All (re)allocations should be aligned */
+    Array<Aligned<alignment>> a;
+    for(std::size_t i = 0; i != 100; ++i) {
+        CORRADE_ITERATION(i);
+        arrayAppend<Allocator>(a, Corrade::InPlaceInit, 'a');
+        CORRADE_COMPARE_AS(reinterpret_cast<std::uintptr_t>(a.data()), alignment,
+            TestSuite::Compare::Divisible);
+    }
+}
+
 void GrowableArrayTest::benchmarkAppendVector() {
     std::vector<Movable> vector;
     CORRADE_BENCHMARK(1) {
@@ -1915,14 +1970,6 @@ void GrowableArrayTest::benchmarkAppendTrivialVector() {
 
     CORRADE_COMPARE(vector.size(), 1000000);
 }
-
-template<template<class> class> struct AllocatorName;
-template<> struct AllocatorName<ArrayNewAllocator> {
-    static const char* name() { return "ArrayNewAllocator"; }
-};
-template<> struct AllocatorName<ArrayMallocAllocator> {
-    static const char* name() { return "ArrayMallocAllocator"; }
-};
 
 template<template<class> class Allocator> void GrowableArrayTest::benchmarkAppendTrivialArray() {
     setTestCaseTemplateName(AllocatorName<Allocator>::name());

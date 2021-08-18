@@ -40,7 +40,7 @@ class SemanticLevel;
 //! levels, regions and objects
 class SemanticScene {
  public:
-  ~SemanticScene() { LOG(INFO) << "Deconstructing SemanticScene"; }
+  ~SemanticScene() { ESP_DEBUG() << "Deconstructing SemanticScene"; }
   //! return axis aligned bounding box of this House
   box3f aabb() const { return bbox_; }
 
@@ -152,8 +152,9 @@ class SemanticScene {
   static bool checkFileExists(const std::string& filename,
                               const std::string& srcFunc) {
     if (!Cr::Utility::Directory::exists(filename)) {
-      LOG(ERROR) << "::" << srcFunc << " : File " << filename
-                 << " does not exist.  Aborting load.";
+      ESP_WARNING() << "::" << Magnum::Debug::nospace << srcFunc
+                    << Magnum::Debug::nospace << ": File" << filename
+                    << "does not exist.  Aborting load.";
       return false;
     }
     return true;
@@ -194,6 +195,8 @@ class SemanticScene {
    * expected to have been verified already.
    * @param jsonDoc the JSON document describing the semantic annotations.
    * @param scene reference to sceneNode to assign semantic scene to
+   * @param objectsExist whether objects cell exists in json. This cell will not
+   * exist in ReplicaCAD semantic lexicon.
    * @param rotation rotation to apply to semantic scene upon load.
    * @return successfully built. Currently only returns true, but retaining
    * return value for future support.
@@ -201,6 +204,7 @@ class SemanticScene {
   static bool buildReplicaHouse(
       const io::JsonDocument& jsonDoc,
       SemanticScene& scene,
+      bool objectsExist,
       const quatf& rotation = quatf::FromTwoVectors(-vec3f::UnitZ(),
                                                     geo::ESP_GRAVITY));
 

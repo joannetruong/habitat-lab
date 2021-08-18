@@ -58,18 +58,25 @@ if(${_index} GREATER -1)
 endif()
 
 macro(_basis_setup_source_file source)
-    # Handle export and import of imgui symbols via IMGUI_API
-    # definition in visibility.h of Magnum ImGuiIntegration.
-    set_property(SOURCE ${source} APPEND PROPERTY COMPILE_DEFINITIONS
-        BASISU_NO_ITERATOR_DEBUG_LEVEL)
+    # Basis shouldn't override the MSVC iterator debug level as it would make
+    # it inconsistent with the rest of the code
+    if(CORRADE_TARGET_WINDOWS)
+        set_property(SOURCE ${source} APPEND PROPERTY COMPILE_DEFINITIONS
+            BASISU_NO_ITERATOR_DEBUG_LEVEL)
+    endif()
 
     # Hide warnings from basis source files. There's thousands of -Wpedantic
     # ones which are hard to suppress on old GCCs (which have just -pedantic),
     # so simply give up and disable all.
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR (CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang"
-        AND NOT CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC") OR CORRADE_TARGET_EMSCRIPTEN)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CORRADE_TARGET_EMSCRIPTEN)
         set_property(SOURCE ${source} APPEND_STRING PROPERTY COMPILE_FLAGS
             " -w")
+    # Clang supports -w, but it doesn't have any effect on all the
+    # -Wall -Wold-style-cast etc flags specified before. -Wno-everything does.
+    # Funnily enough this is not an issue on Emscripten.;
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "(Apple)?Clang" AND NOT CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+        set_property(SOURCE ${source} APPEND_STRING PROPERTY COMPILE_FLAGS
+            " -Wno-everything")
     endif()
 endmacro()
 

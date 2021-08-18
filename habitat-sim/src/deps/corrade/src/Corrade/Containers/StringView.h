@@ -33,11 +33,12 @@
  */
 
 #include <cstddef>
-#include <utility>
+#include <initializer_list>
 
 #include "Corrade/Containers/Containers.h"
 #include "Corrade/Containers/EnumSet.h"
 #include "Corrade/Utility/Assert.h"
+#include "Corrade/Utility/Move.h"
 #include "Corrade/Utility/Utility.h"
 #include "Corrade/Utility/visibility.h"
 
@@ -158,7 +159,7 @@ of delimiter characters</li>
 <li>@ref join() and @ref joinWithoutEmptyParts() is an inverse of the
 above</li>
 <li>@ref partition() is similar to @ref split(), but always returning three
-elements with a clearly defined behavio, which can make certain code more
+elements with a clearly defined behavior, which can make certain code more
 robust while reducing the amount of possible error states</li>
 <li>@ref trimmed() (and its variants @ref trimmedPrefix() /
 @ref trimmedSuffix()), commonly used to remove leading and trailing
@@ -291,7 +292,7 @@ template<class T> class CORRADE_UTILITY_EXPORT BasicStringView {
            returns a std::vector. Besides that, to simplify the implementation,
            there's no const-adding conversion. Instead, the implementer is
            supposed to add an ArrayViewConverter variant for that. */
-        template<class U, class = decltype(Implementation::StringViewConverter<T, typename std::decay<U&&>::type>::from(std::declval<U&&>()))> constexpr /*implicit*/ BasicStringView(U&& other) noexcept: BasicStringView{Implementation::StringViewConverter<T, typename std::decay<U&&>::type>::from(std::forward<U>(other))} {}
+        template<class U, class = decltype(Implementation::StringViewConverter<T, typename std::decay<U&&>::type>::from(std::declval<U&&>()))> constexpr /*implicit*/ BasicStringView(U&& other) noexcept: BasicStringView{Implementation::StringViewConverter<T, typename std::decay<U&&>::type>::from(Utility::forward<U>(other))} {}
 
         /**
          * @brief Convert to an @ref ArrayView
@@ -486,7 +487,15 @@ template<class T> class CORRADE_UTILITY_EXPORT BasicStringView {
          * propagates the @ref flags() as appropriate.
          * @see @ref split(), @ref splitWithoutEmptyParts() const
          */
-        Array<BasicStringView<T>> splitWithoutEmptyParts(StringView delimiters) const;
+        Array<BasicStringView<T>> splitOnAnyWithoutEmptyParts(StringView delimiters) const;
+
+        #ifdef CORRADE_BUILD_DEPRECATED
+        /** @brief @copybrief splitOnAnyWithoutEmptyParts()
+         * @m_deprecated_since_latest Use @ref splitOnAnyWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnAnyWithoutEmptyParts() instead") Array<BasicStringView<T>> splitWithoutEmptyParts(StringView delimiters) const;
+        #endif
 
         /**
          * @brief Split on whitespace, removing empty parts
@@ -494,13 +503,21 @@ template<class T> class CORRADE_UTILITY_EXPORT BasicStringView {
          * Equivalent to calling @ref splitWithoutEmptyParts(StringView) const
          * with @cpp " \t\f\v\r\n" @ce passed to @p delimiters.
          */
-        Array<BasicStringView<T>> splitWithoutEmptyParts() const;
+        Array<BasicStringView<T>> splitOnWhitespaceWithoutEmptyParts() const;
+
+        #ifdef CORRADE_BUILD_DEPRECATED
+        /** @brief @copybrief splitOnWhitespaceWithoutEmptyParts()
+         * @m_deprecated_since_latest Use @ref splitOnWhitespaceWithoutEmptyParts()
+         *      instead.
+         */
+        CORRADE_DEPRECATED("use splitOnWhitespaceWithoutEmptyParts() instead") Array<BasicStringView<T>> splitWithoutEmptyParts() const;
+        #endif
 
         /**
          * @brief Partition
          *
          * Equivalent to Python's @m_class{m-doc-external} [str.partition()](https://docs.python.org/3/library/stdtypes.html#str.partition).
-         * Splits @p string at the first occurence of @p separator. First
+         * Splits @p string at the first occurrence of @p separator. First
          * returned value is the part before the separator, second the
          * separator, third a part after the separator. If the separator is not
          * found, returns the input string followed by two empty strings.
@@ -682,17 +699,36 @@ template<class T> class CORRADE_UTILITY_EXPORT BasicStringView {
          * variants. Those algorithms on the other hand have to perform certain
          * preprocessing of the input and keep extra state and due to that
          * overhead aren't generally suited for one-time searches.
+         *
+         * Consider using @ref find(char) const for single-byte substrings.
          * @see @ref contains()
          */
         BasicStringView<T> find(StringView substring) const;
 
         /**
+         * @brief Find a character
+         *
+         * Faster than @ref find(StringView) const if the string has just one
+         * byte.
+         */
+        BasicStringView<T> find(char character) const;
+
+        /**
          * @brief Whether the view contains a substring
          *
          * A slightly lighter variant of @ref find() useful when you only want
-         * to know if a substring was found or not.
+         * to know if a substring was found or not. Consider using
+         * @ref contains(char) const for single-byte substrings.
          */
         bool contains(StringView substring) const;
+
+        /**
+         * @brief Whether the view contains a character
+         *
+         * Faster than @ref contains(StringView) const if the string has just
+         * one byte.
+         */
+        bool contains(char character) const;
 
     private:
         /* Needed for mutable/immutable conversion */

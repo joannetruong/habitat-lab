@@ -22,6 +22,10 @@ def perform_general_tests(attr_mgr, search_string):
     template_id = attr_mgr.get_template_id_by_handle(template_handle)
     assert search_string in template_handle
 
+    # verify both handle and id exist in the manager
+    assert attr_mgr.get_library_has_handle(template_handle)
+    assert attr_mgr.get_library_has_id(template_id)
+
     # verify that access is the same for ID and handle lookup
     template0 = attr_mgr.get_template_by_handle(template_handle)
     template1 = attr_mgr.get_template_by_id(template_id)
@@ -93,6 +97,13 @@ def perform_general_tests(attr_mgr, search_string):
         new_iter_handle = new_handle_stub + str(i)
         tmplt_id = attr_mgr.register_template(template3, new_iter_handle)
         assert tmplt_id != -1
+
+    # retrieve a dictionary of all templates that were
+    # just created, using search on handle stub substring
+    new_template_dict = attr_mgr.get_templates_by_handle_substring(new_handle_stub)
+    assert len(new_template_dict) == num_to_add
+    for k, v in new_template_dict.items():
+        assert k == v.handle
 
     # lock all added templates
     locked_template_handles = attr_mgr.set_lock_by_substring(

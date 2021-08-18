@@ -60,6 +60,7 @@ Changelog
 -   Added a caster for :dox:`Containers::Optional`, allowing it to be used
     directly in function signatures and showing up on the Python side as either
     :py:`None` or the actual value
+-   Various documentation fixes (see :gh:`mosra/magnum-bindings#11`)
 
 `2020.06`_
 ==========
