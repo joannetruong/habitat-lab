@@ -76,7 +76,7 @@ class SpotSimv2(HabitatSim):
         self.first_setup = True
         self.is_render_obs = False
         self.fixed_base = False
-        
+        self.ordered_joints = np.arange(12) # hip out, hip forward, knee
         self.update_i = 0
         self.h_offset = 0.3
         self.ep_info = None
@@ -102,6 +102,7 @@ class SpotSimv2(HabitatSim):
         self.ac_freq_ratio = agent_config.AC_FREQ_RATIO
         # The physics update time step.
         self.ctrl_freq = agent_config.CTRL_FREQ
+        self.follow_robot = True # replace with config
         self.dt = 1/self.ctrl_freq
         # Effective control speed is (ctrl_freq/ac_freq_ratio)
 
@@ -274,6 +275,7 @@ class SpotSimv2(HabitatSim):
         #     raise ValueError()
 
         look_at = mn.Vector3(1, 0.0, 0.75)
+        cam_pos = mn.Vector3(0, 0.0, 0)
         look_at = robot_state.transform_point(look_at)
         # if self.pov_mode == 'move':
         #     agent_config = self.habitat_config
@@ -332,34 +334,33 @@ class SpotSimv2(HabitatSim):
             self.set_mtr_pos(n, a)
 
     def step(self, action): 
-        print('SPOT SIM STEP')
+        #print('SPOT SIM STEP')
         state = self.robot_wrapper.calc_state()
-        print('SPOT SIM STEP 0')
+        #print('SPOT SIM STEP 0')
         target_speed = np.array([action[0], action[1]])
         target_ang_vel = action[2]
-        print('SPOT SIM STEP 01')
+        #print('SPOT SIM STEP 01')
         latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
-        print('SPOT SIM STEP 02')
+        #print('SPOT SIM STEP 02')
         self.raibert_controller.update_latent_action(state, latent_action)
 
-        print('SPOT SIM STEP 1')
+        #print('SPOT SIM STEP 1')
         for i in range(self.time_per_step):
-            print('SPOT SIM STEP 2')
+            #print('SPOT SIM STEP 2')
             state = self.robot_wrapper.calc_state()
-            print('SPOT SIM STEP 3')
+            #print('SPOT SIM STEP 3')
             raibert_action = self.raibert_controller.get_action(state, i+1)
-            print('SPOT SIM STEP 4')
+            #print('SPOT SIM STEP 4')
             self.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
-            print('SPOT SIM STEP 5')
-            if follow_robot:
+            #print('SPOT SIM STEP 5')
+            if self.follow_robot:
                 self._follow_robot()
-            print('SPOT SIM STEP 6')
-
-            # while self.sim.get_world_time() < start_time + dt:
-            print('SPOT SIM STEP 6')
+            #print('SPOT SIM STEP 6')
             self._sim.step_physics(self.dt)
         sim_obs = self._sim.get_sensor_observations(0)
         observations = self._sensor_suite.get_observations(sim_obs)
+
+        
         return observations
 
     def get_agent_state(self, agent_id=0):

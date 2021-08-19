@@ -1346,11 +1346,11 @@ class VelocityAction(SimulatorTaskAction):
 
             return agent_observations
         else:
-            print('NAV STEPPING')
+            #print('NAV STEPPING')
             action = [linear_velocity, strafe_velocity, angular_velocity]
-            print('ACTION: ', action)
-            print('SELF._SIM: ', self._sim)
-            self._sim.step(action)
+            #print('ACTION: ', action)
+            #print('SELF._SIM: ', self._sim)
+            return self._sim.step(action)
             # print('SELF.ROBOT WRAPPER: ', self.robot_wrapper)
             # state = self.robot_wrapper.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
             # target_speed = np.array([action[0], action[1]])

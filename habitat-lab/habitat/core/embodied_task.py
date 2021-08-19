@@ -300,7 +300,11 @@ class EmbodiedTask:
         ), f"Can't find '{action_name}' action in {self.actions.keys()}."
 
         task_action = self.actions[action_name]
+        #print('TASK ACTION IS...')
+        #print(task_action)
+        #print('\n\n\n\n\n\n\n\n\n\n\n\n\n\n')
         observations = task_action.step(**action["action_args"], task=self)
+        #print(observations)
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations,

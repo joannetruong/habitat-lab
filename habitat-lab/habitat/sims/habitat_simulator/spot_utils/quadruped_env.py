@@ -78,7 +78,7 @@ class A1():
                 in the world. 'base_ori_euler' is the orientation of the robot
                 in euler angles.
         """
-        print('CALC STATE')
+        #print('CALC STATE')
 
         joint_positions = self.robot.joint_positions
         joint_velocities = self.robot.joint_velocities
