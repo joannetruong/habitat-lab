@@ -264,62 +264,25 @@ class SpotSimv2(HabitatSim):
         self.move_cam_pos += np.array(delta_xyz)
 
     def _follow_robot(self):
-        robot_state = self.robot_hab.transformation
-
-        node = self._sim._default_agent.scene_node
-
-        # if self.pov_mode == 'bird':
-        #     cam_pos = mn.Vector3(0.0, 0.0, 4.0)
-        # elif self.pov_mode == '3rd':
-        #     cam_pos = mn.Vector3(0.0, -1.2, 1.5)
-        # elif self.pov_mode == '1st':
-        #     cam_pos = mn.Vector3(0.17, 0.0, 0.90+self.h_offset)
-        # elif self.pov_mode == 'move':
-        #     cam_pos = mn.Vector3(*self.move_cam_pos)
-        # else:
-        #     raise ValueError()
-
-        look_at = mn.Vector3(1, 0.0, 0.75)
+        #robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
+        robot_state = self.robot.transformation
+        node = self.sim._default_agent.scene_node
+        self.h_offset = 0.69
         cam_pos = mn.Vector3(0, 0.0, 0)
+
+        look_at = mn.Vector3(1, 0.0, 0)
         look_at = robot_state.transform_point(look_at)
-        # if self.pov_mode == 'move':
-        #     agent_config = self.habitat_config
-        #     if 'LOOK_AT' in agent_config:
-        #         x,y,z = agent_config.LOOK_AT
-        #     else:
-        #         x,y,z = self.get_end_effector_pos()
-        #     look_at = mn.Vector3(x,y,z)
-        # else:
+
         cam_pos = robot_state.transform_point(cam_pos)
 
         node.transformation = mn.Matrix4.look_at(
                 cam_pos,
                 look_at,
-                mn.Vector3(0, -1, 0))
-        #print('node at  :', ['%.2f' % x for x in node.transformation.translation])
+                mn.Vector3(0, 1, 0))
 
         self.cam_trans = node.transformation
         self.cam_look_at = look_at
         self.cam_pos = cam_pos
-
-        # Lock all arm cameras to the end effector.
-        for k in self._sensors:
-            if 'arm' not in k:
-                continue
-            sens_obj = self._sensors[k]._sensor_object
-            cur_t = sens_obj.node.transformation
-
-            link_rigid_state = self._sim.get_articulated_link_rigid_state(self.robot_id, self.ee_link)
-            ee_trans = mn.Matrix4.from_(link_rigid_state.rotation.to_matrix(), link_rigid_state.translation)
-
-            offset_trans = mn.Matrix4.translation(mn.Vector3(0, 0.0, 0.1))
-            rot_trans = mn.Matrix4.rotation_y(mn.Deg(-90))
-            spin_trans = mn.Matrix4.rotation_z(mn.Deg(90))
-            arm_T = ee_trans @ offset_trans @ rot_trans @ spin_trans
-            sens_obj.node.transformation = node.transformation.inverted() @ arm_T
-
-        # Viz the camera position
-        #self.viz_marker = self.viz_pos(self.cam_pos, self.viz_marker)
 
     def set_mtr_pos(self, joint, ctrl):
         jms = self.robot_hab.get_joint_motor_settings(joint)
@@ -365,7 +328,6 @@ class SpotSimv2(HabitatSim):
         sim_obs = self._sim.get_sensor_observations(0)
         observations = self._sensor_suite.get_observations(sim_obs)
 
-        
         return observations
 
     def get_agent_state(self, agent_id=0):

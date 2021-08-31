@@ -41,6 +41,13 @@ from habitat.utils.geometry_utils import (
 from habitat.utils.visualizations import fog_of_war, maps
 from habitat_sim.bindings import RigidState
 from habitat_sim.physics import VelocityControl
+from habitat_sim.physics import MotionType
+import habitat_sim
+
+from .spot_utils.quadruped_env import A1, AlienGo, Laikago, Spot
+from .spot_utils.daisy_env import Daisy, Daisy_4legged
+from .spot_utils.raibert_controller import Raibert_controller
+from .spot_utils.raibert_controller import Raibert_controller_turn_stable
 
 try:
     from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
@@ -1182,6 +1189,7 @@ class VelocityAction(SimulatorTaskAction):
         self.vel_control.ang_vel_is_local = True
 
         config = kwargs["config"]
+        self.config = config
         self.min_lin_vel, self.max_lin_vel = config.LIN_VEL_RANGE
         self.min_strafe_vel, self.max_strafe_vel = config.STRAFE_VEL_RANGE
         self.min_ang_vel, self.max_ang_vel = config.ANG_VEL_RANGE
@@ -1196,6 +1204,21 @@ class VelocityAction(SimulatorTaskAction):
         self.oblong_robot = config.USE_OBLONG_ROBOT
         self.urdf_robot = config.USE_URDF_ROBOT
         self.counter = 0
+
+        self.robot_name = config.ROBOT
+        self.ac_freq_ratio = config.AC_FREQ_RATIO
+        self.ctrl_freq = config.CTRL_FREQ
+        self.dt = 1/self.ctrl_freq
+        self.pos_gain = np.ones((3,)) * 0.1 # 0.2
+        self.vel_gain = np.ones((3,)) * 1.0 # 1.5
+        self.pos_gain[2] = 0.1 # 0.7
+        self.vel_gain[2] = 1.0 # 1.5
+        self.robot_id = None
+        self.fixed_base = False
+        self.time_per_step = config.TIME_PER_STEP
+
+        self._load_robot()
+        
 
     @property
     def action_space(self):
@@ -1248,7 +1271,7 @@ class VelocityAction(SimulatorTaskAction):
         linear_velocity = (linear_velocity + 1.0) / 2.0
         strafe_velocity = (strafe_velocity + 1.0) / 2.0
         angular_velocity = (angular_velocity + 1.0) / 2.0
-        print(self._sim.robot_hab.transformation.translation)
+        
         # Scale actions
         linear_velocity = self.min_lin_vel + linear_velocity * (
             self.max_lin_vel - self.min_lin_vel
@@ -1350,17 +1373,131 @@ class VelocityAction(SimulatorTaskAction):
             action = [linear_velocity, strafe_velocity, angular_velocity]
 
             
-            self.counter = self.counter + 1
+            # self.counter = self.counter + 1
 
-            agent_observations = self._sim.step(action)
+            # agent_observations = self._sim.step(action)
 
 
-            img = agent_observations['rgb']
-            # print(type(img))
-            # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_' + str(self.counter) + '.jpg', (img.squeeze() * 255).astype(dtype=np.uint8))
-            if np.any(np.isnan(img)):
-                print('HAS NANSSSS')
+            # img = agent_observations['rgb']
+            # # print(type(img))
+            # # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_' + str(self.counter) + '.jpg', (img.squeeze() * 255).astype(dtype=np.uint8))
+            # if np.any(np.isnan(img)):
+            #     print('HAS NANSSSS')
+                    #print('SPOT SIM STEP')
+            state = self.robot_wrapper.calc_state()
+            #print('SPOT SIM STEP 0')
+            target_speed = np.array([action[0], action[1]])
+            target_ang_vel = action[2]
+            #print('SPOT SIM STEP 01')
+            latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+            #print('SPOT SIM STEP 02')
+            self.raibert_controller.update_latent_action(state, latent_action)
+
+            #print('SPOT SIM STEP 1')
+            for i in range(self.time_per_step):
+                #print('SPOT SIM STEP 2')
+                state = self.robot_wrapper.calc_state()
+                #print('SPOT SIM STEP 3')
+                raibert_action = self.raibert_controller.get_action(state, i+1)
+                #print('SPOT SIM STEP 4')
+                self.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
+                #print('SPOT SIM STEP 5')
+                if self.follow_robot:
+                    self._follow_robot()
+                #print('SPOT SIM STEP 6')
+                self._sim.step_physics(self.dt)
+            sim_obs = self._sim.get_sensor_observations(0)
+            agent_observations = self._sensor_suite.get_observations(sim_obs)
+
+
+            print('\n\n\n\n\nSTEPPING')
+            
             return agent_observations
+
+    def _load_robot(self):
+        print('loading robot')
+        if not self.config.get('LOAD_ROBOT', True):
+            return
+
+        if self.robot_id is None:
+            agent_config = self.config
+            robot_file = agent_config.ROBOT_URDF
+            art_obj_mgr = self._sim.get_articulated_object_manager()
+            # backend_cfg = habitat_sim.SimulatorConfiguration()
+            self.robot_hab = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=self.fixed_base)
+            self.robot_id = self.robot_hab.object_id
+            if self.robot_id == -1:
+                raise ValueError('Could not load ' + robot_file)
+
+        jms = []
+        jms.append(habitat_sim.physics.JointMotorSettings(
+                0,  # position_target
+                self.pos_gain[0],  # position_gain
+                0,  # velocity_target
+                self.vel_gain[0],  # velocity_gain
+                10.0,  # max_impulse
+            ))
+
+        jms.append(habitat_sim.physics.JointMotorSettings(
+                        0,  # position_target
+                        self.pos_gain[1],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[1],  # velocity_gain
+                        10.0,  # max_impulse
+                    ))
+        jms.append(habitat_sim.physics.JointMotorSettings(
+                        0,  # position_target
+                        self.pos_gain[2],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[2],  # velocity_gain
+                        10.0,  # max_impulse
+                    ))      
+        for i in range(12):
+            self.robot_hab.update_joint_motor(i, jms[np.mod(i,3)])
+        rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
+
+        if self.robot_name == 'A1':
+            self.robot_wrapper = A1(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+        elif self.robot_name == 'AlienGo':
+            self.robot_wrapper = AlienGo(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+        elif self.robot_name == 'Daisy':
+            self.robot_wrapper = Daisy(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+        elif self.robot_name == 'Laikago':
+            self.robot_wrapper = Laikago(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+        elif self.robot_name == 'Daisy_4legged':
+            self.robot_wrapper = Daisy4(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+        elif self.robot_name == 'Spot':
+            self.robot_wrapper = Spot(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
+
+        self.robot_wrapper.robot_specific_reset()
+        
+        # Set up Raibert controller and link it to spot
+        action_limit = np.zeros((12, 2))
+        action_limit[:, 0] = np.zeros(12) + np.pi / 2
+        action_limit[:, 1] = np.zeros(12) - np.pi / 2
+        self.raibert_controller = Raibert_controller_turn_stable(control_frequency=self.ctrl_freq, num_timestep_per_HL_action=self.time_per_step, robot=self.robot_name)
+        print('FINISHED LOADING ROBOT')
+
+    def _follow_robot(self):
+        #robot_state = self.sim.get_articulated_object_root_state(self.robot_id)
+        robot_state = self.robot_hab.transformation
+        node = self._sim._default_agent.scene_node
+        self.h_offset = 0.69
+        cam_pos = mn.Vector3(0, 0.0, 0)
+
+        look_at = mn.Vector3(1, 0.0, 0)
+        look_at = robot_state.transform_point(look_at)
+
+        cam_pos = robot_state.transform_point(cam_pos)
+
+        node.transformation = mn.Matrix4.look_at(
+                cam_pos,
+                look_at,
+                mn.Vector3(0, 1, 0))
+
+        self.cam_trans = node.transformation
+        self.cam_look_at = look_at
+        self.cam_pos = cam_pos
 
 
 

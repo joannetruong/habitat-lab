@@ -2,7 +2,7 @@ SEED: 100
 ENVIRONMENT:
   MAX_EPISODE_STEPS: 500
 SIMULATOR:
-  TYPE: "SpotSim-v1" # "Sim-v0" 
+  TYPE: "Sim-v0" # "Sim-v0" 
   ROBOT: 'Spot'
   ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
   AC_FREQ_RATIO: 4
@@ -41,6 +41,12 @@ TASK:
       SUCCESS_DISTANCE: 0.30
       USE_OBLONG_ROBOT: False
       USE_URDF_ROBOT: True
+      ROBOT: 'Spot'
+      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+      AC_FREQ_RATIO: 4
+      CTRL_FREQ: 120.0
+      ENABLE_PHYSICS: True
+      TIME_PER_STEP: 100
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
     GOAL_FORMAT: "POLAR"
