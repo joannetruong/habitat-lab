@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export GLOG_minloglevel=2
-export MAGNUM_LOG=quiet
+# export GLOG_minloglevel=2
+# export MAGNUM_LOG=quiet
 #export PYTHONPATH=$PYTHONPATH:/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-sim/
 cd ~/Documents/habspot/habitat_spot/habitat-lab/
 

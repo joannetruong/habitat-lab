@@ -1195,7 +1195,8 @@ class VelocityAction(SimulatorTaskAction):
         self.success_distance = config.SUCCESS_DISTANCE
         self.oblong_robot = config.USE_OBLONG_ROBOT
         self.urdf_robot = config.USE_URDF_ROBOT
-        print('SELF.URDF_ROBOT: ', self.urdf_robot)
+        self.counter = 0
+
     @property
     def action_space(self):
         if self.use_strafe_vel:
@@ -1215,6 +1216,7 @@ class VelocityAction(SimulatorTaskAction):
 
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
         task.is_stop_called = False  # type: ignore
+        
 
     def step(
         self,
@@ -1242,12 +1244,11 @@ class VelocityAction(SimulatorTaskAction):
             allow_sliding = self._sim.config.sim_cfg.allow_sliding  # type: ignore
         if time_step is None:
             time_step = self.time_step
-
         # Convert from [-1, 1] to [0, 1] range
         linear_velocity = (linear_velocity + 1.0) / 2.0
         strafe_velocity = (strafe_velocity + 1.0) / 2.0
         angular_velocity = (angular_velocity + 1.0) / 2.0
-
+        print(self._sim.robot_hab.transformation.translation)
         # Scale actions
         linear_velocity = self.min_lin_vel + linear_velocity * (
             self.max_lin_vel - self.min_lin_vel
@@ -1258,7 +1259,7 @@ class VelocityAction(SimulatorTaskAction):
         angular_velocity = self.min_ang_vel + angular_velocity * (
             self.max_ang_vel - self.min_ang_vel
         )
-        # print('lin_x: ', linear_velocity, ' strafe: ', strafe_velocity, ' ang vel: ', angular_velocity)
+
         # Stop is called if both linear/angular speed are below their threshold
         if not self.auto_stop:
             if (
@@ -1346,16 +1347,21 @@ class VelocityAction(SimulatorTaskAction):
 
             return agent_observations
         else:
-            #print('NAV STEPPING')
             action = [linear_velocity, strafe_velocity, angular_velocity]
-            #print('ACTION: ', action)
-            #print('SELF._SIM: ', self._sim)
-            return self._sim.step(action)
-            # print('SELF.ROBOT WRAPPER: ', self.robot_wrapper)
-            # state = self.robot_wrapper.calc_state(prev_state=self.prev_state, finite_diff=self.finite_diff)
-            # target_speed = np.array([action[0], action[1]])
-            # target_ang_vel = action[2]
-            # self._sim.step_physics(1/120.)
+
+            
+            self.counter = self.counter + 1
+
+            agent_observations = self._sim.step(action)
+
+
+            img = agent_observations['rgb']
+            # print(type(img))
+            # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_' + str(self.counter) + '.jpg', (img.squeeze() * 255).astype(dtype=np.uint8))
+            if np.any(np.isnan(img)):
+                print('HAS NANSSSS')
+            return agent_observations
+
 
 
 @registry.register_task(name="Nav-v0")
@@ -1366,7 +1372,8 @@ class NavigationTask(EmbodiedTask):
         super().__init__(config=config, sim=sim, dataset=dataset)
 
     def overwrite_sim_config(self, sim_config: Any, episode: Episode) -> Any:
-        return merge_sim_episode_config(sim_config, episode)
+        merged_config = merge_sim_episode_config(sim_config, episode)
+        return merged_config
 
     def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:
         return not getattr(self, "is_stop_called", False)

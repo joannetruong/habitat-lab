@@ -2,7 +2,7 @@ SEED: 100
 ENVIRONMENT:
   MAX_EPISODE_STEPS: 500
 SIMULATOR:
-  TYPE: "SpotSim-v1"
+  TYPE: "SpotSim-v1" # "Sim-v0" 
   ROBOT: 'Spot'
   ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
   AC_FREQ_RATIO: 4

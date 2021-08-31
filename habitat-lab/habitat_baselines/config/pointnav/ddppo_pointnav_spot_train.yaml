@@ -11,8 +11,8 @@ EVAL_CKPT_PATH_DIR: '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_resul
 CHECKPOINT_FOLDER:  '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 TXT_DIR:            '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 8
-SENSORS: ["DEPTH_SENSOR"]
+NUM_ENVIRONMENTS: 2
+SENSORS: ["RGB_SENSOR"]
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 2e8
 LOG_INTERVAL: 10
@@ -67,7 +67,7 @@ RL:
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights
-    pretrained_encoder: True
+    pretrained_encoder: False
     # Whether or not the visual encoder backbone will be trained.
     train_encoder: False
     # Whether or not to reset the critic linear layer

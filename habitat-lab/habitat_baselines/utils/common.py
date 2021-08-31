@@ -114,7 +114,6 @@ class GaussianNet(nn.Module):
     def forward(self, x: Tensor) -> CustomNormal:
         mu = self.mu(x)
 
-        print(mu)
 
         if self.config.action_activation == "tanh":
             mu = torch.tanh(mu)

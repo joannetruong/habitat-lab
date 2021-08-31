@@ -51,6 +51,7 @@ class SpotTask(NavigationTask):
         super().__init__(**kwargs)
 
     def overwrite_sim_config(self, sim_config, episode):
+        print('In SpotTask-v0')
         return merge_sim_episode_with_object_config(sim_config, episode)
 
 
@@ -66,12 +67,11 @@ EE_GRIPPER_OFFSET = mn.Vector3(0.08,0,0)
 @registry.register_simulator(name="SpotSim-v1")
 class SpotSimv2(HabitatSim):
     def __init__(self, config):
-
         super().__init__(config)
         print('INIT SPOT SIM')
 
         agent_config = self.habitat_config
-        #self.navmesh_settings = get_nav_mesh_settings(self._get_agent_config())
+        
         self.robot_id = None
         self.first_setup = True
         self.is_render_obs = False
@@ -111,6 +111,8 @@ class SpotSimv2(HabitatSim):
         self.track_markers = []
         self._goal_pos = None
         self._load_robot()
+        
+
 
     def set_agent_state(
         self,
@@ -119,11 +121,13 @@ class SpotSimv2(HabitatSim):
         agent_id,
         reset_sensors=True,
     ):
+        
         self.set_robot_pos(position)
+
         xyzw_quat = [rotation[-1], rotation[0], rotation[1], rotation[2]]
         roll, yaw, pitch = squaternion.Quaternion(*xyzw_quat).to_euler()
-        self.set_robot_rot(yaw)
         
+        self.set_robot_rot(yaw)
         # self.robot_hab.translation = mn.Vector3(position)
         # self.robot_hab.rotation = rotation
 
@@ -136,6 +140,7 @@ class SpotSimv2(HabitatSim):
         # agent.set_state(new_state, reset_sensors)
         # print('SPOT SIM SET AGENT STATE 3')
         self.reset_robot()
+        
         return True
 
     def reset(self):
