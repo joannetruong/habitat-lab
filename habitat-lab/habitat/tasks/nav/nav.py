@@ -1216,8 +1216,16 @@ class VelocityAction(SimulatorTaskAction):
         self.robot_id = None
         self.fixed_base = False
         self.time_per_step = config.TIME_PER_STEP
+        self.follow_robot = True
+        self.start_position = None
 
         self._load_robot()
+        print('Finished loading robot')
+        self.init_state = self.robot_wrapper.calc_state()
+
+        # SET THE CORRECT INITIAL STATE????
+        self.raibert_controller.set_init_state(self.init_state)
+        
         
 
     @property
@@ -1238,8 +1246,66 @@ class VelocityAction(SimulatorTaskAction):
             )
 
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
+       
+        self.start_position = kwargs['episode'].start_position
+
+        print('Rest 0')
+        #self.set_robot_pos(kwargs['episode'].start_position)
+        print('Reset 1')
+        #self.set_robot_rot(kwargs['episode'].start_rotation)
+        self.set_init_state(kwargs['episode'].start_position,kwargs['episode'].start_rotation)
+        print('Reset 2')
         task.is_stop_called = False  # type: ignore
+        # print(self.robot_hab.transformation.translation)
+
+    def set_init_state(self, pos, rot):
+        rotation = mn.Quaternion.identity_init()
+        print('rotation0')
+        rotation.vector = mn.Vector3(rot[1], rot[2], rot[3])
+        print('rotation1')
+        rotation.scalar = rot[0]
+        print('rotation2')
+        print(rotation.axis())
+        print(rotation.angle())
+        transform = mn.Matrix4.rotation(rotation.angle(), rotation.axis())
+        print('rotation3')
+        transform.translation = mn.Vector3(pos[0], pos[1], pos[2])
+        print('rotation4')
+
+        print(transform)
+
+        self.robot_hab.transformation = transform
+
+    def set_robot_pos(self, set_pos):
+        """
+        - set_pos: 2D coordinates of where the robot will be placed. The height
+          will be same as current position.
+        """
+        base_transform = self.robot_hab.transformation
+        pos = base_transform.translation
+        base_transform.translation = mn.Vector3(set_pos[0], set_pos[1], set_pos[2])
+        # self._sim.set_articulated_object_root_state(self.robot_id, base_transform)
+        self.robot_hab.translation = base_transform.translation
+
+    def set_robot_rot(self, rot_quat):
+        """
+        Set the rotation of the robot along the y-axis. The position will
+        remain the same.
+        """
+        cur_trans = self.robot_hab.transformation
+
         
+        rot = mn.Quaternion().identity_init()
+
+        rot.vector = mn.Vector3()
+        self.robot_hab.transformation.rotation = rot
+
+        # rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
+        # add_rot_mat = mn.Matrix4.rotation(mn.Rad(rot_rad), mn.Vector3(0.0, 0, 1))
+        # new_trans = rot_trans @ add_rot_mat
+        # new_trans.translation = pos
+        # self.robot_hab.transformation.rotation = mn.Quaternion.from_matrix(new_trans.rotation()) 
+        # self._sim.set_articulated_object_root_state(self.robot_id, new_trans)
 
     def step(
         self,
@@ -1263,6 +1329,7 @@ class VelocityAction(SimulatorTaskAction):
             time_step: amount of time to move the agent for
             allow_sliding: whether the agent will slide on collision
         """
+        
         if allow_sliding is None:
             allow_sliding = self._sim.config.sim_cfg.allow_sliding  # type: ignore
         if time_step is None:
@@ -1370,6 +1437,8 @@ class VelocityAction(SimulatorTaskAction):
 
             return agent_observations
         else:
+            
+
             action = [linear_velocity, strafe_velocity, angular_velocity]
 
             
@@ -1385,14 +1454,16 @@ class VelocityAction(SimulatorTaskAction):
             #     print('HAS NANSSSS')
                     #print('SPOT SIM STEP')
             state = self.robot_wrapper.calc_state()
+            
             #print('SPOT SIM STEP 0')
-            target_speed = np.array([action[0], action[1]])
-            target_ang_vel = action[2]
+            target_speed = np.array([action[0], action[1]]) 
+            target_ang_vel = action[2] 
             #print('SPOT SIM STEP 01')
             latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
             #print('SPOT SIM STEP 02')
+            #print('SPOT SIM STEP 0')
             self.raibert_controller.update_latent_action(state, latent_action)
-
+            
             #print('SPOT SIM STEP 1')
             for i in range(self.time_per_step):
                 #print('SPOT SIM STEP 2')
@@ -1400,17 +1471,26 @@ class VelocityAction(SimulatorTaskAction):
                 #print('SPOT SIM STEP 3')
                 raibert_action = self.raibert_controller.get_action(state, i+1)
                 #print('SPOT SIM STEP 4')
-                self.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
+                self.robot_wrapper.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
                 #print('SPOT SIM STEP 5')
-                if self.follow_robot:
-                    self._follow_robot()
+                
                 #print('SPOT SIM STEP 6')
                 self._sim.step_physics(self.dt)
+            #print('SPOT SIM STEP 7')
+            if self.follow_robot:
+                self._follow_robot()
             sim_obs = self._sim.get_sensor_observations(0)
-            agent_observations = self._sensor_suite.get_observations(sim_obs)
+            agent_observations = self._sim._sensor_suite.get_observations(sim_obs)
+            # img = agent_observations['rgb']
+            
+            # #print(type(img))
+            # img = (img.squeeze() * 255).astype(dtype=np.uint8)
+            # font = cv2.FONT_HERSHEY_SIMPLEX
+            # cv2.putText(img, str(self.robot_hab.transformation.translation), (20, 20), font, 0.5, (0, 0, 0), 2)
+            # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_'  + str(int(10*self.start_position[0])) + '_' + str(self.counter) + '.jpg', img)
+            #print('SPOT SIM 8')
 
-
-            print('\n\n\n\n\nSTEPPING')
+            self.counter += 1
             
             return agent_observations
 

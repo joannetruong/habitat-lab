@@ -142,11 +142,14 @@ class A1():
         Args:
             a (list): List of floats. Length must be equal to len(self.ordered_joints).
         """
+        #print("ARA 0")
         assert (np.isfinite(action).all())
         assert len(action) == len(self.ordered_joints)
+        #print("ARA 1")
         for n, j in enumerate(self.ordered_joints):
             a = float(np.clip(action[n], -np.pi/2, np.pi/2)) 
             self.set_mtr_pos(n, a)
+        #print("ARA 2")
 
     def robot_specific_reset(self, joint_pos=None):
         if joint_pos is None:
