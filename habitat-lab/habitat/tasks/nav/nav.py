@@ -1214,17 +1214,11 @@ class VelocityAction(SimulatorTaskAction):
         self.pos_gain[2] = 0.1 # 0.7
         self.vel_gain[2] = 1.0 # 1.5
         self.robot_id = None
+        self.robot_hab = None
         self.fixed_base = False
         self.time_per_step = config.TIME_PER_STEP
         self.follow_robot = True
         self.start_position = None
-
-        self._load_robot()
-        print('Finished loading robot')
-        self.init_state = self.robot_wrapper.calc_state()
-
-        # SET THE CORRECT INITIAL STATE????
-        self.raibert_controller.set_init_state(self.init_state)
 
     @property
     def action_space(self):
@@ -1244,10 +1238,18 @@ class VelocityAction(SimulatorTaskAction):
             )
 
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
-       
+        if self.robot_hab is None or self.robot_hab.object_id == -1:
+            self._load_robot()
+            print('Finished loading robot')
+            self.init_state = self.robot_wrapper.calc_state()
+
+            # SET THE CORRECT INITIAL STATE????
+            self.raibert_controller.set_init_state(self.init_state)
+
         self.start_position = kwargs['episode'].start_position
 
         self.set_init_state(kwargs['episode'].start_position,kwargs['episode'].start_rotation)
+        print('robot init state: ', self.robot_hab.translation)
         task.is_stop_called = False  # type: ignore
         # print(self.robot_hab.transformation.translation)
 
