@@ -396,7 +396,7 @@ class EpisodicCompassSensor(HeadingSensor):
     ):
         agent_state = self._sim.get_agent_state()
         rotation_world_agent = agent_state.rotation
-        rotation_world_start = quaternion_from_coeff(episode.start_rotation)
+        rotation_world_start = quaternion_from_coeff(episode.START_ROTATION)
 
         return self._quat_to_xy_heading(
             rotation_world_agent.inverse() * rotation_world_start
@@ -1225,8 +1225,6 @@ class VelocityAction(SimulatorTaskAction):
 
         # SET THE CORRECT INITIAL STATE????
         self.raibert_controller.set_init_state(self.init_state)
-        
-        
 
     @property
     def action_space(self):
@@ -1249,32 +1247,56 @@ class VelocityAction(SimulatorTaskAction):
        
         self.start_position = kwargs['episode'].start_position
 
-        print('Rest 0')
-        #self.set_robot_pos(kwargs['episode'].start_position)
-        print('Reset 1')
-        #self.set_robot_rot(kwargs['episode'].start_rotation)
         self.set_init_state(kwargs['episode'].start_position,kwargs['episode'].start_rotation)
-        print('Reset 2')
         task.is_stop_called = False  # type: ignore
         # print(self.robot_hab.transformation.translation)
 
+    def convert_pose(self, pos, rot):
+        # ROT IN W X Y Z, both are lists
+        def quaternion_rotate_vector(quat, v):
+            r"""Rotates a vector by a quaternion
+            Args:
+                quaternion: The quaternion to rotate by
+                v: The vector to rotate
+            Returns:
+                np.array: The rotated vector
+            """
+            vq = np.quaternion(0, 0, 0, 0)
+            vq.imag = v
+            return (quat * vq * quat.inverse()).imag
+
+
+        def quat_to_rad(rotation):
+            heading_vector = quaternion_rotate_vector(
+                rotation.inverse(), np.array([0, 0, -1])
+            )
+            phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+            return phi
+
+        heading = np.quaternion(*rot)
+        heading = -quat_to_rad(heading) + np.pi / 2
+
+        next_rs = mn.Matrix4.rotation_y(
+            mn.Rad(-heading),
+        ).__matmul__(
+            mn.Matrix4.rotation(
+                mn.Rad(np.pi),
+                mn.Vector3((0.0, 1.0, 0.0)),
+            )
+        ).__matmul__(
+            mn.Matrix4.rotation(
+                mn.Rad(-np.pi / 2.0),
+                mn.Vector3((1.0, 0.0, 0.0)),
+            )
+        )
+        next_rs.translation = np.array([*pos]) + np.array([0.0, 0.425, 0.0])
+        return next_rs
+
     def set_init_state(self, pos, rot):
-        rotation = mn.Quaternion.identity_init()
-        print('rotation0')
-        rotation.vector = mn.Vector3(rot[1], rot[2], rot[3])
-        print('rotation1')
-        rotation.scalar = rot[0]
-        print('rotation2')
-        print(rotation.axis())
-        print(rotation.angle())
-        transform = mn.Matrix4.rotation(rotation.angle(), rotation.axis())
-        print('rotation3')
-        transform.translation = mn.Vector3(pos[0], pos[1], pos[2])
-        print('rotation4')
+        wxyz_rot = [rot[3], rot[0], rot[1], rot[2]]
+        next_rs = self.convert_pose(pos, wxyz_rot)
 
-        print(transform)
-
-        self.robot_hab.transformation = transform
+        self.robot_hab.transformation = next_rs
 
     def set_robot_pos(self, set_pos):
         """
@@ -1380,119 +1402,126 @@ class VelocityAction(SimulatorTaskAction):
             [0.0, angular_velocity, 0.0]
         )
         
-        if not self.urdf_robot:
-            agent_state = self._sim.get_agent_state()
+        # if not self.urdf_robot:
+        agent_state = self._sim.get_agent_state()
 
-            # Convert from np.quaternion to mn.Quaternion
-            normalized_quaternion = agent_state.rotation
-            agent_mn_quat = mn.Quaternion(
-                normalized_quaternion.imag, normalized_quaternion.real
-            )
-            current_rigid_state = RigidState(
-                agent_mn_quat,
-                agent_state.position,
-            )
+        # Convert from np.quaternion to mn.Quaternion
+        normalized_quaternion = agent_state.rotation
+        agent_mn_quat = mn.Quaternion(
+            normalized_quaternion.imag, normalized_quaternion.real
+        )
+        current_rigid_state = RigidState(
+            agent_mn_quat,
+            agent_state.position,
+        )
 
-            # manually integrate the rigid state
-            goal_rigid_state = self.vel_control.integrate_transform(
-                time_step, current_rigid_state
-            )
+        # manually integrate the rigid state
+        goal_rigid_state = self.vel_control.integrate_transform(
+            time_step, current_rigid_state
+        )
 
-            # snap rigid state to navmesh and set state to object/agent
-            if allow_sliding:
-                step_fn = self._sim.pathfinder.try_step  # type: ignore
-            else:
-                step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
-
-            final_position = step_fn(
-                agent_state.position, goal_rigid_state.translation
-            )
-            final_rotation = [
-                *goal_rigid_state.rotation.vector,
-                goal_rigid_state.rotation.scalar,
-            ]
-
-            # Check if a collision occured
-            dist_moved_before_filter = (
-                goal_rigid_state.translation - agent_state.position
-            ).dot()
-            dist_moved_after_filter = (final_position - agent_state.position).dot()
-
-            # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
-            # collision _didn't_ happen. One such case is going up stairs.  Instead,
-            # we check to see if the the amount moved after the application of the
-            # filter is _less_ than the amount moved before the application of the
-            # filter.
-            EPS = 1e-5
-            collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
-
-            agent_observations = self._sim.get_observations_at(
-                position=final_position,
-                rotation=final_rotation,
-                keep_agent_at_new_pose=True,
-            )
-
-            # TODO: Make a better way to flag collisions
-            self._sim._prev_sim_obs["collided"] = collided  # type: ignore
-
-            return agent_observations
+        # snap rigid state to navmesh and set state to object/agent
+        if allow_sliding:
+            step_fn = self._sim.pathfinder.try_step  # type: ignore
         else:
+            step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
+
+        final_position = step_fn(
+            agent_state.position, goal_rigid_state.translation
+        )
+        final_rotation = [
+            *goal_rigid_state.rotation.vector,
+            goal_rigid_state.rotation.scalar,
+        ]
+        # Transform goal pose and snap URDF to goal pose
+        pos = [goal_rigid_state.translation[0], goal_rigid_state.translation[1], goal_rigid_state.translation[2]]
+        wxyz_rot = [goal_rigid_state.rotation.scalar, *goal_rigid_state.rotation.vector]
+        next_rs = self.convert_pose(pos, wxyz_rot)
+        
+        self.robot_hab.transformation = next_rs
+        
+        # Check if a collision occured
+        dist_moved_before_filter = (
+            goal_rigid_state.translation - agent_state.position
+        ).dot()
+        dist_moved_after_filter = (final_position - agent_state.position).dot()
+
+        # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
+        # collision _didn't_ happen. One such case is going up stairs.  Instead,
+        # we check to see if the the amount moved after the application of the
+        # filter is _less_ than the amount moved before the application of the
+        # filter.
+        EPS = 1e-5
+        collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
+
+        agent_observations = self._sim.get_observations_at(
+            position=final_position,
+            rotation=final_rotation,
+            keep_agent_at_new_pose=True,
+        )
+
+
+        # TODO: Make a better way to flag collisions
+        self._sim._prev_sim_obs["collided"] = collided  # type: ignore
+
+        return agent_observations
+        # else:
             
 
-            action = [linear_velocity, strafe_velocity, angular_velocity]
+        #     action = [linear_velocity, strafe_velocity, angular_velocity]
 
             
-            # self.counter = self.counter + 1
+        #     # self.counter = self.counter + 1
 
-            # agent_observations = self._sim.step(action)
+        #     # agent_observations = self._sim.step(action)
 
 
-            # img = agent_observations['rgb']
-            # # print(type(img))
-            # # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_' + str(self.counter) + '.jpg', (img.squeeze() * 255).astype(dtype=np.uint8))
-            # if np.any(np.isnan(img)):
-            #     print('HAS NANSSSS')
-                    #print('SPOT SIM STEP')
-            state = self.robot_wrapper.calc_state()
+        #     # img = agent_observations['rgb']
+        #     # # print(type(img))
+        #     # # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_' + str(self.counter) + '.jpg', (img.squeeze() * 255).astype(dtype=np.uint8))
+        #     # if np.any(np.isnan(img)):
+        #     #     print('HAS NANSSSS')
+        #             #print('SPOT SIM STEP')
+        #     state = self.robot_wrapper.calc_state()
             
-            #print('SPOT SIM STEP 0')
-            target_speed = np.array([action[0], action[1]]) 
-            target_ang_vel = action[2] 
-            #print('SPOT SIM STEP 01')
-            latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
-            #print('SPOT SIM STEP 02')
-            #print('SPOT SIM STEP 0')
-            self.raibert_controller.update_latent_action(state, latent_action)
+        #     #print('SPOT SIM STEP 0')
+        #     target_speed = np.array([action[0], action[1]]) 
+        #     target_ang_vel = action[2] 
+        #     #print('SPOT SIM STEP 01')
+        #     latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+        #     #print('SPOT SIM STEP 02')
+        #     #print('SPOT SIM STEP 0')
+        #     self.raibert_controller.update_latent_action(state, latent_action)
             
-            #print('SPOT SIM STEP 1')
-            for i in range(self.time_per_step):
-                #print('SPOT SIM STEP 2')
-                state = self.robot_wrapper.calc_state()
-                #print('SPOT SIM STEP 3')
-                raibert_action = self.raibert_controller.get_action(state, i+1)
-                #print('SPOT SIM STEP 4')
-                self.robot_wrapper.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
-                #print('SPOT SIM STEP 5')
+        #     #print('SPOT SIM STEP 1')
+        #     for i in range(self.time_per_step):
+        #         #print('SPOT SIM STEP 2')
+        #         state = self.robot_wrapper.calc_state()
+        #         #print('SPOT SIM STEP 3')
+        #         raibert_action = self.raibert_controller.get_action(state, i+1)
+        #         #print('SPOT SIM STEP 4')
+        #         self.robot_wrapper.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
+        #         #print('SPOT SIM STEP 5')
                 
-                #print('SPOT SIM STEP 6')
-                self._sim.step_physics(self.dt)
-            #print('SPOT SIM STEP 7')
-            if self.follow_robot:
-                self._follow_robot()
-            sim_obs = self._sim.get_sensor_observations(0)
-            agent_observations = self._sim._sensor_suite.get_observations(sim_obs)
-            # img = agent_observations['rgb']
+        #         #print('SPOT SIM STEP 6')
+        #         self._sim.step_physics(self.dt)
+        #     #print('SPOT SIM STEP 7')
+        #     if self.follow_robot:
+        #         self._follow_robot()
+        #     sim_obs = self._sim.get_sensor_observations(0)
+        #     agent_observations = self._sim._sensor_suite.get_observations(sim_obs)
+        #     # img = agent_observations['rgb']
             
-            # #print(type(img))
-            # img = (img.squeeze() * 255).astype(dtype=np.uint8)
-            # font = cv2.FONT_HERSHEY_SIMPLEX
-            # cv2.putText(img, str(self.robot_hab.transformation.translation), (20, 20), font, 0.5, (0, 0, 0), 2)
-            # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_'  + str(int(10*self.start_position[0])) + '_' + str(self.counter) + '.jpg', img)
-            #print('SPOT SIM 8')
+        #     # #print(type(img))
+        #     # img = (img.squeeze() * 255).astype(dtype=np.uint8)
+        #     # font = cv2.FONT_HERSHEY_SIMPLEX
+        #     # cv2.putText(img, str(self.robot_hab.transformation.translation), (20, 20), font, 0.5, (0, 0, 0), 2)
+        #     # cv2.imwrite('/srv/share3/mrudolph8/test_imgs/imgs/rgb_img_'  + str(int(10*self.start_position[0])) + '_' + str(self.counter) + '.jpg', img)
+        #     #print('SPOT SIM 8')
 
-            self.counter += 1
+        #     self.counter += 1
             
-            return agent_observations
+        #     return agent_observations
 
     def _load_robot(self):
         print('loading robot')
