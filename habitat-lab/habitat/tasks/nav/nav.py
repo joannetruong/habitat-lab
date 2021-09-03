@@ -1249,7 +1249,6 @@ class VelocityAction(SimulatorTaskAction):
         self.start_position = kwargs['episode'].start_position
 
         self.set_init_state(kwargs['episode'].start_position,kwargs['episode'].start_rotation)
-        print('robot init state: ', self.robot_hab.translation)
         task.is_stop_called = False  # type: ignore
         # print(self.robot_hab.transformation.translation)
 
@@ -1530,15 +1529,13 @@ class VelocityAction(SimulatorTaskAction):
         if not self.config.get('LOAD_ROBOT', True):
             return
 
-        if self.robot_id is None:
-            agent_config = self.config
-            robot_file = agent_config.ROBOT_URDF
-            art_obj_mgr = self._sim.get_articulated_object_manager()
-            # backend_cfg = habitat_sim.SimulatorConfiguration()
-            self.robot_hab = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=self.fixed_base)
-            self.robot_id = self.robot_hab.object_id
-            if self.robot_id == -1:
-                raise ValueError('Could not load ' + robot_file)
+        agent_config = self.config
+        robot_file = agent_config.ROBOT_URDF
+        art_obj_mgr = self._sim.get_articulated_object_manager()
+        # backend_cfg = habitat_sim.SimulatorConfiguration()
+        self.robot_hab = art_obj_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=self.fixed_base)
+        if self.robot_hab.object_id == -1:
+            raise ValueError('Could not load ' + robot_file)
 
         jms = []
         jms.append(habitat_sim.physics.JointMotorSettings(
