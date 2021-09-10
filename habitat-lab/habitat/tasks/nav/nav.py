@@ -48,6 +48,7 @@ from .spot_utils.quadruped_env import A1, AlienGo, Laikago, Spot
 from .spot_utils.daisy_env import Daisy, Daisy_4legged
 from .spot_utils.raibert_controller import Raibert_controller
 from .spot_utils.raibert_controller import Raibert_controller_turn_stable
+import squaternion
 
 try:
     from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
@@ -1206,7 +1207,6 @@ class VelocityAction(SimulatorTaskAction):
         self.counter = 0
 
         self.robot_name = config.ROBOT
-        self.ac_freq_ratio = config.AC_FREQ_RATIO
         self.ctrl_freq = config.CTRL_FREQ
         self.dt = 1/self.ctrl_freq
         self.pos_gain = np.ones((3,)) * 0.1 # 0.2
@@ -1218,6 +1218,7 @@ class VelocityAction(SimulatorTaskAction):
         self.fixed_base = False
         self.time_per_step = config.TIME_PER_STEP
         self.follow_robot = True
+        self.make_video = True
         self.start_position = None
 
     @property
@@ -1241,61 +1242,99 @@ class VelocityAction(SimulatorTaskAction):
         if self.robot_hab is None or self.robot_hab.object_id == -1:
             self._load_robot()
             print('Finished loading robot')
+            self.start_position = kwargs['episode'].start_position
+
+            self.set_init_state(kwargs['episode'].start_position, kwargs['episode'].start_rotation)
+            task.is_stop_called = False 
+
             self.init_state = self.robot_wrapper.calc_state()
 
             # SET THE CORRECT INITIAL STATE????
             self.raibert_controller.set_init_state(self.init_state)
 
-        self.start_position = kwargs['episode'].start_position
-
-        self.set_init_state(kwargs['episode'].start_position,kwargs['episode'].start_rotation)
-        task.is_stop_called = False  # type: ignore
         # print(self.robot_hab.transformation.translation)
 
-    def convert_pose(self, pos, rot):
+    def quat_to_rad(self, rotation):
+        heading_vector = quaternion_rotate_vector(
+            rotation.inverse(), np.array([0, 0, -1])
+        )
+        phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+        return phi
+
+    def convert_pose_to_robot(self, pos, rot):
         # ROT IN W X Y Z, both are lists
-        def quaternion_rotate_vector(quat, v):
-            r"""Rotates a vector by a quaternion
-            Args:
-                quaternion: The quaternion to rotate by
-                v: The vector to rotate
-            Returns:
-                np.array: The rotated vector
-            """
-            vq = np.quaternion(0, 0, 0, 0)
-            vq.imag = v
-            return (quat * vq * quat.inverse()).imag
-
-
-        def quat_to_rad(rotation):
-            heading_vector = quaternion_rotate_vector(
-                rotation.inverse(), np.array([0, 0, -1])
-            )
-            phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-            return phi
-
-        heading = np.quaternion(*rot)
-        heading = -quat_to_rad(heading) + np.pi / 2
+        heading = np.quaternion(*rot) # np.quaternion takes in as input W X Y Z
+        heading = -self.quat_to_rad(heading) + np.pi / 2
 
         next_rs = mn.Matrix4.rotation_y(
             mn.Rad(-heading),
         ).__matmul__(
             mn.Matrix4.rotation(
-                mn.Rad(np.pi),
+                mn.Rad(np.pi), # rotate 180 deg in yaw
                 mn.Vector3((0.0, 1.0, 0.0)),
             )
         ).__matmul__(
             mn.Matrix4.rotation(
-                mn.Rad(-np.pi / 2.0),
+                mn.Rad(-np.pi / 2.0), # rotate 90 deg in roll
                 mn.Vector3((1.0, 0.0, 0.0)),
             )
         )
         next_rs.translation = np.array([*pos]) + np.array([0.0, 0.425, 0.0])
         return next_rs
 
+    def convert_pose_from_robot(self, rigid_state):
+        # pos as a mn.Vector3
+        # ROT is list, W X Y Z
+        # np.quaternion takes in as input W X Y Z
+        rot = [
+            rigid_state.rotation.scalar, 
+            *rigid_state.rotation.vector,
+        ]
+        heading = np.quaternion(*rot)
+        heading = -self.quat_to_rad(heading)
+
+        next_rs = mn.Matrix4.rotation_y(
+            mn.Rad(-heading),
+        )
+        # .__matmul__(
+        #     mn.Matrix4.rotation(
+        #         mn.Rad(-np.pi / 2.0),
+        #         mn.Vector3((1.0, 0.0, 0.0)),
+        #     )
+        # ).__matmul__(
+        #     mn.Matrix4.rotation(
+        #         mn.Rad(np.pi),
+        #         mn.Vector3((1.0, 0.0, 0.0)),
+        #     ))
+        # ).__matmul__(
+        #     mn.Matrix4.rotation(
+        #         mn.Rad(np.pi / 2.0),
+        #         mn.Vector3((1.0, 0.0, 0.0)),
+        #     )
+        # )
+
+        pos = np.array([*rigid_state.translation]) - np.array([0.0, 0.425, 0.0])
+        curr_robot_pos = mn.Vector3(pos[0], pos[1], pos[2])
+
+        curr_robot_quat = mn.Quaternion.from_matrix(next_rs.rotation())
+        curr_robot_rot = [
+            *curr_robot_quat.vector,
+             curr_robot_quat.scalar
+        ]
+        # curr_robot_rot = [
+        #     *rigid_state.rotation.vector,
+        #      rigid_state.rotation.scalar
+        # ]
+        print('curr robot rot: ', curr_robot_rot)
+
+        obs_quat = squaternion.Quaternion(rigid_state.rotation.scalar, *rigid_state.rotation.vector)
+        roll, yaw, pitch = obs_quat.to_euler()
+        print('roll: ', roll, ' pitch: ', pitch, ' yaw: ', yaw)
+        return curr_robot_pos, curr_robot_rot
+
     def set_init_state(self, pos, rot):
         wxyz_rot = [rot[3], rot[0], rot[1], rot[2]]
-        next_rs = self.convert_pose(pos, wxyz_rot)
+        next_rs = self.convert_pose_to_robot(pos, wxyz_rot)
 
         self.robot_hab.transformation = next_rs
 
@@ -1329,6 +1368,14 @@ class VelocityAction(SimulatorTaskAction):
         # new_trans.translation = pos
         # self.robot_hab.transformation.rotation = mn.Quaternion.from_matrix(new_trans.rotation()) 
         # self._sim.set_articulated_object_root_state(self.robot_id, new_trans)
+
+    def get_true_up_dir(self):
+        fix_rot = self.start_rotation.inverted()
+        rotation_quat = mn.Quaternion.from_matrix(self.robot_hab.transformation.rotation())
+        rotation_quat = fix_rot.__mul__(rotation_quat)
+        rotation_mat = rotation_quat.to_matrix()
+        up_dir = rotation_mat.__mul__(mn.Vector3(0.0,1.0,0.0))
+        return up_dir
 
     def step(
         self,
@@ -1403,67 +1450,104 @@ class VelocityAction(SimulatorTaskAction):
             [0.0, angular_velocity, 0.0]
         )
         
-        # if not self.urdf_robot:
-        agent_state = self._sim.get_agent_state()
+        # self.urdf_robot = False
+        if not self.urdf_robot:
+            agent_state = self._sim.get_agent_state()
 
-        # Convert from np.quaternion to mn.Quaternion
-        normalized_quaternion = agent_state.rotation
-        agent_mn_quat = mn.Quaternion(
-            normalized_quaternion.imag, normalized_quaternion.real
-        )
-        current_rigid_state = RigidState(
-            agent_mn_quat,
-            agent_state.position,
-        )
+            # Convert from np.quaternion to mn.Quaternion
+            normalized_quaternion = agent_state.rotation
+            agent_mn_quat = mn.Quaternion(
+                normalized_quaternion.imag, normalized_quaternion.real
+            )
+            current_rigid_state = RigidState(
+                agent_mn_quat,
+                agent_state.position,
+            )
 
-        # manually integrate the rigid state
-        goal_rigid_state = self.vel_control.integrate_transform(
-            time_step, current_rigid_state
-        )
+            # manually integrate the rigid state
+            goal_rigid_state = self.vel_control.integrate_transform(
+                time_step, current_rigid_state
+            )
 
-        # snap rigid state to navmesh and set state to object/agent
-        if allow_sliding:
-            step_fn = self._sim.pathfinder.try_step  # type: ignore
+            # snap rigid state to navmesh and set state to object/agent
+            if allow_sliding:
+                step_fn = self._sim.pathfinder.try_step  # type: ignore
+            else:
+                step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
+
+            final_position = step_fn(
+                agent_state.position, goal_rigid_state.translation
+            )
+            final_rotation = [
+                *goal_rigid_state.rotation.vector,
+                goal_rigid_state.rotation.scalar,
+            ]
+            # Transform goal pose and snap URDF to goal pose
+            pos = [goal_rigid_state.translation[0], goal_rigid_state.translation[1], goal_rigid_state.translation[2]]
+            wxyz_rot = [goal_rigid_state.rotation.scalar, *goal_rigid_state.rotation.vector]
+            next_rs = self.convert_pose_to_robot(pos, wxyz_rot)
+            
+            self.robot_hab.transformation = next_rs
+            
+            # Check if a collision occured
+            dist_moved_before_filter = (
+                goal_rigid_state.translation - agent_state.position
+            ).dot()
+            dist_moved_after_filter = (final_position - agent_state.position).dot()
+
+            # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
+            # collision _didn't_ happen. One such case is going up stairs.  Instead,
+            # we check to see if the the amount moved after the application of the
+            # filter is _less_ than the amount moved before the application of the
+            # filter.
+            EPS = 1e-5
+            collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
+
+            self._sim._prev_sim_obs["collided"] = collided  # type: ignore
         else:
-            step_fn = self._sim.pathfinder.try_step_no_sliding  # type: ignore
+            action = [linear_velocity, strafe_velocity, angular_velocity]
+            action = [0.15,0,0]
+            state = self.robot_wrapper.calc_state()
+            target_speed = np.array([action[0], action[1]]) 
+            target_ang_vel = action[2] 
+            latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
+            self.raibert_controller.update_latent_action(state, latent_action)
 
-        final_position = step_fn(
-            agent_state.position, goal_rigid_state.translation
-        )
-        final_rotation = [
-            *goal_rigid_state.rotation.vector,
-            goal_rigid_state.rotation.scalar,
-        ]
-        # Transform goal pose and snap URDF to goal pose
-        pos = [goal_rigid_state.translation[0], goal_rigid_state.translation[1], goal_rigid_state.translation[2]]
-        wxyz_rot = [goal_rigid_state.rotation.scalar, *goal_rigid_state.rotation.vector]
-        next_rs = self.convert_pose(pos, wxyz_rot)
-        
-        self.robot_hab.transformation = next_rs
-        
-        # Check if a collision occured
-        dist_moved_before_filter = (
-            goal_rigid_state.translation - agent_state.position
-        ).dot()
-        dist_moved_after_filter = (final_position - agent_state.position).dot()
+            for i in range(self.time_per_step):
+                # state = self.robot_wrapper.calc_state()
+                raibert_action = self.raibert_controller.get_action(state, i+1)
+                # raibert_action[1:] = 0
+                self.robot_wrapper.apply_robot_action(raibert_action, self.pos_gain, self.vel_gain)
+                self._sim.step_physics(self.dt)
 
-        # NB: There are some cases where ||filter_end - end_pos|| > 0 when a
-        # collision _didn't_ happen. One such case is going up stairs.  Instead,
-        # we check to see if the the amount moved after the application of the
-        # filter is _less_ than the amount moved before the application of the
-        # filter.
-        EPS = 1e-5
-        collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
+            curr_robot_pose = self.robot_hab.rigid_state
+            curr_robot_pos, curr_robot_rot = self.convert_pose_from_robot(curr_robot_pose)
+            final_position = curr_robot_pos
+            final_rotation = curr_robot_rot
 
+        print('final position: ', final_position)
         agent_observations = self._sim.get_observations_at(
             position=final_position,
             rotation=final_rotation,
-            keep_agent_at_new_pose=True,
+            keep_agent_at_new_pose=False,
         )
 
-
-        # TODO: Make a better way to flag collisions
-        self._sim._prev_sim_obs["collided"] = collided  # type: ignore
+        if self.make_video:
+            # self._unfollow_robot()
+            # vid_sim_obs = self._sim.get_sensor_observations(0)
+            # vid_observations = self._sim._sensor_suite.get_observations(vid_sim_obs)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            ext_bgr_img = (agent_observations['rgb']).astype(dtype=np.uint8)
+            depth_img = (agent_observations['depth'] * 255).astype(dtype=np.uint8)
+            ext_rgb_img = cv2.cvtColor(ext_bgr_img,cv2.COLOR_RGB2BGR)
+            depth_bgr_img = cv2.cvtColor(depth_img,cv2.COLOR_GRAY2BGR)
+            # cv2.putText(img, str(up_dir), (20, 20), font, 0.5, (0, 0, 0), 2)
+            cv2.putText(ext_rgb_img, str(self.robot_hab.transformation.translation), (20, 60), font, 0.5, (0, 0, 0), 2)
+            img = np.hstack((ext_rgb_img, depth_bgr_img))
+            image_save_dir = '/srv/share3/jtruong33/develop/rgb_imgs/'
+            cv2.imwrite(image_save_dir + 'rgb_img_'  + str(self.counter) + '.jpg', img)
+            print('saved img')
+            self.counter +=1
 
         return agent_observations
         # else:
@@ -1539,12 +1623,12 @@ class VelocityAction(SimulatorTaskAction):
 
         jms = []
         jms.append(habitat_sim.physics.JointMotorSettings(
-                0,  # position_target
-                self.pos_gain[0],  # position_gain
-                0,  # velocity_target
-                self.vel_gain[0],  # velocity_gain
-                10.0,  # max_impulse
-            ))
+                        0,  # position_target
+                        self.pos_gain[0],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[0],  # velocity_gain
+                        10.0,  # max_impulse
+                    ))
 
         jms.append(habitat_sim.physics.JointMotorSettings(
                         0,  # position_target
@@ -1562,7 +1646,6 @@ class VelocityAction(SimulatorTaskAction):
                     ))      
         for i in range(12):
             self.robot_hab.update_joint_motor(i, jms[np.mod(i,3)])
-        rot_trans = mn.Matrix4.rotation(mn.Rad(-1.56), mn.Vector3(1.0, 0, 0))
 
         if self.robot_name == 'A1':
             self.robot_wrapper = A1(sim=self._sim, robot=self.robot_hab, robot_id=self.robot_id, dt=self.dt)
@@ -1608,6 +1691,26 @@ class VelocityAction(SimulatorTaskAction):
         self.cam_pos = cam_pos
 
 
+    def _unfollow_robot(self):
+        
+        node = self._sim._default_agent.scene_node
+        robot_state = self.robot_hab.transformation
+
+        look_at = robot_state.translation
+        
+        cam_pos = mn.Vector3(look_at.x + .01, look_at.y+ .01, look_at.z + 1.0)
+        
+
+        # cam_pos = mn.Vector3(1.0, 1.0, 0)
+        # look_at = mn.Vector3(0.0, 0.0, 0)
+        # look_at = robot_state.transform_point(look_at)
+        # cam_pos = robot_state.transform_point(cam_pos)
+
+        node.transformation = mn.Matrix4.look_at(
+            cam_pos, 
+            look_at,
+            mn.Vector3(0.0, 1.0, 0.0)
+        )
 
 @registry.register_task(name="Nav-v0")
 class NavigationTask(EmbodiedTask):

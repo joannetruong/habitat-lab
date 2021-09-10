@@ -13,7 +13,6 @@ class A1():
         self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
-        self.robot_id = robot_id
         self.control = "position"
         self.ordered_joints = np.arange(12) # hip out, hip forward, knee
         self.linear_velocity = 0.35

@@ -5,14 +5,14 @@ ENV_NAME: "NavRLEnv"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: []
-TENSORBOARD_DIR:    '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/tb'
-VIDEO_DIR:          '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/video_dir'
-EVAL_CKPT_PATH_DIR: '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/checkpoints'
-CHECKPOINT_FOLDER:  '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/checkpoints'
-TXT_DIR:            '/srv/share3/mrudolph8/develop/flash_results/cont_ctrl_results/junk/txts'
+TENSORBOARD_DIR:    '/coc/pskynet3/jtruong33/develop/flash_results/habitat_spot_results/8gpu/tb'
+VIDEO_DIR:          '/coc/pskynet3/jtruong33/develop/flash_results/habitat_spot_results/8gpu/video_dir'
+EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/habitat_spot_results/8gpu/checkpoints'
+CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/habitat_spot_results/8gpu/checkpoints'
+TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/habitat_spot_results/8gpu/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 2
-SENSORS: ["RGB_SENSOR"]
+NUM_ENVIRONMENTS: 1
+SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 2e8
 LOG_INTERVAL: 10
@@ -35,7 +35,7 @@ RL:
     # ppo params
     clip_param: 0.2
     ppo_epoch: 2
-    num_mini_batch: 2
+    num_mini_batch: 1
     value_loss_coef: 0.5
     entropy_coef: 0.01
     lr: 2.5e-4
