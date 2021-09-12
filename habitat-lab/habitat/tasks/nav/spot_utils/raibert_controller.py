@@ -90,7 +90,6 @@ class Raibert_controller():
             self.action_limit[:, 0] = j_pos + np.array([action_limits] * self.num_legs).reshape(self.n_dof)
             self.action_limit[:, 1] = j_pos - np.array([action_limits] * self.num_legs).reshape(self.n_dof)
         self.set_control_params(init_state)
-        print('Set initial state')
 
     def set_control_params(self, state):
         self.init_foot_pos = self.kinematics_solver.forward_kinematics_robot(state['j_pos']).reshape(self.num_legs, 3)
@@ -290,26 +289,18 @@ class Raibert_controller_turn_stable(Raibert_controller_turn):
         )
 
     def update_latent_action(self, state, latent_action):
-        #print("RAIBERT 0")
         self.switch_swing_stance()
         self.latent_action = latent_action
+
         # self.last_com_ori = np.array(state['base_ori_euler'])
         self.last_com_ori = np.array([0, 0, 0])  # np.array(state['base_ori_euler'])
         self.last_com_ori[-1] = 0.0
         self.final_des_body_ori[2] = self.latent_action[-1]
-        #print("RAIBERT 1")
         target_delta_xy = np.zeros(self.num_legs * 3)
         mult_factor = 0.5*self.num_timestep_per_HL_action / self.control_frequency
-        # import pdb; pdb.set_trace()
-        #print("RAIBERT 2")
 
         for i in range(self.num_legs):
-            #print("RAIBERT L0")
-            #print(self.init_r_yaw)
             rad, theta = self.init_r_yaw[i]
-            #print(rad)
-            #print(theta)
-            #print("RAIBERT L1")
             if i in self.swing_set:
                 # angle = self.latent_action[-1] + self.init_r_yaw[i][1]
                 target_delta_xy[3 * i] = self.latent_action[0] + rad*self.target_ang_vel*math.sin(theta)*mult_factor
@@ -317,6 +308,6 @@ class Raibert_controller_turn_stable(Raibert_controller_turn):
             else:
                 target_delta_xy[3 * i] = -self.latent_action[0] - rad*self.target_ang_vel*math.sin(theta)*mult_factor
                 target_delta_xy[3 * i + 1] = -self.latent_action[1] - rad*self.target_ang_vel*math.cos(theta)*mult_factor
-        #print("RAIBERT 3")
         self.target_delta_xyz_world = self.kinematics_solver.robot_frame_to_world_robot(self.last_com_ori,
                                                                                         target_delta_xy)
+

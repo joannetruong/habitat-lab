@@ -26,8 +26,6 @@ class A1():
         self.dt = dt
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
 
-
-
     def set_up_continuous_action_space(self):
         self.high_level_action_space = gym.spaces.Box(shape=(self.high_level_action_dim,),
                                            low=-self.linear_velocity,
@@ -53,6 +51,8 @@ class A1():
 
     
     def remap_joints(self, joints):
+        # habitat ordering: front left, front right, rear left, rear right
+        # igibson ordering: front right, front left, rear right, and rear left,
         joint_remapped = [0]*len(joints)
         joint_remapped[0] = joints[3]
         joint_remapped[1] = joints[4]
@@ -66,6 +66,7 @@ class A1():
         joint_remapped[9] = joints[6]
         joint_remapped[10] = joints[7]
         joint_remapped[11] = joints[8]
+        return joint_remapped
 
     def calc_state(self):
         """Computes the state.
@@ -84,8 +85,8 @@ class A1():
         joint_velocities = self.robot.joint_velocities
         robot_state = self.robot.rigid_state 
 
-        joint_positions_remapped = self.remap_joints(joint_positions)
-        joint_velocities_remapped = self.remap_joints(joint_velocities)
+        # joint_positions_remapped = self.remap_joints(joint_positions)
+        # joint_velocities_remapped = self.remap_joints(joint_velocities)
 
         lin_vel = self.robot.root_linear_velocity
         ang_vel = self.robot.root_angular_velocity
@@ -96,10 +97,10 @@ class A1():
         base_orientation_quat.vector = mn.Vector3(base_orientation_quat.vector.x, base_orientation_quat.vector.y,base_orientation_quat.vector.z)
 
         base_position = base_pos
-        base_pos_tmp = rotate_pos_from_hab(base_pos)
-        base_position.x = base_pos_tmp[0]
-        base_position.y = base_pos_tmp[1]
-        base_position.z = base_pos_tmp[2]
+        # base_pos_tmp = rotate_pos_from_hab(base_pos)
+        # base_position.x = base_pos_tmp[0]
+        # base_position.y = base_pos_tmp[1]
+        # base_position.z = base_pos_tmp[2]
 
         base_orientation_euler = get_rpy(base_orientation_quat)
 
@@ -119,7 +120,7 @@ class A1():
             'base_pos': np.array([base_position.x, base_position.y, base_position.z]) ,
             'base_ori_euler': base_orientation_euler,
             'base_ori_quat_hab': base_orientation_quat,
-            'base_ori_quat': base_orientation_quat_trans,
+            'base_ori_quat': base_orientation_quat,
             'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
             'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
             'j_pos': joint_positions,
@@ -130,11 +131,6 @@ class A1():
         jms = self.robot.get_joint_motor_settings(joint)
         jms.position_target = ctrl
         self.robot.update_joint_motor(joint, jms)
-
-    def set_joint_pos(self, joint_idx, angle):
-        set_pos = np.array(self.robot.joint_positions) 
-        set_pos[joint_idx] = angle
-        self.robot.joint_positions = set_pos
 
     def apply_robot_action(self, action, pos_gain, vel_gain):
         """Applies actions to the robot.
@@ -221,7 +217,7 @@ class Laikago(A1):
 class Spot(A1):
     def __init__(self, sim=None, robot=None, robot_id=0, dt=1/60):
         super().__init__(sim=sim,robot=robot, robot_id=robot_id, dt=dt)
-        self._initial_joint_positions = [-0.05, 0.7, -1.3,
-                                         0.05, 0.7, -1.3,
+        self._initial_joint_positions = [0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3,
-                                         0.05, 0.7, -1.3]
+                                         0.05, 0.7, -1.3,
+                                         -0.05, 0.7, -1.3]
