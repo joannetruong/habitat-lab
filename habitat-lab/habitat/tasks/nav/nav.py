@@ -1460,10 +1460,9 @@ class VelocityAction(SimulatorTaskAction):
             start_robot_pose = self.robot_hab.rigid_state
             start_position, start_rotation = self.convert_pose_from_robot(start_robot_pose)
 
-            action = [linear_velocity, strafe_velocity, angular_velocity]
             state = self.robot_wrapper.calc_state()
-            target_speed = np.array([action[0], action[1]]) 
-            target_ang_vel = action[2] 
+            target_speed = np.array([linear_velocity, strafe_velocity]) 
+            target_ang_vel = angular_velocity
             latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
             self.raibert_controller.update_latent_action(state, latent_action)
 
@@ -1494,7 +1493,11 @@ class VelocityAction(SimulatorTaskAction):
             rotation=final_rotation,
             keep_agent_at_new_pose=True,
         )
-        self.make_video=False
+        self.make_video=True
+        roll_fall = (np.abs(roll) > 0.75 and np.abs(roll) < 2.39)
+        pitch_fall = (np.abs(pitch) > 0.45 and np.abs(pitch) < 2.69)
+        z_fall = curr_robot_pose.translation[1] < 0.49 or curr_robot_pose.translation[1] > 0.7
+            
         if self.make_video:
             # self._unfollow_robot()
             # vid_sim_obs = self._sim.get_sensor_observations(0)
@@ -1506,7 +1509,7 @@ class VelocityAction(SimulatorTaskAction):
             depth_bgr_img = cv2.cvtColor(depth_img,cv2.COLOR_GRAY2BGR)
             # cv2.putText(img, str(up_dir), (20, 20), font, 0.5, (0, 0, 0), 2)
             text = 'r: ' +  str(np.round(roll, 1)) + ' p: ' + str(np.round(pitch, 1)) + ' y: ' + str(np.round(yaw, 1)) + ' z: ' + str(np.round(curr_robot_pose.translation[1], 2))
-            if np.abs(roll) > 0.75 or np.abs(pitch) > 0.45 or curr_robot_pose.translation[1] < 0.49:
+            if roll_fall or pitch_fall or z_fall:
                 text += 'term'
             cv2.putText(ext_rgb_img, text, (20, 60), font, 0.5, (1, 0, 0), 2)
             img = np.hstack((ext_rgb_img, depth_bgr_img))
