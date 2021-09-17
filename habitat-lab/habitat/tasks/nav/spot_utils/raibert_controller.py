@@ -89,6 +89,7 @@ class Raibert_controller():
             j_pos = np.array(self.init_state['j_pos'])
             self.action_limit[:, 0] = j_pos + np.array([action_limits] * self.num_legs).reshape(self.n_dof)
             self.action_limit[:, 1] = j_pos - np.array([action_limits] * self.num_legs).reshape(self.n_dof)
+
         self.set_control_params(init_state)
 
     def set_control_params(self, state):
@@ -99,8 +100,10 @@ class Raibert_controller():
         self.final_des_body_ori = np.array([0, 0, state['base_ori_euler'][2]])
         self.init_r_yaw = self.get_init_r_yaw(self.init_foot_pos)
         self.swing_start_foot_pos_robot = self.kinematics_solver.forward_kinematics_robot(state['j_pos'])
-        self.swing_start_foot_pos_world = self.kinematics_solver.robot_frame_to_world_robot(state['base_ori_euler'],
+
+        self.swing_start_foot_pos_world = self.kinematics_solver.robot_frame_to_world_robot(state['base_ori_euler'] * 0,
                                                                                             self.swing_start_foot_pos_robot)
+
         # self.swing_start_foot_pos_world = self.init_foot_pos
 
     def get_init_r_yaw(self,init_foot_pos):

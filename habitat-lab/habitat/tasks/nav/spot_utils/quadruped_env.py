@@ -88,12 +88,12 @@ class A1():
         rot_mn = mn.Matrix4.from_(rigid_state.rotation.to_matrix(), mn.Vector3(0,0,0))
         rs_m = rot_mn.__matmul__(
                     mn.Matrix4.rotation(
-                    mn.Rad(np.pi / 2.0), # rotate 90 deg in roll
+                    mn.Rad(-np.pi / 2.0), # rotate 90 deg in roll
                     mn.Vector3((1.0, 0.0, 0.0)),
                     )
                     ).__matmul__(
                     mn.Matrix4.rotation(
-                        mn.Rad(-np.pi), # rotate 180 deg in yaw
+                        mn.Rad(-np.pi * 0.01), # rotate 180 deg in yaw
                         mn.Vector3((0.0, 1.0, 0.0)),
                     )
                     )
@@ -137,13 +137,14 @@ class A1():
         base_position.y = base_pos_tmp[1]
         base_position.z = base_pos_tmp[2]
 
+    
         _, robot_rot = self.convert_pose_from_robot(robot_state)
-
+        robot_rot = robot_state.rotation.__mul__(mn.Quaternion.rotation(mn.Rad(np.pi/2), mn.Vector3(1.0, 0.0, 0.0)))
         tmp_quat = squaternion.Quaternion(robot_rot.scalar, *robot_rot.vector)
         roll, yaw, pitch = tmp_quat.to_euler()
-        # base_orientation_euler = np.array([roll, pitch, yaw])
-        base_orientation_euler = np.array([0, 0, 0])
-
+        base_orientation_euler = np.array([roll, pitch, yaw])
+        #base_orientation_euler = np.array([0, 0, 0])
+        
         lin_vel = self.robot.root_linear_velocity
         ang_vel = self.robot.root_angular_velocity
         base_velocity = mn.Vector3(lin_vel.x, lin_vel.z, lin_vel.y)
@@ -154,7 +155,7 @@ class A1():
             'base_pos_y': base_position.y,
             'base_pos_z': base_position.z,
             'base_pos': np.array([base_position.x, base_position.y, base_position.z]),
-            'base_ori_euler': base_orientation_euler,
+            'base_ori_euler':base_orientation_euler,
             'base_ori_quat': robot_state.rotation,
             'base_velocity': base_velocity,
             'base_ang_vel': base_angular_velocity_euler,
@@ -264,3 +265,7 @@ class Spot(A1):
                                          -0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3]
+        # self._initial_joint_positions = [0.15, 0.7, -1.3,
+        #                                  -0.4, 0.7, -1.3,
+        #                                  0.15, 0.7, -1.3,
+        #                                  -0.4, 0.7, -1.3]
