@@ -1481,7 +1481,6 @@ class VelocityAction(SimulatorTaskAction):
             start_position, start_rotation = self.convert_pose_from_robot(start_robot_pose)
 
             state = self.robot_wrapper.calc_state()
-<<<<<<< HEAD
             target_speed = np.array([action[0], action[1]])
             target_ang_vel = action[2] 
 
@@ -1499,10 +1498,6 @@ class VelocityAction(SimulatorTaskAction):
                 target_ang_vel = 0
 
             
-=======
-            target_speed = np.array([linear_velocity, strafe_velocity]) 
-            target_ang_vel = angular_velocity
->>>>>>> 22da13f83f5ca81fa8d8fa8b2ce8936028e77c1e
             latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
             self.raibert_controller.update_latent_action(state, latent_action)
             state['final_des_ori'] = self.raibert_controller.final_des_body_ori
@@ -1563,17 +1558,10 @@ class VelocityAction(SimulatorTaskAction):
             keep_agent_at_new_pose=True,
         )
         self.make_video=True
-<<<<<<< HEAD
-        
-        roll_fall = (np.abs(roll) > 0.75 and np.abs(roll) < 2.39)
-        pitch_fall = (np.abs(pitch) > 0.45 and np.abs(pitch) < 2.69)
-        z_fall = curr_robot_pose.translation[1] < 0.49 or curr_robot_pose.translation[1] > 0.7
-=======
         roll_fall = (np.abs(roll) > 0.75 and np.abs(roll) < 2.39)
         pitch_fall = (np.abs(pitch) > 0.45 and np.abs(pitch) < 2.69)
         z_fall = curr_robot_pose.translation[1] < 0.49 or curr_robot_pose.translation[1] > 0.7
             
->>>>>>> 22da13f83f5ca81fa8d8fa8b2ce8936028e77c1e
         if self.make_video:
             font = cv2.FONT_HERSHEY_SIMPLEX
             ext_bgr_img = (agent_observations['rgb']).astype(dtype=np.uint8)
@@ -1581,11 +1569,7 @@ class VelocityAction(SimulatorTaskAction):
             ext_rgb_img = cv2.cvtColor(ext_bgr_img,cv2.COLOR_RGB2BGR)
             depth_bgr_img = cv2.cvtColor(depth_img,cv2.COLOR_GRAY2BGR)
             # cv2.putText(img, str(up_dir), (20, 20), font, 0.5, (0, 0, 0), 2)
-<<<<<<< HEAD
             text = str(np.round(np.array(state['base_ori_euler']),2)) #'r: ' +  str(np.round(roll, 1)) + ' p: ' + str(np.round(pitch, 1)) + ' y: ' + str(np.round(yaw, 1)) + ' z: ' + str(np.round(curr_robot_pose.translation[1], 2))
-=======
-            text = 'r: ' +  str(np.round(roll, 1)) + ' p: ' + str(np.round(pitch, 1)) + ' y: ' + str(np.round(yaw, 1)) + ' z: ' + str(np.round(curr_robot_pose.translation[1], 2))
->>>>>>> 22da13f83f5ca81fa8d8fa8b2ce8936028e77c1e
             if roll_fall or pitch_fall or z_fall:
                 text += 'term'
             cv2.putText(ext_rgb_img, text, (20, 20), font, 0.5, (1, 0, 0), 2)
