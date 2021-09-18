@@ -1481,8 +1481,8 @@ class VelocityAction(SimulatorTaskAction):
             start_position, start_rotation = self.convert_pose_from_robot(start_robot_pose)
 
             state = self.robot_wrapper.calc_state()
-            target_speed = np.array([action[0], action[1]])
-            target_ang_vel = action[2] 
+            target_speed = np.array([linear_velocity, strafe_velocity])
+            target_ang_vel = angular_velocity
 
             if self.counter < 25:
                 target_speed = np.array([.15,0])
