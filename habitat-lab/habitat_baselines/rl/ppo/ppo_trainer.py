@@ -74,7 +74,8 @@ class PPOTrainer(BaseRLTrainer):
     actor_critic: Policy
 
     def __init__(self, config=None):
-        resume_state = load_resume_state(config)
+        # resume_state = load_resume_state(config)
+        resume_state = None
         if resume_state is not None:
             config = resume_state["config"]
 

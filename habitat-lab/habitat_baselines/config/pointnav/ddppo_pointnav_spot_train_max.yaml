@@ -11,7 +11,7 @@ EVAL_CKPT_PATH_DIR: '/srv/share3/mrudolph8/develop/habitat_spot_results/checkpoi
 CHECKPOINT_FOLDER:  '/srv/share3/mrudolph8/develop/habitat_spot_results/checkpoints'
 TXT_DIR:            '/srv/share3/mrudolph8/develop/habitat_spot_results/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 1
+NUM_ENVIRONMENTS: 8
 SENSORS: ["RGB_SENSOR", "DEPTH_SENSOR"]
 NUM_UPDATES: -1
 TOTAL_NUM_STEPS: 2e8
@@ -35,7 +35,7 @@ RL:
     # ppo params
     clip_param: 0.2
     ppo_epoch: 2
-    num_mini_batch: 1
+    num_mini_batch: 2
     value_loss_coef: 0.5
     entropy_coef: 0.01
     lr: 2.5e-4

@@ -1218,7 +1218,7 @@ class VelocityAction(SimulatorTaskAction):
         self.fixed_base = False
         self.time_per_step = config.TIME_PER_STEP
         self.follow_robot = True
-        self.make_video = True
+        self.make_video = False
         self.capture_every_frame = False
     @property
     def action_space(self):
@@ -1241,22 +1241,21 @@ class VelocityAction(SimulatorTaskAction):
         if self.robot_hab is None or self.robot_hab.object_id == -1:
             self._load_robot()
             self.set_init_state(kwargs['episode'].start_position, kwargs['episode'].start_rotation)
-            
             task.is_stop_called = False 
-
+            self.robot_wrapper.robot_specific_reset()
             self.init_state = self.robot_wrapper.calc_state()
             self.raibert_controller.set_init_state(self.init_state)
             print("loaded and reset robot")
         else:
             self.set_init_state(kwargs['episode'].start_position, kwargs['episode'].start_rotation)
+            self.robot_wrapper.robot_specific_reset()
             self.init_state = self.robot_wrapper.calc_state()
             self.raibert_controller.set_init_state(self.init_state)
             task.is_stop_called = False 
             print("reset robot")
         
-        self.robot_wrapper.robot_specific_reset()
-        print('EULER')
-        print(self.init_state['base_ori_euler'])
+        
+
 
     def quat_to_rad(self, rotation):
         heading_vector = quaternion_rotate_vector(
@@ -1484,30 +1483,10 @@ class VelocityAction(SimulatorTaskAction):
             target_speed = np.array([linear_velocity, strafe_velocity])
             target_ang_vel = angular_velocity
 
-            if self.counter < 25:
-                target_speed = np.array([.15,0])
-                target_ang_vel = 0
-            elif self.counter < 50:
-                target_speed = np.array([0,0])
-                target_ang_vel = 0.15
-            elif self.counter < 75:
-                target_speed = np.array([0,0])
-                target_ang_vel = -.15
-            else:
-                target_speed = np.array([0.15, 0])   
-                target_ang_vel = 0
-
             
             latent_action = self.raibert_controller.plan_latent_action(state, target_speed, target_ang_vel=target_ang_vel)
             self.raibert_controller.update_latent_action(state, latent_action)
             state['final_des_ori'] = self.raibert_controller.final_des_body_ori
-            # init_robot_pose = self.robot_hab.rigid_state
-            # init_position, init_rotation = self.convert_pose_from_robot(init_robot_pose)
-            # agent_observations = self._sim.get_observations_at(
-            #     position=init_position,
-            #     rotation=init_rotation,
-            #     keep_agent_at_new_pose=True,
-            # )
             
             for i in range(self.time_per_step):
                 if self.make_video and self.capture_every_frame:
@@ -1525,11 +1504,9 @@ class VelocityAction(SimulatorTaskAction):
                     ext_rgb_img = cv2.cvtColor(ext_bgr_img,cv2.COLOR_RGB2BGR)
                     depth_bgr_img = cv2.cvtColor(depth_img,cv2.COLOR_GRAY2BGR)
                     
-                    text = str(np.round(np.array(state['base_ori_euler']),2)) #'r: ' +  str(np.round(roll, 1)) + ' p: ' + str(np.round(pitch, 1)) + ' y: ' + str(np.round(yaw, 1)) + ' z: ' + str(np.round(curr_robot_pose.translation[1], 2))
+                    text = str(np.round(np.array(state['base_ori_euler']),2))
                     cv2.putText(ext_rgb_img, text, (20, 20), font, 0.5, (1, 0, 0), 2)
-                    hip = state['j_pos'][0::3] #- state['j_pos'][0::3]
-                    hip_out =  state['j_pos'][1::3]
-                    knee =  state['j_pos'][2::3]
+
 
                     cv2.putText(ext_rgb_img, str(np.round(state['final_des_ori'],2)), (20, 40), font, 0.5, (1, 0, 0), 2)
 
@@ -1546,6 +1523,8 @@ class VelocityAction(SimulatorTaskAction):
                 state = self.robot_wrapper.calc_state()
                 state['final_des_ori'] = self.raibert_controller.final_des_body_ori
 
+                
+
             curr_robot_pose = self.robot_hab.rigid_state
             final_position, final_rotation = self.convert_pose_from_robot(curr_robot_pose)
             tmp_quat = squaternion.Quaternion(final_rotation[3], final_rotation[0], final_rotation[1], final_rotation[2])
@@ -1557,11 +1536,14 @@ class VelocityAction(SimulatorTaskAction):
             rotation=final_rotation,
             keep_agent_at_new_pose=True,
         )
-        self.make_video=True
+
+
         roll_fall = (np.abs(roll) > 0.75 and np.abs(roll) < 2.39)
-        pitch_fall = (np.abs(pitch) > 0.45 and np.abs(pitch) < 2.69)
+        pitch_fall = (np.abs(pitch) > 0.75 and np.abs(pitch) < 2.39)
         z_fall = curr_robot_pose.translation[1] < 0.49 or curr_robot_pose.translation[1] > 0.7
             
+
+
         if self.make_video:
             font = cv2.FONT_HERSHEY_SIMPLEX
             ext_bgr_img = (agent_observations['rgb']).astype(dtype=np.uint8)
@@ -1585,10 +1567,10 @@ class VelocityAction(SimulatorTaskAction):
         roll_fall = (np.abs(roll) > 0.75 and np.abs(roll) < 2.39)
         pitch_fall = (np.abs(pitch) > 0.45 and np.abs(pitch) < 2.69)
         z_fall = curr_robot_pose.translation[1] < 0.49 or curr_robot_pose.translation[1] > 0.7
-        if roll_fall or pitch_fall or z_fall or (self.counter % 15 == 0):
-            print('terminating episode')
-            task.is_stop_called = True
-            return self._sim.get_observations_at(position=start_position, rotation=start_rotation)
+        # if (self.counter % 15 == 0): # or roll_fall or pitch_fall or z_fall:
+        #     print('terminating episode')
+        #     task.is_stop_called = True
+        #     return self._sim.get_observations_at(position=start_position, rotation=start_rotation)
 
         return agent_observations
         # else:
