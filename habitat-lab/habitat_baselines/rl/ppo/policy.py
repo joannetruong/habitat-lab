@@ -24,30 +24,25 @@ from habitat_baselines.utils.common import CategoricalNet, GaussianNet
 
 
 class Policy(nn.Module, metaclass=abc.ABCMeta):
-    def __init__(self, net, dim_actions, policy_config=None):
+    def __init__(
+        self, net, dim_actions, action_distribution_type="categorical"
+    ):
         super().__init__()
         self.net = net
         self.dim_actions = dim_actions
+        self.action_distribution_type = action_distribution_type
 
-        if policy_config is None:
-            self.action_distribution_type = "categorical"
-        else:
-            self.action_distribution_type = (
-                policy_config.action_distribution_type
-            )
-
-        if self.action_distribution_type == "categorical":
+        if action_distribution_type == "categorical":
             self.action_distribution = CategoricalNet(
                 self.net.output_size, self.dim_actions
             )
-        elif self.action_distribution_type == "gaussian":
+        elif action_distribution_type == "gaussian":
             self.action_distribution = GaussianNet(
-                self.net.output_size, self.dim_actions, policy_config
+                self.net.output_size, self.dim_actions
             )
         else:
             ValueError(
-                f"Action distribution {self.action_distribution_type}"
-                "not supported."
+                f"Action distribution {action_distribution_type} not supported."
             )
 
         self.critic = CriticHead(self.net.output_size)

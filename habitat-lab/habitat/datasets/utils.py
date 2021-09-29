@@ -17,7 +17,10 @@ from numpy import float64
 from habitat.core.logging import logger
 from habitat.core.simulator import ShortestPathPoint
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
-from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
+try:
+    from habitat.tasks.nav.shortest_path_follower import ShortestPathFollower
+except ModuleNotFoundError:
+    pass
 from habitat.utils.geometry_utils import quaternion_to_list
 
 try:

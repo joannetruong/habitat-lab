@@ -1,3 +1,0 @@
-Starting TesterTest::Test with 1 test cases...
-    OK [17] compareMessage()
-Finished TesterTest::Test with 0 errors out of 1 checks.

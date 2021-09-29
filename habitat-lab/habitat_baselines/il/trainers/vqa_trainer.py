@@ -16,10 +16,7 @@ from habitat.datasets.utils import VocabDict
 from habitat_baselines.common.base_il_trainer import BaseILTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
-try:
-    from habitat_baselines.il.data.data import EQADataset
-except:
-    pass
+from habitat_baselines.il.data.data import EQADataset
 from habitat_baselines.il.metrics import VqaMetric
 from habitat_baselines.il.models.models import VqaLstmCnnAttentionModel
 from habitat_baselines.utils.common import img_bytes_2_np_array

@@ -12,6 +12,7 @@ from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional
 
 import numpy as np
+import json
 import torch
 import tqdm
 from gym import spaces
@@ -73,11 +74,21 @@ class PPOTrainer(BaseRLTrainer):
     agent: PPO
     actor_critic: Policy
 
-    def __init__(self, config=None):
-        # resume_state = load_resume_state(config)
-        resume_state = None
-        if resume_state is not None:
-            config = resume_state["config"]
+    def __init__(self, config=None, runtype='train'):
+        if runtype == 'train':
+            resume_state = load_resume_state(config)
+            self.OVERRIDE_TOTAL_NUM_STEPS = None
+            if resume_state is not None:
+                if 'OVERRIDE' in config:
+                    self.OVERRIDE_NUM_CHECKPOINTS = config.OVERRIDE.NUM_CHECKPOINTS
+                    self.OVERRIDE_TOTAL_NUM_STEPS = config.OVERRIDE.TOTAL_NUM_STEPS
+                    config = resume_state["config"]
+                    config.defrost()
+                    config.NUM_CHECKPOINTS = self.OVERRIDE_NUM_CHECKPOINTS
+                    config.TOTAL_NUM_STEPS = self.OVERRIDE_TOTAL_NUM_STEPS
+                    config.freeze()
+                else:
+                    config = resume_state["config"]
 
         super().__init__(config)
         self.actor_critic = None
@@ -94,9 +105,17 @@ class PPOTrainer(BaseRLTrainer):
         self._is_distributed = get_distrib_size()[2] > 1
         self._obs_batching_cache = ObservationBatchingCache()
 
-        self.using_velocity_ctrl = (
-            self.config.TASK_CONFIG.TASK.POSSIBLE_ACTIONS
-        ) == ["VELOCITY_CONTROL"]
+        self.discrete_actions = (
+            self.config.TASK_CONFIG.TASK.ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS
+        )
+        if (
+            config.RL.POLICY.action_distribution_type == "gaussian"
+            or len(self.discrete_actions) > 0
+        ):
+            config.defrost()
+            config.TASK_CONFIG.TASK.POSSIBLE_ACTIONS = ["VELOCITY_CONTROL"]
+            config.freeze()
+
     @property
     def obs_space(self):
         if self._obs_space is None and self.envs is not None:
@@ -138,7 +157,27 @@ class PPOTrainer(BaseRLTrainer):
         observation_space = apply_obs_transforms_obs_space(
             observation_space, self.obs_transforms
         )
-
+        from gym.spaces import Dict, Box
+        if self.config.TASK_CONFIG.SIMULATOR.get('PEOPLE_MASK', False):
+            observation_space = Dict(
+                {
+                    'depth': Box(
+                        low=0., high=1., shape=(
+                            self.envs.observation_spaces[0].spaces['depth'].shape[0],
+                            self.envs.observation_spaces[0].spaces['depth'].shape[1],
+                            2,
+                        )
+                    ),
+                    'pointgoal_with_gps_compass': self.envs.observation_spaces[0].spaces['pointgoal_with_gps_compass']
+                }
+            )
+        else:
+            observation_space = Dict(
+                {
+                    'depth': self.envs.observation_spaces[0].spaces['depth'],
+                    'pointgoal_with_gps_compass': self.envs.observation_spaces[0].spaces['pointgoal_with_gps_compass']
+                }
+            )
         self.actor_critic = policy.from_config(
             self.config, observation_space, self.policy_action_space
         )
@@ -247,28 +286,23 @@ class PPOTrainer(BaseRLTrainer):
 
         self._init_envs()
 
-        if self.using_velocity_ctrl:
-            if self.config.TASK_CONFIG.TASK.ACTIONS.VELOCITY_CONTROL.USE_STRAFE:
-                self.policy_action_space = ActionSpace(
-                    {
-                        "linear_velocity": EmptySpace(),
-                        "strafe_velocity": EmptySpace(),
-                        "angular_velocity": EmptySpace(),
-                    }
-                )
-                action_shape = 3
-            else:
-                self.policy_action_space = ActionSpace(
-                    {
-                        "linear_velocity": EmptySpace(),
-                        "angular_velocity": EmptySpace(),
-                    }
-                )
-                action_shape = 2
+        if self.config.RL.POLICY.action_distribution_type == "gaussian":
+            self.policy_action_space = self.envs.action_spaces[0][
+                "VELOCITY_CONTROL"
+            ]
+            action_shape = self.policy_action_space.n
             discrete_actions = False
         else:
-            self.policy_action_space = self.envs.action_spaces[0]
-            action_shape = -1
+            if len(self.discrete_actions) > 0:
+                self.policy_action_space = ActionSpace(
+                    {
+                        str(i): EmptySpace()
+                        for i in range(len(self.discrete_actions))
+                    }
+                )
+            else:
+                self.policy_action_space = self.envs.action_spaces[0]
+            action_shape = 1
             discrete_actions = True
 
         ppo_cfg = self.config.RL.PPO
@@ -320,7 +354,7 @@ class PPOTrainer(BaseRLTrainer):
             discrete_actions=discrete_actions,
         )
         self.rollouts.to(self.device)
-        print(self.envs)
+
         observations = self.envs.reset()
         batch = batch_obs(
             observations, device=self.device, cache=self._obs_batching_cache
@@ -330,6 +364,7 @@ class PPOTrainer(BaseRLTrainer):
         if self._static_encoder:
             with torch.no_grad():
                 batch["visual_features"] = self._encoder(batch)
+
         self.rollouts.buffers["observations"][0] = batch
 
         self.current_episode_reward = torch.zeros(self.envs.num_envs, 1)
@@ -466,8 +501,18 @@ class PPOTrainer(BaseRLTrainer):
         for index_env, act in zip(
             range(env_slice.start, env_slice.stop), actions.unbind(0)
         ):
-            if self.using_velocity_ctrl:
-                step_action = action_to_velocity_control(act)
+            if self.config.RL.POLICY.action_distribution_type == "gaussian":
+                step_action = action_to_velocity_control(
+                    act, num_steps=self.num_steps_done
+                )
+            elif len(self.discrete_actions) > 0:
+                act2 = torch.tensor(
+                    self.discrete_actions[act.item()],
+                    device='cpu',
+                )
+                step_action = action_to_velocity_control(
+                    act2, num_steps=self.num_steps_done
+                )
             else:
                 step_action = act.item()
             self.envs.async_step_at(index_env, step_action)
@@ -740,16 +785,14 @@ class PPOTrainer(BaseRLTrainer):
             self.pth_time = requeue_stats["pth_time"]
             self.num_steps_done = requeue_stats["num_steps_done"]
             self.num_updates_done = requeue_stats["num_updates_done"]
-            self._last_checkpoint_percent = requeue_stats[
-                "_last_checkpoint_percent"
-            ]
+            if self.OVERRIDE_TOTAL_NUM_STEPS is None:
+                self._last_checkpoint_percent = requeue_stats[
+                    "_last_checkpoint_percent"
+                ]
+            else:
+                self._last_checkpoint_percent = self.percent_done()
             count_checkpoints = requeue_stats["count_checkpoints"]
             prev_time = requeue_stats["prev_time"]
-
-            self._last_checkpoint_percent = requeue_stats[
-                "_last_checkpoint_percent"
-            ]
-
             self.running_episode_stats = requeue_stats["running_episode_stats"]
             self.window_episode_stats.update(
                 requeue_stats["window_episode_stats"]
@@ -906,13 +949,15 @@ class PPOTrainer(BaseRLTrainer):
         ppo_cfg = config.RL.PPO
 
         config.defrost()
-        # config.TASK_CONFIG.DATASET.SPLIT = config.EVAL.SPLIT
-        config.TASK_CONFIG.DATASET.SPLIT = config.TASK_CONFIG.DATASET.VAL_SPLIT
+        config.TASK_CONFIG.DATASET.SPLIT = config.EVAL.SPLIT
         config.freeze()
 
         if len(self.config.VIDEO_OPTION) > 0:
             config.defrost()
-            config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
+            if config.TASK_CONFIG.TASK.TYPE == 'SocialNav-v0':
+                config.TASK_CONFIG.TASK.MEASUREMENTS.append("SOCIAL_TOP_DOWN_MAP")
+            else:
+                config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
             config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
             config.freeze()
 
@@ -921,27 +966,22 @@ class PPOTrainer(BaseRLTrainer):
 
         self._init_envs(config)
 
-        if self.using_velocity_ctrl:
-            if self.config.TASK_CONFIG.TASK.ACTIONS.VELOCITY_CONTROL.USE_STRAFE:
-                self.policy_action_space = ActionSpace(
-                    {
-                        "linear_velocity": EmptySpace(),
-                        "strafe_velocity": EmptySpace(),
-                        "angular_velocity": EmptySpace(),
-                    }
-                )
-                action_shape = 3
-            else:
-                self.policy_action_space = ActionSpace(
-                    {
-                        "linear_velocity": EmptySpace(),
-                        "angular_velocity": EmptySpace(),
-                    }
-                )
-                action_shape = 2
+        if self.config.RL.POLICY.action_distribution_type == "gaussian":
+            self.policy_action_space = self.envs.action_spaces[0][
+                "VELOCITY_CONTROL"
+            ]
+            action_shape = self.policy_action_space.n
             action_type = torch.float
         else:
-            self.policy_action_space = self.envs.action_spaces[0]
+            if len(self.discrete_actions) > 0:
+                self.policy_action_space = ActionSpace(
+                    {
+                        str(i): EmptySpace()
+                        for i in range(len(self.discrete_actions))
+                    }
+                )
+            else:
+                self.policy_action_space = self.envs.action_spaces[0]
             action_shape = 1
             action_type = torch.long
 
@@ -1003,6 +1043,7 @@ class PPOTrainer(BaseRLTrainer):
 
         pbar = tqdm.tqdm(total=number_of_eval_episodes)
         self.actor_critic.eval()
+        all_episode_stats = {}
         while (
             len(stats_episodes) < number_of_eval_episodes
             and self.envs.num_envs > 0
@@ -1020,19 +1061,29 @@ class PPOTrainer(BaseRLTrainer):
                     test_recurrent_hidden_states,
                     prev_actions,
                     not_done_masks,
-                    deterministic=False,
+                    # deterministic=False,
+                    deterministic=True,
                 )
-                if self.using_velocity_ctrl:
-                    actions = actions.reshape([self.envs.num_envs, action_shape]).to(device="cpu")
+
                 prev_actions.copy_(actions)  # type: ignore
             # NB: Move actions to CPU.  If CUDA tensors are
             # sent in to env.step(), that will create CUDA contexts
             # in the subprocesses.
             # For backwards compatibility, we also call .item() to convert to
             # an int
-            if self.using_velocity_ctrl:
+            if self.config.RL.POLICY.action_distribution_type == "gaussian":
                 step_data = [
                     action_to_velocity_control(a)
+                    for a in actions.to(device="cpu")
+                ]
+            elif len(self.discrete_actions) > 0:
+                step_data = [
+                    action_to_velocity_control(
+                        torch.tensor(
+                            self.discrete_actions[a.item()],
+                            device='cpu',
+                        )
+                    )
                     for a in actions.to(device="cpu")
                 ]
             else:
@@ -1087,41 +1138,12 @@ class PPOTrainer(BaseRLTrainer):
                         )
                     ] = episode_stats
 
-                    txt_dir = getattr(self.config, "TXT_DIR", '')
-                    if txt_dir != '':
-                        if not os.path.isdir(txt_dir):
-                            os.makedirs(txt_dir)
-                        episode_steps_filename = '{}.csv'.format(
-                            os.path.basename(checkpoint_path[:-4]).replace('.','_')
-                        )
-                        episode_steps_filename = os.path.join(
-                            txt_dir, episode_steps_filename
-                        )
-                        if not os.path.isfile(episode_steps_filename):
-                            episode_steps_data = (
-                                'id,reward,distance_to_goal,success,spl,steps,collisions,soft_spl,episode_distance,num_actions\n'
-                            )
-                        else:    
-                            with open(episode_steps_filename) as f:
-                                episode_steps_data = f.read()
-                        episode_steps_data += ','.join([
-                            str(d) for d in
-                            [
-                                current_episodes[i].episode_id,
-                                episode_stats['reward'],
-                                episode_stats['distance_to_goal'],
-                                episode_stats['success'],
-                                episode_stats['spl'],
-                                len(rgb_frames[i]), # number of steps taken
-                                episode_stats['collisions.count'],
-                                episode_stats['softspl'],
-                                episode_stats['episode_distance'],
-                                episode_stats['num_actions'],
-                            ]
-                        ]) + '\n'
-                        with open(episode_steps_filename,'w') as f:
-                            f.write(episode_steps_data)
-                    
+                    episode_stats['num_steps'] = len(rgb_frames[i])
+
+                    all_episode_stats[
+                        current_episodes[i].episode_id
+                    ] = episode_stats
+
                     if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
@@ -1131,9 +1153,10 @@ class PPOTrainer(BaseRLTrainer):
                             checkpoint_idx=checkpoint_index,
                             metrics=self._extract_scalars_from_info(infos[i]),
                             tb_writer=writer,
+                            fps=30,
                         )
 
-                        rgb_frames[i] = []
+                    rgb_frames[i] = []
 
                 # episode continues
                 elif len(self.config.VIDEO_OPTION) > 0:
@@ -1142,6 +1165,8 @@ class PPOTrainer(BaseRLTrainer):
                         {k: v[i] for k, v in batch.items()}, infos[i]
                     )
                     rgb_frames[i].append(frame)
+                else:
+                    rgb_frames[i].append(None)
 
             not_done_masks = not_done_masks.to(device=self.device)
             (
@@ -1171,12 +1196,27 @@ class PPOTrainer(BaseRLTrainer):
                 / num_episodes
             )
 
-        for k, v in aggregated_stats.items():
-            logger.info(f"Average episode {k}: {v:.4f}")
-
         step_id = checkpoint_index
         if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
             step_id = ckpt_dict["extra_state"]["step"]
+
+        # with open(checkpoint_path+'.txt', 'w') as f:
+        #     f.write(f"{step_id}\n")
+        for k, v in aggregated_stats.items():
+            logger.info(f"Average episode {k}: {v:.4f}")
+                # f.write(f"Average episode {k}: {v:.4f}\n")
+
+        # Save JSON file
+        all_episode_stats['agg_stats'] = aggregated_stats
+        json_dir = self.config.JSON_DIR
+        if json_dir != '':
+            os.makedirs(json_dir, exist_ok=True)
+            json_path = os.path.join(
+                json_dir,
+                f"{os.path.basename(checkpoint_path[:-4]).replace('.','_')}.json",
+            )
+            with open(json_path, 'w') as f:
+                json.dump(all_episode_stats, f)
 
         writer.add_scalars(
             "eval_reward",

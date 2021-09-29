@@ -1,4 +1,0 @@
-newmtl Material
-Ka 1 1 1
-map_Ka diffuse_texture.png
-# kate: hl Wavefront OBJ

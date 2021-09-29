@@ -6,9 +6,12 @@
 
 from typing import List, Tuple, Union
 
+try:
+    import magnum as mn
+except ModuleNotFoundError:
+    pass
 import numpy as np
 import quaternion
-import squaternion
 
 EPSILON = 1e-8
 
@@ -111,8 +114,35 @@ def agent_state_target2ref(
 
     return (rotation_in_ref_coordinate, position_in_ref_coordinate)
 
-def get_rpy(rotation):
-    obs_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
-    roll, yaw, pitch = obs_quat.to_euler()
-    return np.array([roll, pitch, yaw])
 
+def get_heading_error(source, target):
+    r"""Computes the difference between two headings (radians); can be negative
+    or positive.
+    """
+    diff = target - source
+    if diff > np.pi:
+        diff -= np.pi*2
+    elif diff < -np.pi:
+        diff += np.pi*2
+    return diff
+
+def heading_to_quaternion(heading):
+    r"""Computes the difference between two headings (radians); can be negative
+    or positive.
+    """
+    quat = quaternion.from_euler_angles([heading+np.pi/2,0,0,0])
+    quat = quaternion.as_float_array(quat)
+    quat = [quat[1],-quat[3],quat[2],quat[0]]
+    quat = np.quaternion(*quat)
+
+    return mn.Quaternion(quat.imag, quat.real)
+
+def quat_to_rad(rotation):
+    r"""Returns the yaw represented by the rotation np quaternion
+    """
+    heading_vector = quaternion_rotate_vector(
+        rotation.inverse(), np.array([0, 0, -1])
+    )
+    phi = np.arctan2(heading_vector[0], -heading_vector[2])
+
+    return phi

@@ -1,3 +1,0 @@
-Starting MyCustomTestName with 1 test cases...
-    OK [13] compareWith()
-Finished MyCustomTestName with 0 errors out of 1 checks.

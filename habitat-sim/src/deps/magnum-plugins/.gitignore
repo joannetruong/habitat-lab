@@ -1,8 +1,0 @@
-/build*
-pkg
-/debian
-/obj-*
-*.kdev4
-*~
-*.pkg.tar.zst
-CMakeLists.txt.user*

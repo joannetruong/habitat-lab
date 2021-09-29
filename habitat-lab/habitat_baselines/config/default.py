@@ -18,6 +18,7 @@ CONFIG_FILE_SEPARATOR = ","
 # EXPERIMENT CONFIG
 # -----------------------------------------------------------------------------
 _C = CN()
+_C.JUNK = False
 # task config can be a list of conifgs like "A.yaml,B.yaml"
 _C.BASE_TASK_CONFIG_PATH = "configs/tasks/pointnav.yaml"
 _C.TASK_CONFIG = CN()  # task_config will be stored as a config node
@@ -29,6 +30,7 @@ _C.TORCH_GPU_ID = 0
 _C.VIDEO_OPTION = ["disk", "tensorboard"]
 _C.TENSORBOARD_DIR = "tb"
 _C.VIDEO_DIR = "video_dir"
+_C.JSON_DIR = ""
 _C.TEST_EPISODE_COUNT = -1
 _C.EVAL_CKPT_PATH_DIR = "data/checkpoints"  # path to ckpt or path to ckpts dir
 _C.NUM_ENVIRONMENTS = 16
@@ -59,7 +61,6 @@ _C.FORCE_TORCH_SINGLE_THREADED = False
 _C.EVAL = CN()
 # The split to evaluate on
 _C.EVAL.SPLIT = "val"
-_C.EVAL.VAL_SPLIT = "val_split5"
 _C.EVAL.USE_CKPT_CONFIG = True
 # -----------------------------------------------------------------------------
 # REINFORCEMENT LEARNING (RL) ENVIRONMENT CONFIG
@@ -69,6 +70,11 @@ _C.RL.REWARD_MEASURE = "distance_to_goal"
 _C.RL.SUCCESS_MEASURE = "spl"
 _C.RL.SUCCESS_REWARD = 2.5
 _C.RL.SLACK_REWARD = -0.01
+_C.RL.FULL_GEODESIC_DECAY = -1.0
+_C.RL.COLLISION_PENALTY = 0.0
+_C.RL.BACKWARDS_PENALTY = 0.0
+_C.RL.ANG_ACCEL_PENALTY_COEFF = 0.0
+_C.RL.MAX_ANG_ACCEL_PENALTY = 0.0
 # -----------------------------------------------------------------------------
 # preemption CONFIG
 # -----------------------------------------------------------------------------
@@ -87,15 +93,7 @@ _C.RL.preemption.save_state_batch_only = False
 # -----------------------------------------------------------------------------
 _C.RL.POLICY = CN()
 _C.RL.POLICY.name = "PointNavResNetPolicy"
-_C.RL.POLICY.action_distribution_type = "categorical"  # or 'gaussian'
-# For gaussian action distribution:
-_C.RL.POLICY.use_log_std = False
-_C.RL.POLICY.min_std = 1e-6
-_C.RL.POLICY.max_std = 1
-_C.RL.POLICY.min_log_std = -5
-_C.RL.POLICY.max_log_std = 2
-# For continuous action distributions (including gaussian):
-_C.RL.POLICY.action_activation = "tanh"  # ['tanh', 'softplus', '']
+_C.RL.POLICY.action_distribution_type = "categorical"
 # -----------------------------------------------------------------------------
 # OBS_TRANSFORMS CONFIG
 # -----------------------------------------------------------------------------

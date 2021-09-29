@@ -54,13 +54,19 @@ def execute_exp(config: Config, run_type: str) -> None:
 
     trainer_init = baseline_registry.get_trainer(config.TRAINER_NAME)
     assert trainer_init is not None, f"{config.TRAINER_NAME} is not supported"
-    trainer = trainer_init(config)
+    trainer = trainer_init(config, runtype=run_type)
 
     if run_type == "train":
         trainer.train()
     elif run_type == "eval":
         trainer.eval()
 
+PATHS_TO_JUNK = {
+    'LOG_FILE': '/private/home/naokiyokoyama/junk/train.log',
+    'CHECKPOINT_FOLDER': '/private/home/naokiyokoyama/junk',
+    'TENSORBOARD_DIR': '/private/home/naokiyokoyama/junk',
+    'VIDEO_DIR': '/private/home/naokiyokoyama/junk',
+}
 
 def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     r"""Runs experiment given mode and config
@@ -73,6 +79,13 @@ def run_exp(exp_config: str, run_type: str, opts=None) -> None:
     Returns:
         None.
     """
+    if 'JUNK' in opts and opts[opts.index('JUNK')+1] == 'True':
+        for k,v in PATHS_TO_JUNK.items():
+            if k in opts:
+                opts[opts.index(k)+1] = v
+            else:
+                opts.extend([k, v])
+
     config = get_config(exp_config, opts)
     execute_exp(config, run_type)
 

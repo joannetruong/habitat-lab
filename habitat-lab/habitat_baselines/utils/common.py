@@ -31,7 +31,6 @@ from torch import Size, Tensor
 from torch import nn as nn
 
 from habitat import logger
-from habitat.config import Config
 from habitat.core.dataset import Episode
 from habitat.core.utils import try_cv2_import
 from habitat.utils import profiling_wrapper
@@ -82,7 +81,13 @@ class CustomNormal(torch.distributions.normal.Normal):
         return super().rsample(sample_shape)
 
     def log_probs(self, actions):
-        ret = super().log_prob(actions).sum(-1).unsqueeze(-1)
+        ret = (
+            super()
+            .log_prob(actions)
+            .view(actions.size(0), -1)
+            .sum(-1)
+            .unsqueeze(-1)
+        )
         return ret
 
 
@@ -91,20 +96,15 @@ class GaussianNet(nn.Module):
         self,
         num_inputs: int,
         num_outputs: int,
-        config: Config,
+        std_min: float = 1e-6,
+        std_max: float = 1,
     ) -> None:
         super().__init__()
 
-        self.config = config
-        if config.use_log_std:
-            self.min_std = config.min_log_std
-            self.max_std = config.max_log_std
-        else:
-            self.min_std = config.min_std
-            self.max_std = config.max_std
-
         self.mu = nn.Linear(num_inputs, num_outputs)
         self.std = nn.Linear(num_inputs, num_outputs)
+        self.std_min = std_min
+        self.std_max = std_max
 
         nn.init.orthogonal_(self.mu.weight, gain=0.01)
         nn.init.constant_(self.mu.bias, 0)
@@ -112,17 +112,8 @@ class GaussianNet(nn.Module):
         nn.init.constant_(self.std.bias, 0)
 
     def forward(self, x: Tensor) -> CustomNormal:
-        mu = self.mu(x)
-
-
-        if self.config.action_activation == "tanh":
-            mu = torch.tanh(mu)
-        elif self.config.action_activation == "softplus":
-            mu = torch.nn.functional.softplus(mu)
-
-        std = torch.clamp(self.std(x), min=self.min_std, max=self.max_std)
-        if self.config.use_log_std:
-            std = std.exp(std)
+        mu = torch.tanh(self.mu(x))
+        std = torch.clamp(self.std(x), min=self.std_min, max=self.std_max)
 
         return CustomNormal(mu, std)
 
@@ -221,7 +212,6 @@ def batch_obs(
                     batch_t[sensor_name] = cache.get(
                         len(observations), sensor_name, sensor, device
                     )
-
                 batch_t[sensor_name][i].copy_(sensor)
 
     if cache is None:
@@ -268,20 +258,25 @@ def poll_checkpoint_folder(
     models_paths = list(
         filter(os.path.isfile, glob.glob(checkpoint_folder + "/*"))
     )
-    # models_paths.sort(key=os.path.getmtime)
-    # ind = previous_ckpt_ind + 1
-    # if ind < len(models_paths):
-    #     return models_paths[ind]
-    # return None
-    models_paths = list(
-        filter(lambda x: not os.path.isfile(x+'.done') and not x.endswith('.done'), glob.glob(checkpoint_folder + "/*"))
-    )
-    models_paths = sorted(models_paths, key=lambda x: int(x.split('.')[-2]))
-    if len(models_paths) > 0:
-        with open(models_paths[0]+'.done','w') as f:
-            pass
-        return models_paths[0]
+    models_paths.sort(key=os.path.getmtime)
+    ind = previous_ckpt_ind + 1
+    if ind < len(models_paths):
+        return models_paths[ind]
     return None
+    # models_paths = list(
+    #     filter(
+    #         lambda x: not os.path.isfile(x+'.done'),
+    #         glob.glob(os.path.join(checkpoint_folder, '*.pth'))
+    #     )
+    # )
+    # models_paths = sorted(models_paths, key=lambda x: int(x.split('.')[-2]))
+    # if len(models_paths) > 0:
+    #     # with open(models_paths[0]+'.done','w') as f:
+    #     #     pass
+    #     return models_paths[0]
+    # else:
+    #     exit()
+    # return None
 
 
 def generate_video(
@@ -540,21 +535,26 @@ def delete_folder(path: str) -> None:
 
 def action_to_velocity_control(
     action: torch.Tensor,
+    allow_sliding: bool = None,
+    num_steps: float = -1,
 ) -> Union[int, str, Dict[str, Any]]:
-    if action.shape[0] == 2:
+    if len(action) == 2:
         lin_vel, ang_vel = torch.clip(action, min=-1, max=1)
-        strafe_vel = torch.tensor(0.0, dtype=torch.float)
+        hor_vel = 0.0
     else:
-        lin_vel, strafe_vel, ang_vel = torch.clip(action, min=-1, max=1)
+        lin_vel, ang_vel, hor_vel = torch.clip(action, min=-1, max=1)
+        hor_vel = hor_vel.item()
     step_action = {
         "action": {
             "action": "VELOCITY_CONTROL",
             "action_args": {
-                "linear_velocity": lin_vel.item(),
-                "strafe_velocity": strafe_vel.item(),
-                "angular_velocity": ang_vel.item(),
-                "allow_sliding": False,
+                "lin_vel": lin_vel.item(),
+                "ang_vel": ang_vel.item(),
+                "hor_vel": hor_vel,
+                "allow_sliding": allow_sliding,
             },
         }
     }
+    if num_steps != -1:
+        step_action["action"]["action_args"]["num_steps"] = num_steps
     return step_action

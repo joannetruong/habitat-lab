@@ -8,11 +8,13 @@ from habitat_sim.utils.common import quat_from_two_vectors, quat_rotate_vector
 from habitat_sim import geo
 import magnum as mn
 
+
 # File I/O related
 def parse_config(config):
     with open(config, 'r') as f:
         config_data = yaml.load(f, Loader=yaml.FullLoader)
     return config_data
+
 
 # Geometry related
 def rotate_vector_3d(v, r, p, y):
@@ -21,11 +23,13 @@ def rotate_vector_3d(v, r, p, y):
     global_to_local = local_to_global.T
     return np.dot(global_to_local, v)
 
+
 def scalar_vector_to_quat(scalar, vector):
-    new_scalar = np.cos(scalar/2)
-    new_vector = np.array(vector)*np.sin(scalar/2)
+    new_scalar = np.cos(scalar / 2)
+    new_vector = np.array(vector) * np.sin(scalar / 2)
     quat = squaternion.Quaternion(new_scalar, *new_vector)
     return quat
+
 
 def quaternion_from_coeff(coeffs: np.ndarray) -> np.quaternion:
     r"""Creates a quaternions from coeffs in [x, y, z, w] format"""
@@ -33,6 +37,7 @@ def quaternion_from_coeff(coeffs: np.ndarray) -> np.quaternion:
     quat.real = coeffs[3]
     quat.imag = coeffs[0:3]
     return quat
+
 
 def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
     r"""Rotates a vector by a quaternion
@@ -46,21 +51,25 @@ def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
     vq.imag = v
     return (quat * vq * quat.inverse()).imag
 
+
 def cartesian_to_polar(x, y):
     rho = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
     return rho, phi
 
+
 def get_rpy(rotation, transform=True):
     tmp_quat = squaternion.Quaternion(rotation.scalar, *rotation.vector)
     if transform:
-        inverse_base_transform = scalar_vector_to_quat(np.pi/2,(1,0,0))
-        tmp_quat = tmp_quat*inverse_base_transform
-        obs_quat = squaternion.Quaternion(tmp_quat.scalar, tmp_quat.vector[0], tmp_quat.vector[2], tmp_quat.vector[1])
+        inverse_base_transform = scalar_vector_to_quat(np.pi / 2, (1, 0, 0))
+        tmp_quat = tmp_quat * inverse_base_transform
+        obs_quat = squaternion.Quaternion(tmp_quat.scalar, tmp_quat.vector[0],
+                                          tmp_quat.vector[2], tmp_quat.vector[1])
     else:
         obs_quat = tmp_quat
     roll, pitch, yaw = obs_quat.to_euler()
     return np.array([roll, -pitch, yaw])
+
 
 def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
     a = np.quaternion(1, 0, 0, 0)
@@ -68,67 +77,76 @@ def quat_from_magnum(quat: mn.Quaternion) -> np.quaternion:
     a.imag = quat.vector
     return a
 
+
 def quat_to_rad(rotation):
     rot = quat_from_magnum(rotation)
 
     if isinstance(rotation, list):
         rot = quaternion_from_coeff(np.array(rot))
     heading_vector = quaternion_rotate_vector(
-       rot.inverse(), np.array([0, 0, -1])
+        rot.inverse(), np.array([0, 0, -1])
     )
 
     # r,y,p = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
     return heading_vector
 
+
 def get_scalar_vector(quat):
-    scalar = np.arccos(quat.normalize.scalar)*2
-    vector = quat.normalize.vector/np.sin(scalar/2)
+    scalar = np.arccos(quat.normalize.scalar) * 2
+    vector = quat.normalize.vector / np.sin(scalar / 2)
     return scalar, vector
 
+
 def get_quat(scalar, vector):
-    new_scalar = np.cos(scalar/2)
-    new_vector = np.array(vector)*np.sin(scalar/2)
+    new_scalar = np.cos(scalar / 2)
+    new_vector = np.array(vector) * np.sin(scalar / 2)
     quat = squaternion.Quaternion(new_scalar, *new_vector)
     return quat
-    
+
+
 def rotate_pos_to_hab(position):
     rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, 1]))
-    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
+    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat,
+                                 position)  # That point in the mp3d scene mesh coordinate frame.
     pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
     return pos
 
+
 def rotate_pos_from_hab(position):
     rotation_mp3d_habitat = quat_from_two_vectors(geo.GRAVITY, np.array([0, 0, -1]))
-    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat, position) # That point in the mp3d scene mesh coordinate frame.
+    pt_mp3d = quat_rotate_vector(rotation_mp3d_habitat,
+                                 position)  # That point in the mp3d scene mesh coordinate frame.
     pos = [pt_mp3d[0], pt_mp3d[1], pt_mp3d[2]]
-    return pos 
+    return pos
+
 
 def euler_from_quaternion(quat):
-        """
-        Convert a quaternion into euler angles (roll, pitch, yaw)
-        roll is rotation around x in radians (counterclockwise)
-        pitch is rotation around y in radians (counterclockwise)
-        yaw is rotation around z in radians (counterclockwise)
-        """
-        
-        w = quat.scalar
-        x = quat.vector.x
-        y = quat.vector.y
-        z = quat.vector.z
-        t0 = +2.0 * (w * x + y * z)
-        t1 = +1.0 - 2.0 * (x * x + y * y)
-        roll_x = math.atan2(t0, t1)
-     
-        t2 = +2.0 * (w * y - z * x)
-        t2 = +1.0 if t2 > +1.0 else t2
-        t2 = -1.0 if t2 < -1.0 else t2
-        pitch_y = math.asin(t2)
-     
-        t3 = +2.0 * (w * z + x * y)
-        t4 = +1.0 - 2.0 * (y * y + z * z)
-        yaw_z = math.atan2(t3, t4)
-     
-        return np.array([roll_x, pitch_y, yaw_z]) # in radians
+    """
+    Convert a quaternion into euler angles (roll, pitch, yaw)
+    roll is rotation around x in radians (counterclockwise)
+    pitch is rotation around y in radians (counterclockwise)
+    yaw is rotation around z in radians (counterclockwise)
+    """
+
+    w = quat.scalar
+    x = quat.vector.x
+    y = quat.vector.y
+    z = quat.vector.z
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = math.atan2(t0, t1)
+
+    t2 = +2.0 * (w * y - z * x)
+    t2 = +1.0 if t2 > +1.0 else t2
+    t2 = -1.0 if t2 < -1.0 else t2
+    pitch_y = math.asin(t2)
+
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = math.atan2(t3, t4)
+
+    return np.array([roll_x, pitch_y, yaw_z])  # in radians
+
 
 def rotate_vector_2d(v, yaw):
     """Rotates 2d vector by yaw counterclockwise"""
@@ -143,9 +161,11 @@ def rotate_vector_2d(v, yaw):
         print('Incorrect input shape for rotate_vector_2d', v.shape)
         return v
 
+
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return np.linalg.norm(np.array(v1) - np.array(v2))
+
 
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
@@ -153,12 +173,14 @@ def cartesian_to_polar(x, y):
     phi = np.arctan2(y, x)
     return rho, phi
 
+
 def quatFromXYZW(xyzw, seq):
     """Convert quaternion from XYZW (pybullet convention) to arbitrary sequence."""
     assert len(seq) == 4 and 'x' in seq and 'y' in seq and 'z' in seq and 'w' in seq, \
         "Quaternion sequence {} is not valid, please double check.".format(seq)
     inds = ['xyzw'.index(axis) for axis in seq]
     return xyzw[inds]
+
 
 def quatToXYZW(orn, seq):
     """Convert quaternion from arbitrary sequence to XYZW (pybullet convention)."""

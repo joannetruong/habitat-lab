@@ -1,4 +1,0 @@
-newmtl First
-map_Kd mips.dds
-newmtl Second
-map_Kd diffuse_texture.png

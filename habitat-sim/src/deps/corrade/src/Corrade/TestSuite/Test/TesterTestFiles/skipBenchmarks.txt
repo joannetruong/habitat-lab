@@ -1,4 +1,0 @@
-Starting TesterTest::Test with 2 test cases...
-    OK [13] compareWith()
-    OK [11] compareAs()
-Finished TesterTest::Test with 0 errors out of 2 checks.

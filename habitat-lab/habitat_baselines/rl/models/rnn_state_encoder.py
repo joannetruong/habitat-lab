@@ -43,7 +43,10 @@ def _build_pack_info_from_dones(
     construct the data for a PackedSequence from a (T*N, ...) tensor
     via x.index_select(0, select_inds)
     """
-    dones = dones.view(T, -1)
+    if T == 0:
+        dones = dones.view(1, -1)
+    else:
+        dones = dones.view(T, -1)
     N = dones.size(1)
 
     rollout_boundaries = dones.clone().detach()

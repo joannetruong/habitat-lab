@@ -1,5 +1,0 @@
-Starting TesterTest::Test with 3 test cases...
-    OK [13] compareWith()
-    OK [04] equal()
-    OK [11] compareAs()
-Finished TesterTest::Test with 0 errors out of 3 checks.

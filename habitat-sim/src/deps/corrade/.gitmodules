@@ -1,3 +1,0 @@
-[submodule "toolchains"]
-	path = toolchains
-	url = https://github.com/mosra/toolchains.git

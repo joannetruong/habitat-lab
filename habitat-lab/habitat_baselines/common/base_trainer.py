@@ -52,7 +52,9 @@ class BaseTrainer:
 
         ckpt_cmd_opts = checkpoint_config.CMD_TRAILING_OPTS
         eval_cmd_opts = config.CMD_TRAILING_OPTS
-
+        checkpoint_config.defrost()
+        checkpoint_config.TOTAL_NUM_STEPS = float(checkpoint_config.TOTAL_NUM_STEPS)
+        checkpoint_config.freeze()
         try:
             config.merge_from_other_cfg(checkpoint_config)
             config.merge_from_other_cfg(self.config)
@@ -97,6 +99,7 @@ class BaseTrainer:
         with TensorboardWriter(
             self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
         ) as writer:
+            print('self.config.EVAL_CKPT_PATH_DIR',self.config.EVAL_CKPT_PATH_DIR)
             if os.path.isfile(self.config.EVAL_CKPT_PATH_DIR):
                 # evaluate singe checkpoint
                 proposed_index = get_checkpoint_id(
@@ -202,6 +205,8 @@ class BaseRLTrainer(BaseTrainer):
         if self.config.NUM_UPDATES != -1:
             return self.num_updates_done / self.config.NUM_UPDATES
         else:
+            if self.OVERRIDE_TOTAL_NUM_STEPS is not None:
+                return self.num_steps_done / self.OVERRIDE_TOTAL_NUM_STEPS
             return self.num_steps_done / self.config.TOTAL_NUM_STEPS
 
     def is_done(self) -> bool:
@@ -211,6 +216,7 @@ class BaseRLTrainer(BaseTrainer):
         needs_checkpoint = False
         if self.config.NUM_CHECKPOINTS != -1:
             checkpoint_every = 1 / self.config.NUM_CHECKPOINTS
+
             if (
                 self._last_checkpoint_percent + checkpoint_every
                 < self.percent_done()

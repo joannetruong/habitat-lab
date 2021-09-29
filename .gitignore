@@ -1,6 +1,7 @@
 **/.mp4
 **/.pyc
 **/data/*
+habitat-sim/
 */spot_videos/*
 **.pyc
 .DS_Store

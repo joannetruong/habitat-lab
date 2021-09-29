@@ -151,6 +151,46 @@ def draw_collision(view: np.ndarray, alpha: float = 0.4) -> np.ndarray:
     view[mask] = (alpha * np.array([255, 0, 0]) + (1.0 - alpha) * view)[mask]
     return view
 
+def draw_human_collision(view: np.ndarray, alpha: float = 0.4) -> np.ndarray:
+    r"""Draw translucent red strips on the border of input view to indicate
+    a collision has taken place.
+    Args:
+        view: input view of size HxWx3 in RGB order.
+        alpha: Opacity of red collision strip. 1 is completely non-transparent.
+    Returns:
+        A view with collision effect drawn.
+    """
+    strip_width = view.shape[0] // 20
+    mask = np.ones(view.shape)
+    mask = mask == 1
+    view[mask] = (alpha * np.array([255, 0, 0]) + (1.0 - alpha) * view)[mask]
+
+    font_scale = 2
+    thickness = 2
+    text = 'HUMAN HIT'
+    label_width, label_height = cv2.getTextSize(
+        text,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        font_scale,
+        thickness
+    )[0]
+
+    h,w = view.shape[:2]
+    origin = (w-label_width)//2, (h+label_height)//2
+
+    cv2.putText(
+        view,
+        text,
+        origin,
+        cv2.FONT_HERSHEY_SIMPLEX,
+        font_scale,
+        (0,0,0),
+        thickness,
+        cv2.LINE_AA
+    )
+
+    return view
+
 
 def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
     r"""Generate image of single frame from observation and info
@@ -198,6 +238,10 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
     if "collisions" in info and info["collisions"]["is_collision"]:
         egocentric_view = draw_collision(egocentric_view)
 
+    # draw human collision
+    if "human_collision" in info and info["human_collision"]:
+        egocentric_view = draw_human_collision(egocentric_view)
+
     frame = egocentric_view
 
     if "top_down_map" in info:
@@ -205,6 +249,13 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
             info["top_down_map"], egocentric_view.shape[0]
         )
         frame = np.concatenate((egocentric_view, top_down_map), axis=1)
+
+    if "social_top_down_map" in info:
+        top_down_map = maps.colorize_draw_agent_and_people_and_fit_to_height(
+            info["social_top_down_map"], egocentric_view.shape[0]
+        )
+        frame = np.concatenate((egocentric_view, top_down_map), axis=1)
+
     return frame
 
 

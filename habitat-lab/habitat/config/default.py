@@ -76,16 +76,21 @@ ACTIONS.TELEPORT.TYPE = "TeleportAction"
 ACTIONS.VELOCITY_CONTROL = CN()
 ACTIONS.VELOCITY_CONTROL.TYPE = "VelocityAction"
 ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGE = [0.0, 0.25]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.STRAFE_VEL_RANGE = [-0.15, 0.15]  # meters per sec
 ACTIONS.VELOCITY_CONTROL.ANG_VEL_RANGE = [-10.0, 10.0]  # deg per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
-ACTIONS.VELOCITY_CONTROL.MIN_ABS_STRAFE_SPEED = 0.015  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
+ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGE = [0.0, 0.0]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
-ACTIONS.VELOCITY_CONTROL.USE_STRAFE = False 
-ACTIONS.VELOCITY_CONTROL.AUTO_STOP = False 
-ACTIONS.VELOCITY_CONTROL.MAX_COLLISIONS = -1  
-ACTIONS.VELOCITY_CONTROL.USE_OBLONG_ROBOT = False
+ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
+ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
+
+# Spot dynamic nav
+ACTIONS.VELOCITY_CONTROL.DYNAMIC = False
+ACTIONS.VELOCITY_CONTROL.ROBOT_URDF = '/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf'
+ACTIONS.VELOCITY_CONTROL.ROBOT = 'Spot'
+ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 120.0
+ACTIONS.VELOCITY_CONTROL.TIME_PER_STEP = 100
 
 _C.TASK.ACTIONS = ACTIONS
 # -----------------------------------------------------------------------------
@@ -156,21 +161,6 @@ _C.TASK.SPL.TYPE = "SPL"
 _C.TASK.SOFT_SPL = CN()
 _C.TASK.SOFT_SPL.TYPE = "SoftSPL"
 # -----------------------------------------------------------------------------
-# EPISODE_DISTANCE MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.EPISODE_DISTANCE = CN()
-_C.TASK.EPISODE_DISTANCE.TYPE = "EpisodeDistance"
-# -----------------------------------------------------------------------------
-# PROXIMITY MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.PROXIMITY = CN()
-_C.TASK.PROXIMITY.TYPE = "Proximity"
-# -----------------------------------------------------------------------------
-# NUM_ACTIONS MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.NUM_ACTIONS = CN()
-_C.TASK.NUM_ACTIONS.TYPE = "NumActions"
-# -----------------------------------------------------------------------------
 # TopDownMap MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.TOP_DOWN_MAP = CN()
@@ -189,11 +179,36 @@ _C.TASK.TOP_DOWN_MAP.DRAW_VIEW_POINTS = True
 _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_POSITIONS = True
 # Axes aligned bounding boxes
 _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
+
+# -----------------------------------------------------------------------------
+# SocialTopDownMap MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.SOCIAL_TOP_DOWN_MAP = CN()
+_C.TASK.SOCIAL_TOP_DOWN_MAP.TYPE = "SocialTopDownMap"
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_PADDING = 3
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_RESOLUTION = 1024
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_SOURCE = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_BORDER = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_SHORTEST_PATH = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.FOG_OF_WAR = CN()
+_C.TASK.SOCIAL_TOP_DOWN_MAP.FOG_OF_WAR.DRAW = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.FOG_OF_WAR.VISIBILITY_DIST = 5.0
+_C.TASK.SOCIAL_TOP_DOWN_MAP.FOG_OF_WAR.FOV = 90
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_VIEW_POINTS = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_GOAL_POSITIONS = True
+_C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 # -----------------------------------------------------------------------------
 # COLLISIONS MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.COLLISIONS = CN()
 _C.TASK.COLLISIONS.TYPE = "Collisions"
+# -----------------------------------------------------------------------------
+# HUMAN_COLLISION MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.HUMAN_COLLISION = CN()
+_C.TASK.HUMAN_COLLISION.TYPE = "HumanCollision"
+_C.TASK.HUMAN_COLLISION.TERMINATION_RADIUS = 0.3
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 # # EQA TASK
@@ -307,6 +322,7 @@ _C.SIMULATOR.HABITAT_SIM_V0.ENABLE_PHYSICS = False
 _C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = (
     "./data/default.physics_config.json"
 )
+_C.SIMULATOR.NUM_PEOPLE = 1
 # -----------------------------------------------------------------------------
 # PYROBOT
 # -----------------------------------------------------------------------------
@@ -355,8 +371,7 @@ _C.PYROBOT.LOCOBOT.CAMERA_ACTIONS = ["set_pan", "set_tilt", "set_pan_tilt"]
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
 _C.DATASET.TYPE = "PointNav-v1"
-_C.DATASET.SPLIT = "train"
-_C.DATASET.VAL_SPLIT = "val_split5"
+_C.DATASET.SPLIT = "train"	
 _C.DATASET.SCENES_DIR = "data/scene_datasets"
 _C.DATASET.CONTENT_SCENES = ["*"]
 _C.DATASET.DATA_PATH = (

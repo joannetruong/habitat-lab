@@ -5,32 +5,27 @@ ENV_NAME: "NavRLEnv"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: []
-TENSORBOARD_DIR:    '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/tb'
-VIDEO_DIR:          '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/video_dir'
-EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
-CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
-TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'
+TENSORBOARD_DIR: "tb"
+VIDEO_DIR: "video_dir"
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 8
+EVAL_CKPT_PATH_DIR: "data/new_checkpoints"
+NUM_ENVIRONMENTS: 4
 SENSORS: ["DEPTH_SENSOR"]
+CHECKPOINT_FOLDER: "data/new_checkpoints"
 NUM_UPDATES: -1
-TOTAL_NUM_STEPS: 2e8
+TOTAL_NUM_STEPS: 2.5e9
 LOG_INTERVAL: 10
-NUM_CHECKPOINTS: 50
+NUM_CHECKPOINTS: 100
 # Force PyTorch to be single threaded as
 # this improves performance considerably
 FORCE_TORCH_SINGLE_THREADED: True
 
 RL:
-  SLACK_REWARD: -0.01
-  SUCCESS_REWARD: 5.0
-  STEP_PROXIMITY_THRESHOLD: 0.15  # maxium proximity threshold (0.15)
-  STEP_PROXIMITY_PENALTY: -0.1 # penalty multiplier  
-  PROXIMITY_PENALTY_TYPE: None   
+  SUCCESS_REWARD: 2.5
 
   POLICY:
     name: "PointNavResNetPolicy"
-    action_distribution_type: "gaussian"
+
   PPO:
     # ppo params
     clip_param: 0.2
@@ -63,13 +58,13 @@ RL:
     # The PyTorch distributed backend to use
     distrib_backend: NCCL
     # Visual encoder backbone
-    pretrained_weights: /coc/testnvme/jtruong33/habitat-cont-v2/habitat-lab/ddppo-models/locobot_sliding_125M.pth
+    pretrained_weights: data/ddppo-models/gibson-2plus-resnet50.pth
     # Initialize with pretrained weights
     pretrained: False
     # Initialize just the visual encoder backbone with pretrained weights
-    pretrained_encoder: True
+    pretrained_encoder: False
     # Whether or not the visual encoder backbone will be trained.
-    train_encoder: False
+    train_encoder: True
     # Whether or not to reset the critic linear layer
     reset_critic: True
 

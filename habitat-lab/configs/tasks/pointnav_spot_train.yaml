@@ -1,71 +1,55 @@
-SEED: 100
 ENVIRONMENT:
   MAX_EPISODE_STEPS: 500
 SIMULATOR:
-  TYPE: "Sim-v0" # "Sim-v0" 
-  ROBOT: 'Spot'
-  ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
-  AC_FREQ_RATIO: 4
-  CTRL_FREQ: 120.0
-  ENABLE_PHYSICS: True
-  TIME_PER_STEP: 100
   AGENT_0:
-    HEIGHT: 0.60
-    RADIUS: 0.25
     SENSORS: ['RGB_SENSOR', 'DEPTH_SENSOR']
+    HEIGHT: 0.60
+    RADIUS: 0.2
   HABITAT_SIM_V0:
     GPU_DEVICE_ID: 0
     ALLOW_SLIDING: False
   RGB_SENSOR:
-    WIDTH: 320
-    HEIGHT: 240
+    # WIDTH: 320
+    # HEIGHT: 240
     HFOV: 70
-    ORIENTATION: [-0.7, 0, 0]
-    POSITION: [0, 1.2, 1.0]
+    ORIENTATION: [-0.7, 0.0, 0.0]
+    # ORIENTATION: [0, 0, 0]
+    # POSITION: [0, 0.69, -0.1778]
+    POSITION: [0.0, 0.5, 1.0]
   DEPTH_SENSOR:
     WIDTH: 320
     HEIGHT: 240
     MAX_DEPTH: 10.0
     MIN_DEPTH: 0.3
     HFOV: 70
-    ORIENTATION: [0, 0, 0]
-    POSITION: [0, 0.69, -0.1778]
+    ORIENTATION: [0.0, 0.0, 0.0]
+    POSITION: [0.0, 0.0, -0.1778]
 TASK:
   TYPE: Nav-v0
-  SUCCESS_DISTANCE: 0.30
-  POSSIBLE_ACTIONS: ["VELOCITY_CONTROL"]
-  ACTIONS:
-    VELOCITY_CONTROL:
-      LIN_VEL_RANGE: [0.0, 0.35]
-      STRAFE_VEL_RANGE: [-0.35, 0.35]
-      ANG_VEL_RANGE: [-10.0, 10.0]
-      MIN_ABS_LIN_SPEED: 0.035
-      MIN_ABS_STRAFE_SPEED: 0.035
-      MIN_ABS_ANG_SPEED: 1.0
-      USE_STRAFE: True
-      AUTO_STOP: False
-      MAX_COLLISIONS: -1
-      SUCCESS_DISTANCE: 0.30
-      USE_OBLONG_ROBOT: False
-      USE_URDF_ROBOT: True
-      ROBOT: 'Spot'
-      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
-      CTRL_FREQ: 120.0
-      ENABLE_PHYSICS: True
-      TIME_PER_STEP: 100
+  SUCCESS_DISTANCE: 0.2
+
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
     GOAL_FORMAT: "POLAR"
     DIMENSIONALITY: 2
   GOAL_SENSOR_UUID: pointgoal_with_gps_compass
+  ACTIONS:
+    VELOCITY_CONTROL:
+      LIN_VEL_RANGE: [-0.35, 0.35]
+      STRAFE_VEL_RANGE: [-0.35, 0.35]
+      ANG_VEL_RANGE: [-10.0, 10.0]
+      MIN_ABS_LIN_SPEED: 0.035
+      MIN_ABS_STRAFE_SPEED: 0.035
+      MIN_ABS_ANG_SPEED: 1.0
+      DYNAMIC: False
+      ROBOT: 'Spot'
+      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
 
-  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL', 'COLLISIONS', 'SOFT_SPL', 'EPISODE_DISTANCE', 'PROXIMITY', 'NUM_ACTIONS']
-  SUCCESS: 
-    SUCCESS_DISTANCE: 0.30
-  SPL:
-    TYPE: SPL
-    SUCCESS_DISTANCE: 0.30
+  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL']
+  SUCCESS:
+    SUCCESS_DISTANCE: 0.2
+
 DATASET:
   TYPE: PointNav-v1
-  SPLIT: train_0.25
+  SPLIT: train_contacttest
   DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_spot/gibson/v2/{split}/{split}.json.gz

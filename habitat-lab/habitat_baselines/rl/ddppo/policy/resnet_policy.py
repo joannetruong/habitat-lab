@@ -48,19 +48,10 @@ class PointNavResNetPolicy(Policy):
         backbone: str = "resnet18",
         normalize_visual_inputs: bool = False,
         force_blind_policy: bool = False,
-        policy_config: Config = None,
+        action_distribution_type: str = "categorical",
         **kwargs
     ):
-        if policy_config is not None:
-            discrete_actions = (
-                policy_config.action_distribution_type == "categorical"
-            )
-            self.action_distribution_type = (
-                policy_config.action_distribution_type
-            )
-        else:
-            discrete_actions = True
-            self.action_distribution_type = "categorical"
+        discrete_actions = action_distribution_type == "categorical"
         super().__init__(
             PointNavResNetNet(
                 observation_space=observation_space,
@@ -75,8 +66,9 @@ class PointNavResNetPolicy(Policy):
                 discrete_actions=discrete_actions,
             ),
             dim_actions=action_space.n,  # for action distribution
-            policy_config=policy_config,
+            action_distribution_type=action_distribution_type,
         )
+        self.action_distribution_type = action_distribution_type
 
     @classmethod
     def from_config(
@@ -91,7 +83,7 @@ class PointNavResNetPolicy(Policy):
             backbone=config.RL.DDPPO.backbone,
             normalize_visual_inputs="rgb" in observation_space.spaces,
             force_blind_policy=config.FORCE_BLIND_POLICY,
-            policy_config=config.RL.POLICY,
+            action_distribution_type=config.RL.POLICY.action_distribution_type,
         )
 
 
@@ -109,13 +101,13 @@ class ResNetEncoder(nn.Module):
 
         if "rgb" in observation_space.spaces:
             self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
-            spatial_size = observation_space.spaces["rgb"].shape[0:2]
+            spatial_size = observation_space.spaces["rgb"].shape[0] // 2
         else:
             self._n_input_rgb = 0
 
         if "depth" in observation_space.spaces:
             self._n_input_depth = observation_space.spaces["depth"].shape[2]
-            spatial_size = observation_space.spaces["depth"].shape[0:2]
+            spatial_size = observation_space.spaces["depth"].shape[0] // 2
         else:
             self._n_input_depth = 0
 
@@ -127,30 +119,19 @@ class ResNetEncoder(nn.Module):
             self.running_mean_and_var = nn.Sequential()
 
         if not self.is_blind:
-            self.initial_pool = nn.AvgPool2d(3)
             input_channels = self._n_input_depth + self._n_input_rgb
             self.backbone = make_backbone(input_channels, baseplanes, ngroups)
 
-
-            spatial_size = tuple(int((s - 1) // 3 + 1) for s in spatial_size)   
-            for _ in range(self.backbone.spatial_compression_steps):    
-                spatial_size = tuple(int((s - 1) // 2 + 1) for s in spatial_size)   
-            self.output_shape = (   
-                self.backbone.final_channels,   
-                spatial_size[0],    
-                spatial_size[1],    
+            final_spatial = int(
+                spatial_size * self.backbone.final_spatial_compress
             )
-
-            # final_spatial = int(
-            #     spatial_size * self.backbone.final_spatial_compress
-            # )
             after_compression_flat_size = 2048
             num_compression_channels = int(
-                round(after_compression_flat_size / np.prod(spatial_size))
+                round(after_compression_flat_size / (final_spatial ** 2))
             )
             self.compression = nn.Sequential(
                 nn.Conv2d(
-                    self.output_shape[0],
+                    self.backbone.final_channels,
                     num_compression_channels,
                     kernel_size=3,
                     padding=1,
@@ -160,10 +141,11 @@ class ResNetEncoder(nn.Module):
                 nn.ReLU(True),
             )
 
-            compression_shape = list(self.output_shape) 
-            compression_shape[0] = num_compression_channels 
-            self.compression_shape = tuple(compression_shape)   
-            self.output_shape = self.compression_shape  
+            self.output_shape = (
+                num_compression_channels,
+                final_spatial,
+                final_spatial,
+            )
 
     @property
     def is_blind(self):
@@ -201,9 +183,8 @@ class ResNetEncoder(nn.Module):
             cnn_input.append(depth_observations)
 
         x = torch.cat(cnn_input, dim=1)
-        # x = F.avg_pool2d(x, 2)
+        x = F.avg_pool2d(x, 2)
 
-        x = self.initial_pool(x)
         x = self.running_mean_and_var(x)
         x = self.backbone(x)
         x = self.compression(x)
@@ -315,7 +296,6 @@ class PointNavResNetNet(Net):
                 make_backbone=getattr(resnet, backbone),
                 normalize_visual_inputs=normalize_visual_inputs,
             )
-
             self.goal_visual_fc = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(
@@ -340,7 +320,8 @@ class PointNavResNetNet(Net):
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(
-                    np.prod(self.visual_encoder.output_shape), hidden_size
+                    4560, hidden_size
+                    # np.prod(self.visual_encoder.output_shape), hidden_size
                 ),
                 nn.ReLU(True),
             )
@@ -471,9 +452,7 @@ class PointNavResNetNet(Net):
                 torch.where(masks.view(-1), prev_actions + 1, start_token)
             )
         else:
-            prev_actions = self.prev_action_embedding(
-                masks * prev_actions.float()
-            )
+            prev_actions = self.prev_action_embedding(prev_actions.float())
 
         x.append(prev_actions)
 

@@ -11,6 +11,11 @@ that aren't part of a floor.
 
 from typing import Dict, Generator, List, Optional, Sequence, Tuple, Union
 
+try:
+    import magnum as mn
+except ModuleNotFoundError:
+    pass
+
 import numpy as np
 from numpy import float64
 
@@ -24,7 +29,6 @@ except ImportError:
     GreedyFollower = BaseException
 try:
     from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
-    from habitat.sims.habitat_simulator.spot_sim import SpotSim
 except ImportError:
     habitat_sim = BaseException
 ISLAND_RADIUS_LIMIT = 1.5
@@ -53,6 +57,7 @@ def is_compatible_episode(
     geodesic_to_euclid_ratio: float,
 ) -> Union[Tuple[bool, float], Tuple[bool, int]]:
     euclid_dist = np.power(np.power(np.array(s) - np.array(t), 2).sum(0), 0.5)
+
     if np.abs(s[1] - t[1]) > 0.5:  # check height difference to assure s and
         #  t are from same floor
         return False, 0
@@ -62,13 +67,15 @@ def is_compatible_episode(
     if not near_dist <= d_separation <= far_dist:
         return False, 0
     distances_ratio = d_separation / euclid_dist
-    if distances_ratio < geodesic_to_euclid_ratio and (
-        np.random.rand()
-        > _ratio_sample_rate(distances_ratio, geodesic_to_euclid_ratio)
-    ):
+    # if distances_ratio < geodesic_to_euclid_ratio and (
+    #         np.random.rand()
+    #         > _ratio_sample_rate(distances_ratio, geodesic_to_euclid_ratio)
+    # ):
+    if distances_ratio < geodesic_to_euclid_ratio:
         return False, 0
     if sim.island_radius(s) < ISLAND_RADIUS_LIMIT:
         return False, 0
+
     return True, d_separation
 
 
@@ -136,6 +143,35 @@ def generate_pointnav_episode(
     :return: navigation episode that satisfy specified distribution for
     currently loaded into simulator scene.
     """
+
+    # Load Spot model
+    robot_file = "/private/home/naokiyokoyama/delme/habitat-sim/data/URDF_demo_assets/spot_arm/urdf/spot_arm.urdf"
+    ao_mgr = sim.get_articulated_object_manager()
+    robot_id = ao_mgr.add_articulated_object_from_urdf(
+        robot_file, fixed_base=False
+    )
+
+    # Set Spot's joints to default walking position
+    robot_id.joint_positions = np.deg2rad(np.array([
+        0., -170., 0,
+        135., 0. - 45.,
+        0., 0., 0.,
+        0., 45, -90,
+        0., 45, -90,
+        0., 45, -90,
+        0., 45, -90,
+    ]))
+
+    # Rotation offset matrices
+    roll_offset = mn.Matrix4.rotation(
+        mn.Rad(-np.pi / 2.0),
+        mn.Vector3((1.0, 0.0, 0.0)),
+    )
+    yaw_offset = mn.Matrix4.rotation(
+        mn.Rad(np.pi),
+        mn.Vector3((0.0, 1.0, 0.0)),
+    )
+
     episode_count = 0
     while episode_count < num_episodes or num_episodes < 0:
         target_position = sim.sample_navigable_point()
@@ -157,8 +193,50 @@ def generate_pointnav_episode(
             if is_compatible:
                 break
         if is_compatible:
+
+            def cartesian_to_polar(x, y):
+                rho = np.sqrt(x ** 2 + y ** 2)
+                phi = np.arctan2(y, x)
+                return rho, phi
+
+            def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
+                r"""Rotates a vector by a quaternion
+                Args:
+                    quaternion: The quaternion to rotate by
+                    v: The vector to rotate
+                Returns:
+                    np.array: The rotated vector
+                """
+                vq = np.quaternion(0, 0, 0, 0)
+                vq.imag = v
+                return (quat * vq * quat.inverse()).imag
+
+            def quat_to_rad(rotation):
+                heading_vector = quaternion_rotate_vector(
+                    rotation.inverse(), np.array([0, 0, -1])
+                )
+                phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+                return phi
+
             angle = np.random.uniform(0, 2 * np.pi)
             source_rotation = [0, np.sin(angle / 2), 0, np.cos(angle / 2)]
+
+            # Move Spot model to source position and rotation
+            heading = np.quaternion(source_rotation[-1], *source_rotation[:-1])
+            heading = -quat_to_rad(heading) + np.pi / 2
+
+            robot_rigid_state = mn.Matrix4.rotation_y(
+                mn.Rad(-heading),
+            ).__matmul__(yaw_offset).__matmul__(roll_offset)
+            robot_rigid_state.translation = np.array(source_position) + np.array([
+                0.0, 0.425, 0.0,
+            ])
+
+            robot_id.transformation = robot_rigid_state
+            collided = sim.contact_test(robot_id.object_id)
+
+            if collided:
+                continue
 
             shortest_paths = None
             if is_gen_shortest_path:

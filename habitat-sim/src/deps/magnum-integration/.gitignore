@@ -1,9 +1,0 @@
-/build*
-pkg
-/debian
-/obj-*
-*.kdev4
-*~
-*.kate-swp
-*.pkg.tar.zst
-CMakeLists.txt.user*

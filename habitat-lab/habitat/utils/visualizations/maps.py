@@ -32,6 +32,14 @@ AGENT_SPRITE = imageio.imread(
 )
 AGENT_SPRITE = np.ascontiguousarray(np.flipud(AGENT_SPRITE))
 
+HUMAN_SPRITE = imageio.imread(
+    os.path.join(
+        os.path.dirname(__file__),
+        "assets",
+        "human.png",
+    )
+)
+
 MAP_INVALID_POINT = 0
 MAP_VALID_POINT = 1
 MAP_BORDER_INDICATOR = 2
@@ -59,6 +67,7 @@ def draw_agent(
     agent_center_coord: Tuple[int, int],
     agent_rotation: float,
     agent_radius_px: int = 5,
+    sprite: np.ndarray = AGENT_SPRITE,
 ) -> np.ndarray:
     r"""Return an image with the agent image composited onto it.
     Args:
@@ -72,11 +81,11 @@ def draw_agent(
 
     # Rotate before resize to keep good resolution.
     rotated_agent = scipy.ndimage.interpolation.rotate(
-        AGENT_SPRITE, agent_rotation * 180 / np.pi
+        sprite, agent_rotation * 180 / np.pi
     )
     # Rescale because rotation may result in larger image than original, but
     # the agent sprite size should stay the same.
-    initial_agent_size = AGENT_SPRITE.shape[0]
+    initial_agent_size = sprite.shape[0]
     new_size = rotated_agent.shape[0]
     agent_size_px = max(
         1, int(agent_radius_px * 2 * new_size / initial_agent_size)
@@ -421,6 +430,52 @@ def colorize_draw_agent_and_fit_to_height(
         agent_rotation=topdown_map_info["agent_angle"],
         agent_radius_px=min(top_down_map.shape[0:2]) // 32,
     )
+
+    if top_down_map.shape[0] > top_down_map.shape[1]:
+        top_down_map = np.rot90(top_down_map, 1)
+
+    # scale top down map to align with rgb view
+    old_h, old_w, _ = top_down_map.shape
+    top_down_height = output_height
+    top_down_width = int(float(top_down_height) / old_h * old_w)
+    # cv2 resize (dsize is width first)
+    top_down_map = cv2.resize(
+        top_down_map,
+        (top_down_width, top_down_height),
+        interpolation=cv2.INTER_CUBIC,
+    )
+
+    return top_down_map
+
+def colorize_draw_agent_and_people_and_fit_to_height(
+    topdown_map_info: Dict[str, Any], output_height: int
+):
+    r"""Given the output of the TopDownMap measure, colorizes the map, draws the agent,
+    and fits to a desired output height
+
+    :param topdown_map_info: The output of the TopDownMap measure
+    :param output_height: The desired output height
+    """
+    top_down_map = topdown_map_info["map"]
+    top_down_map = colorize_topdown_map(
+        top_down_map, topdown_map_info["fog_of_war_mask"]
+    )
+    map_agent_pos = topdown_map_info["agent_map_coord"]
+    top_down_map = draw_agent(
+        image=top_down_map,
+        agent_center_coord=map_agent_pos,
+        agent_rotation=topdown_map_info["agent_angle"],
+        agent_radius_px=min(top_down_map.shape[0:2]) // 32,
+    )
+
+    for pos in topdown_map_info["people_map_coord"]:
+        top_down_map = draw_agent(
+            image=top_down_map,
+            agent_center_coord=pos,
+            agent_rotation=0,
+            agent_radius_px=min(top_down_map.shape[0:2]) // 32,
+            sprite=HUMAN_SPRITE
+        )
 
     if top_down_map.shape[0] > top_down_map.shape[1]:
         top_down_map = np.rot90(top_down_map, 1)
