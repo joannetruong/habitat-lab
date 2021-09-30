@@ -35,17 +35,20 @@ TASK:
   ACTIONS:
     VELOCITY_CONTROL:
       MUST_CALL_STOP: False
-      LIN_VEL_RANGE: [-0.35, 0.35]
-      HOR_VEL_RANGE: [-0.35, 0.35]
-      ANG_VEL_RANGE: [-10.0, 10.0]
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-      DYNAMIC: False
-      ROBOT: 'Spot'
-      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+      LIN_VEL_RANGES: [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]
+      HOR_VEL_RANGES: [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]
+      ANG_VEL_RANGES: [[-45.0, 45.0], [-30, 30], [-10.0, 10.0]]
 
-  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL']
+      DYNAMIC: False
+      ROBOTS: ['A1', 'AlienGo', 'Daisy']
+      ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+                   "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+                   "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
+
+  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL', 'COLLISIONS']
   SUCCESS:
     SUCCESS_DISTANCE: 0.425
 

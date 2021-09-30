@@ -75,11 +75,11 @@ ACTIONS.TELEPORT = CN()
 ACTIONS.TELEPORT.TYPE = "TeleportAction"
 ACTIONS.VELOCITY_CONTROL = CN()
 ACTIONS.VELOCITY_CONTROL.TYPE = "VelocityAction"
-ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGE = [0.0, 0.25]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ANG_VEL_RANGE = [-10.0, 10.0]  # deg per sec
+ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ANG_VEL_RANGES = [[-45.0, 45.0], [-30, 30], [-10.0, 10.0]]  # deg per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
-ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGE = [0.0, 0.0]  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
 ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
@@ -87,8 +87,10 @@ ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
 
 # Spot dynamic nav
 ACTIONS.VELOCITY_CONTROL.DYNAMIC = False
-ACTIONS.VELOCITY_CONTROL.ROBOT_URDF = '/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf'
-ACTIONS.VELOCITY_CONTROL.ROBOT = 'Spot'
+ACTIONS.VELOCITY_CONTROL.ROBOT_URDFS = ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+					                    "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+					                    "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
+ACTIONS.VELOCITY_CONTROL.ROBOTS = ['A1', 'AlienGo', 'Daisy']
 ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 120.0
 ACTIONS.VELOCITY_CONTROL.TIME_PER_STEP = 100
 

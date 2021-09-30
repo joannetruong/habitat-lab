@@ -57,7 +57,8 @@ try:
 except ImportError:
     pass
 
-from .spot_utils.quadruped_env import Spot
+from .spot_utils.quadruped_env import *
+from .spot_utils.daisy_env import *
 from .spot_utils.raibert_controller import Raibert_controller_turn_stable
 
 cv2 = try_cv2_import()
@@ -1160,29 +1161,33 @@ class VelocityAction(SimulatorTaskAction):
         self.vel_control.ang_vel_is_local = True
 
         config = kwargs["config"]
-        self.min_lin_vel, self.max_lin_vel = config.LIN_VEL_RANGE
-        self.min_ang_vel, self.max_ang_vel = config.ANG_VEL_RANGE
+        # self.min_lin_vel, self.max_lin_vel = config.LIN_VEL_RANGE
+        # self.min_ang_vel, self.max_ang_vel = config.ANG_VEL_RANGE
         self.min_abs_lin_speed = config.MIN_ABS_LIN_SPEED
         self.min_abs_ang_speed = config.MIN_ABS_ANG_SPEED
         self.must_call_stop = config.MUST_CALL_STOP
         self.time_step = config.TIME_STEP
 
         # Horizontal velocity
-        self.min_hor_vel, self.max_hor_vel = config.HOR_VEL_RANGE
-        self.has_hor_vel = self.min_hor_vel != 0.0 and self.max_hor_vel != 0.0
-        self.min_abs_hor_speed = config.MIN_ABS_HOR_SPEED
-
+        # self.min_hor_vel, self.max_hor_vel = config.HOR_VEL_RANGE
+        self.lin_vels = config.LIN_VEL_RANGES
+        self.hor_vels = config.HOR_VEL_RANGES
+        self.ang_vels = config.ANG_VEL_RANGES
+        self.robots = config.ROBOTS
         # For acceleration penalty
         self.prev_ang_vel = 0.0
 
+        self.min_lin_vel, self.max_lin_vel = self.lin_vels[0]
+        self.min_ang_vel, self.max_ang_vel = self.ang_vels[0]
+        self.min_hor_vel, self.max_hor_vel = self.hor_vels[0]
+
+        self.has_hor_vel = self.min_hor_vel != 0.0 and self.max_hor_vel != 0.0
+        self.min_abs_hor_speed = config.MIN_ABS_HOR_SPEED
+
         self.dynamic = config.DYNAMIC
         self.robot_id = None
-        self.robot_file = config.ROBOT_URDF
-        assert os.path.isfile(config.ROBOT_URDF), (
-            f'{self.robot_file} does not exist! Fix ACTIONS.VELOCITY_CONTROL.ROBOT_URDF'
-        )
+        self.robot_files = config.ROBOT_URDFS
 
-        self.robot_name = config.ROBOT
         self.ctrl_freq = config.CTRL_FREQ
         self.dt = 1.0/self.ctrl_freq
         self.time_per_step = config.TIME_PER_STEP
@@ -1196,7 +1201,7 @@ class VelocityAction(SimulatorTaskAction):
             self.raibert_controller = Raibert_controller_turn_stable(
                 control_frequency=self.ctrl_freq,
                 num_timestep_per_HL_action=self.time_per_step,
-                robot=self.robot_name
+                robot=self.robots[0]
             )
 
 
@@ -1246,28 +1251,31 @@ class VelocityAction(SimulatorTaskAction):
 
             # Settle for 15 seconds to allow robot to land on ground and be still
             self._sim.step_physics(15)
-        else:
-            self.robot_id.joint_positions = np.deg2rad(np.array([
-                0., 45, -90,
-                0., 45, -90,
-                0., 45, -90,
-                0., 45, -90,
-            ]))
+            # np.deg2rad(np.array([
+            #     0., 45, -90,
+            #     0., 45, -90,
+            #     0., 45, -90,
+            #     0., 45, -90,
+            # ]))
 
     def _load_robot(self):
         # Add robot into the simulator
+        rand_robot = np.random.randint(0,len(self.lin_vels))
+
         art_obj_mgr = self._sim.get_articulated_object_manager()
         self.robot_id = art_obj_mgr.add_articulated_object_from_urdf(
-            self.robot_file, fixed_base=False
+            self.robot_files[rand_robot], fixed_base=False
         )
         if self.robot_id.object_id == -1:
             raise ValueError('Could not load ' + robot_file)
 
         # Initialize robot wrapper
-        if self.robot_name == 'Spot':
-            self.robot_wrapper = Spot(
-                sim=self._sim, robot=self.robot_id, dt=self.dt
-            )
+        self.robot_wrapper = eval(self.robots[rand_robot])(
+            sim=self._sim, robot=self.robot_id, dt=self.dt
+        )
+        self.robot_wrapper.id = rand_robot
+        self.robot_id.joint_positions = self.robot_wrapper._initial_joint_positions
+
 
     def _reset_robot(self, agent_pos, agent_rot):
         # Spawn robot to agent location
@@ -1330,6 +1338,10 @@ class VelocityAction(SimulatorTaskAction):
         hor_vel = (hor_vel + 1.0) / 2.0
 
         # Scale actions
+        self.min_lin_vel, self.max_lin_vel = self.lin_vels[self.robot_wrapper.id]
+        self.min_ang_vel, self.max_ang_vel = self.ang_vels[self.robot_wrapper.id]
+        self.min_hor_vel, self.max_hor_vel = self.hor_vels[self.robot_wrapper.id]
+
         lin_vel = self.min_lin_vel + lin_vel * (
             self.max_lin_vel - self.min_lin_vel
         )

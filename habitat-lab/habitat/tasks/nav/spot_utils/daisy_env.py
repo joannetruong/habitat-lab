@@ -1,9 +1,10 @@
 from .utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
 import gym, gym.spaces
 import numpy as np
+import magnum as mn
 
 class Daisy():
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+    def __init__(self, sim=None, robot=None, dt=1/60):
         # config["urdf_path"] = "daisy/daisy_advanced_side.urdf"
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
@@ -11,6 +12,7 @@ class Daisy():
         self.torque_coef = 1.0
         self.high_level_action_dim = 2
         self.control = "position"
+        self.id = 0 
         self._action_mapping = {
             'L_F_motor_1/X8_9': 0,
             'L_F_motor_2/X8_16': 1,
@@ -37,6 +39,20 @@ class Daisy():
                                          0.0, -1.2, 0.5,
                                          0.0, 1.2, -0.5,
                                          0.0, -1.2, 0.5]
+        self.rotation_offset = mn.Matrix4.rotation_y(
+            mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
+        ).__matmul__(
+            mn.Matrix4.rotation_y(
+                mn.Rad(np.pi),  # Rotate 180 deg yaw
+            )
+        ).__matmul__(
+            mn.Matrix4.rotation_x(
+                mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
+            )
+        )
+        
+        # Spawn the URDF 0.425 meters above the navmesh upon reset
+        self.spawn_offset = np.array([0.0, 0.42, 0.0])
 
     def joint_mapping(self, joint):
         index = [0, 1, 2, 9, 10, 11, 3, 4, 5, 12, 13, 14, 6, 7, 8, 15, 16, 17]
@@ -177,7 +193,7 @@ class Daisy():
         self.apply_robot_action(action)
 
 class Daisy_4legged(Daisy):
-    def __init__(self, sim=None, agent=None, robot_id=0, dt=1/60):
+    def __init__(self, sim=None, robot=None, dt=1/60):
         self._action_mapping = {
             'L_F_motor_1/X8_9': 0,
             'L_F_motor_2/X8_16': 1,
@@ -196,7 +212,7 @@ class Daisy_4legged(Daisy):
                                          0.0, -1.2, 0.5,
                                          0.0, 1.2, -0.5,
                                          0.0, -1.2, 0.5]
-        super().__init__(sim=sim, agent=agent, robot_id=robot_id, dt=dt)
+        super().__init__(sim=sim, robot=robot, dt=dt)
 
     def joint_mapping(self, joint):
         index = [0, 1, 2, 6, 7, 8, 3, 4, 5, 9, 10, 11]

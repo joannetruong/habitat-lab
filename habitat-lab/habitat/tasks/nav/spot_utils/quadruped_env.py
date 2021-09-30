@@ -16,6 +16,7 @@ class A1():
         self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
+        self.id = 0 
         self.control = "position"
         self.ordered_joints = np.arange(12)  # hip out, hip forward, knee
         self.linear_velocity = 0.35
@@ -24,6 +25,21 @@ class A1():
                                          0.05, 0.60, -1.5,
                                          -0.05, 0.65, -1.5,
                                          0.05, 0.65, -1.5]
+        # Spot needs to rolled 90 deg then yaw'd 180 deg relative to agent
+        self.rotation_offset = mn.Matrix4.rotation_y(
+            mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
+        ).__matmul__(
+            mn.Matrix4.rotation_y(
+                mn.Rad(np.pi),  # Rotate 180 deg yaw
+            )
+        ).__matmul__(
+            mn.Matrix4.rotation_x(
+                mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
+            )
+        )
+        
+        # Spawn the URDF 0.425 meters above the navmesh upon reset
+        self.spawn_offset = np.array([0.0, 0.24, 0.0])
         self.robot_specific_reset()
         self.dt = dt
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
@@ -268,21 +284,23 @@ class A1():
 
 
 class AlienGo(A1):
-    def __init__(self, sim=None, robot_id=0, dt=1 / 60):
-        super().__init__(sim=sim, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot=None, dt=1 / 60):
+        super().__init__(sim=sim, robot=robot, dt=dt)
         self._initial_joint_positions = [-0.1, 0.60, -1.5,
                                          0.1, 0.60, -1.5,
                                          -0.1, 0.6, -1.5,
                                          0.1, 0.6, -1.5]
 
+        self.spawn_offset = np.array([0.0, 0.30, 0.0])
 
 class Laikago(A1):
-    def __init__(self, sim=None, robot_id=0, dt=1 / 60):
-        super().__init__(sim=sim, robot_id=robot_id, dt=dt)
+    def __init__(self, sim=None, robot=None, dt=1 / 60):
+        super().__init__(sim=sim, robot=robot, dt=dt)
         self._initial_joint_positions = [-0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2]
+        self.spawn_offset = np.array([0.0, 0.42, 0.0])
 
 
 class Spot(A1):
@@ -292,19 +310,6 @@ class Spot(A1):
                                          -0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3]
-
-        # Spot needs to rolled 90 deg then yaw'd 180 deg relative to agent
-        self.rotation_offset = mn.Matrix4.rotation_y(
-            mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
-        ).__matmul__(
-            mn.Matrix4.rotation_y(
-                mn.Rad(np.pi),  # Rotate 180 deg yaw
-            )
-        ).__matmul__(
-            mn.Matrix4.rotation_x(
-                mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
-            )
-        )
         
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         self.spawn_offset = np.array([0.0, 0.425, 0.0])
