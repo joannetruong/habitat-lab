@@ -8,15 +8,16 @@ from habitat.tasks.utils import cartesian_to_polar
 from .utils import euler_from_quaternion, get_rpy, rotate_pos_from_hab, \
     scalar_vector_to_quat, rotate_vector_2d
 import squaternion
-
+from .z_model import *
+import torch
 
 class A1():
-    def __init__(self, sim=None, robot=None, dt=1 / 60):
+    def __init__(self, sim=None, robot=None):
         # self.torque = config.get("torque", 1.0)
         self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
-        self.id = 0 
+        self.id = 0
         self.control = "position"
         self.ordered_joints = np.arange(12)  # hip out, hip forward, knee
         self.linear_velocity = 0.35
@@ -37,11 +38,18 @@ class A1():
                 mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
             )
         )
-        
+
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         self.spawn_offset = np.array([0.0, 0.24, 0.0])
         self.robot_specific_reset()
-        self.dt = dt
+        self.z_in = torch.rand(1).requires_grad_(True)
+        self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
+        params_to_train = [self.z_in]
+        params_to_train += list(self.z_model.parameters())
+        self.z_optim = torch.optim.Adam(params_to_train,
+                                            lr=1e-4,
+                                            betas=[0.9, 0.999],
+                                            weight_decay=1e-2)
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
 
     def set_up_continuous_action_space(self):
@@ -284,8 +292,8 @@ class A1():
 
 
 class AlienGo(A1):
-    def __init__(self, sim=None, robot=None, dt=1 / 60):
-        super().__init__(sim=sim, robot=robot, dt=dt)
+    def __init__(self, sim=None, robot=None):
+        super().__init__(sim=sim, robot=robot)
         self._initial_joint_positions = [-0.1, 0.60, -1.5,
                                          0.1, 0.60, -1.5,
                                          -0.1, 0.6, -1.5,
@@ -294,8 +302,8 @@ class AlienGo(A1):
         self.spawn_offset = np.array([0.0, 0.30, 0.0])
 
 class Laikago(A1):
-    def __init__(self, sim=None, robot=None, dt=1 / 60):
-        super().__init__(sim=sim, robot=robot, dt=dt)
+    def __init__(self, sim=None, robot=None):
+        super().__init__(sim=sim, robot=robot)
         self._initial_joint_positions = [-0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
@@ -304,13 +312,13 @@ class Laikago(A1):
 
 
 class Spot(A1):
-    def __init__(self, sim=None, robot=None, dt=1 / 60):
-        super().__init__(sim=sim, robot=robot, dt=dt)
+    def __init__(self, sim=None, robot=None):
+        super().__init__(sim=sim, robot=robot)
         self._initial_joint_positions = [0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3]
-        
+
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         self.spawn_offset = np.array([0.0, 0.425, 0.0])
 

@@ -48,6 +48,10 @@ _C.ENVIRONMENT.ITERATOR_OPTIONS.STEP_REPETITION_RANGE = 0.2
 _C.TASK = CN()
 _C.TASK.TYPE = "Nav-v0"
 _C.TASK.SUCCESS_DISTANCE = 0.2
+_C.TASK.ROBOT_URDFS = ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+                       "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+                       "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
+_C.TASK.ROBOTS = ['A1', 'AlienGo', 'Daisy']
 _C.TASK.SENSORS = []
 _C.TASK.MEASUREMENTS = []
 _C.TASK.GOAL_SENSOR_UUID = "pointgoal"
@@ -74,6 +78,8 @@ ACTIONS.LOOK_DOWN.TYPE = "LookDownAction"
 ACTIONS.TELEPORT = CN()
 ACTIONS.TELEPORT.TYPE = "TeleportAction"
 ACTIONS.VELOCITY_CONTROL = CN()
+
+# KINEMATIC VELOCITY ACTION
 ACTIONS.VELOCITY_CONTROL.TYPE = "VelocityAction"
 ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
 ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
@@ -84,15 +90,22 @@ ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
 ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
 ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
-
-# Spot dynamic nav
-ACTIONS.VELOCITY_CONTROL.DYNAMIC = False
-ACTIONS.VELOCITY_CONTROL.ROBOT_URDFS = ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-					                    "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-					                    "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
-ACTIONS.VELOCITY_CONTROL.ROBOTS = ['A1', 'AlienGo', 'Daisy']
 ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 120.0
-ACTIONS.VELOCITY_CONTROL.TIME_PER_STEP = 100
+
+# DYNAMIC VELOCITY ACTION 
+ACTIONS.DYNAMIC_VELOCITY_CONTROL = CN()
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.TYPE = "DynamicVelocityAction"
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.LIN_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.HOR_VEL_RANGES = [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.ANG_VEL_RANGES = [[-45.0, 45.0], [-30, 30], [-10.0, 10.0]]  # deg per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.DISCRETE_ACTIONS = []
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.MUST_CALL_STOP = True
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.TIME_PER_STEP = 100
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.CTRL_FREQ = 120.0
 
 _C.TASK.ACTIONS = ACTIONS
 # -----------------------------------------------------------------------------
@@ -373,7 +386,7 @@ _C.PYROBOT.LOCOBOT.CAMERA_ACTIONS = ["set_pan", "set_tilt", "set_pan_tilt"]
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
 _C.DATASET.TYPE = "PointNav-v1"
-_C.DATASET.SPLIT = "train"	
+_C.DATASET.SPLIT = "train"  
 _C.DATASET.SCENES_DIR = "data/scene_datasets"
 _C.DATASET.CONTENT_SCENES = ["*"]
 _C.DATASET.DATA_PATH = (

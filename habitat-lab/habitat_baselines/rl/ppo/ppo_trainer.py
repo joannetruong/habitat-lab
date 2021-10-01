@@ -108,13 +108,14 @@ class PPOTrainer(BaseRLTrainer):
         self.discrete_actions = (
             self.config.TASK_CONFIG.TASK.ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS
         )
-        if (
-            config.RL.POLICY.action_distribution_type == "gaussian"
-            or len(self.discrete_actions) > 0
-        ):
-            config.defrost()
-            config.TASK_CONFIG.TASK.POSSIBLE_ACTIONS = ["VELOCITY_CONTROL"]
-            config.freeze()
+        self.action_type = config.TASK_CONFIG.TASK.POSSIBLE_ACTIONS[0]
+        # if (
+        #     config.RL.POLICY.action_distribution_type == "gaussian"
+        #     or len(self.discrete_actions) > 0
+        # ):
+        #     config.defrost()
+        #     config.TASK_CONFIG.TASK.POSSIBLE_ACTIONS = ["VELOCITY_CONTROL"]
+        #     config.freeze()
 
     @property
     def obs_space(self):
@@ -288,7 +289,7 @@ class PPOTrainer(BaseRLTrainer):
 
         if self.config.RL.POLICY.action_distribution_type == "gaussian":
             self.policy_action_space = self.envs.action_spaces[0][
-                "VELOCITY_CONTROL"
+                self.action_type
             ]
             action_shape = self.policy_action_space.n
             discrete_actions = False
@@ -503,7 +504,7 @@ class PPOTrainer(BaseRLTrainer):
         ):
             if self.config.RL.POLICY.action_distribution_type == "gaussian":
                 step_action = action_to_velocity_control(
-                    act, num_steps=self.num_steps_done
+                    act, self.action_type, num_steps=self.num_steps_done
                 )
             elif len(self.discrete_actions) > 0:
                 act2 = torch.tensor(
@@ -511,7 +512,7 @@ class PPOTrainer(BaseRLTrainer):
                     device='cpu',
                 )
                 step_action = action_to_velocity_control(
-                    act2, num_steps=self.num_steps_done
+                    act2, self.action_type, num_steps=self.num_steps_done
                 )
             else:
                 step_action = act.item()
@@ -968,7 +969,7 @@ class PPOTrainer(BaseRLTrainer):
 
         if self.config.RL.POLICY.action_distribution_type == "gaussian":
             self.policy_action_space = self.envs.action_spaces[0][
-                "VELOCITY_CONTROL"
+                self.action_type
             ]
             action_shape = self.policy_action_space.n
             action_type = torch.float
@@ -1073,7 +1074,7 @@ class PPOTrainer(BaseRLTrainer):
             # an int
             if self.config.RL.POLICY.action_distribution_type == "gaussian":
                 step_data = [
-                    action_to_velocity_control(a)
+                    action_to_velocity_control(a, self.action_type)
                     for a in actions.to(device="cpu")
                 ]
             elif len(self.discrete_actions) > 0:
@@ -1082,7 +1083,8 @@ class PPOTrainer(BaseRLTrainer):
                         torch.tensor(
                             self.discrete_actions[a.item()],
                             device='cpu',
-                        )
+                        ),
+                        self.action_type
                     )
                     for a in actions.to(device="cpu")
                 ]

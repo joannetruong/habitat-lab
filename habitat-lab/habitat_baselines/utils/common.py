@@ -117,7 +117,6 @@ class GaussianNet(nn.Module):
 
         return CustomNormal(mu, std)
 
-
 def linear_decay(epoch: int, total_num_updates: int) -> float:
     r"""Returns a multiplicative factor for linear value decay
 
@@ -535,6 +534,7 @@ def delete_folder(path: str) -> None:
 
 def action_to_velocity_control(
     action: torch.Tensor,
+    action_type: str = "VELOCITY_CONTROL",
     allow_sliding: bool = None,
     num_steps: float = -1,
 ) -> Union[int, str, Dict[str, Any]]:
@@ -546,7 +546,7 @@ def action_to_velocity_control(
         hor_vel = hor_vel.item()
     step_action = {
         "action": {
-            "action": "VELOCITY_CONTROL",
+            "action": action_type,
             "action_args": {
                 "lin_vel": lin_vel.item(),
                 "ang_vel": ang_vel.item(),
