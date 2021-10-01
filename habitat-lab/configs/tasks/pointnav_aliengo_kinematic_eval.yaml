@@ -22,15 +22,11 @@ SIMULATOR:
     MIN_DEPTH: 0.3
     HFOV: 70
     ORIENTATION: [0.0, 0.0, 0.0]
-    POSITION: [0.0, 0.60, -0.1778]
+    POSITION: [0.0, 0.30, 0.0]
 TASK:
   TYPE: MultiNav-v0
-#  ROBOTS: ['A1', 'AlienGo', 'Daisy']
-#  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-#               "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-#               "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
-  ROBOTS: [ 'A1']
-  ROBOT_URDFS: [ "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
+  ROBOTS: [ 'AlienGo']
+  ROBOT_URDFS: [ "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf"]
 
   SUCCESS_DISTANCE: 0.425
 
@@ -47,12 +43,9 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-#      LIN_VEL_RANGES: [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]
-#      HOR_VEL_RANGES: [[-0.50, 0.50], [-0.35, 0.35], [-0.15, 0.15]]
-#      ANG_VEL_RANGES: [[-45.0, 45.0], [-30, 30], [-10.0, 10.0]]
-      LIN_VEL_RANGES: [ [ -0.50, 0.50 ] ]
-      HOR_VEL_RANGES: [ [ -0.50, 0.50 ]]
-      ANG_VEL_RANGES: [ [ -45.0, 45.0 ]]
+      LIN_VEL_RANGES: [[-0.35, 0.35] ]
+      HOR_VEL_RANGES: [[-0.35, 0.35]]
+      ANG_VEL_RANGES: [[-30, 30]]
 
   MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL', 'COLLISIONS']
   SUCCESS:

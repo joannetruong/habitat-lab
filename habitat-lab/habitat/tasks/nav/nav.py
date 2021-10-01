@@ -56,7 +56,7 @@ try:
     import habitat_sim
 except ImportError:
     pass
-    
+
 from .spot_utils.raibert_controller import Raibert_controller_turn_stable
 
 cv2 = try_cv2_import()
@@ -1368,8 +1368,7 @@ class VelocityAction(SimulatorTaskAction):
         curr_rs = task.robot_id.transformation
         next_rs = task.robot_id.rigid_state
 
-        next_rs.translation = np.array(final_position) + np.array([
-            0.0, 0.425, 0.0,
+        next_rs.translation = np.array(final_position) + task.robot_wrapper.spawn_offset
         ])
         next_rs.rotation = mn.Quaternion.from_matrix(
                 task.robot_id.transformation.__matmul__(
@@ -1464,7 +1463,7 @@ class DynamicVelocityAction(VelocityAction):
             )
 
         return ActionSpace(action_dict)
-        
+
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
         super().reset(task=task, *args, **kwargs)
         agent_pos = kwargs['episode'].start_position
@@ -1587,9 +1586,9 @@ class DynamicVelocityAction(VelocityAction):
             final_rotation = agent_start_rot_copy
 
             task.robot_id.rigid_state = robot_start_rigid_state
-        
-        # assert navigable, 'navigable failed' 
-        # assert not snapped_pts_nan, 'snapped pts nan' 
+
+        # assert navigable, 'navigable failed'
+        # assert not snapped_pts_nan, 'snapped pts nan'
 
         agent_observations = self._sim.get_observations_at(
             position=final_position,
