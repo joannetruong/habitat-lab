@@ -1364,18 +1364,58 @@ class VelocityAction(SimulatorTaskAction):
             self.prev_ang_vel = 0.0
             return self._sim.get_observations_at()
 
+        """See if goal state causes interpenetration with surroundings"""
+
+        # Calculate next rigid state off agent rigid state
+
+        def cartesian_to_polar(x, y):
+            rho = np.sqrt(x ** 2 + y ** 2)
+            phi = np.arctan2(y, x)
+            return rho, phi
+
+        def quaternion_rotate_vector(quat: np.quaternion, v: np.array) -> np.array:
+            r"""Rotates a vector by a quaternion
+            Args:
+                quaternion: The quaternion to rotate by
+                v: The vector to rotate
+            Returns:
+                np.array: The rotated vector
+            """
+            vq = np.quaternion(0, 0, 0, 0)
+            vq.imag = v
+            return (quat * vq * quat.inverse()).imag
+
+        def quat_to_rad(rotation):
+            heading_vector = quaternion_rotate_vector(
+                rotation.inverse(), np.array([0, 0, -1])
+            )
+            phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+            return phi
+
+        heading = np.quaternion(goal_rigid_state.rotation.scalar, *goal_rigid_state.rotation.vector)
+        heading = -quat_to_rad(heading) + np.pi / 2
+
+        next_rs = mn.Matrix4.rotation_y(
+            mn.Rad(-heading),
+        ).__matmul__( # Rotate 180 deg yaw
+            mn.Matrix4.rotation(
+                mn.Rad(np.pi),
+                mn.Vector3((0.0, 1.0, 0.0)),
+            )
+        ).__matmul__( # Rotate 90 deg roll
+            mn.Matrix4.rotation(
+                mn.Rad(-np.pi / 2.0),
+                mn.Vector3((1.0, 0.0, 0.0)),
+            )
+        )
+
+        next_rs.translation = np.array(final_position) + np.array([
+            0.0, 0.425, 0.0,
+        ])
+
         # Check if next rigid state causes interpenetration
         curr_rs = task.robot_id.transformation
-        next_rs = task.robot_id.rigid_state
-
-        next_rs.translation = np.array(final_position) + task.robot_wrapper.spawn_offset
-        ])
-        next_rs.rotation = mn.Quaternion.from_matrix(
-                task.robot_id.transformation.__matmul__(
-                    task.robot_wrapper.rotation_offset.inverted()
-                ).rotation()
-            )
-        task.robot_id.rigid_state = next_rs
+        task.robot_id.transformation = next_rs
         collided = self._sim.contact_test(task.robot_id.object_id)
         if collided:
             # Interpenetration occurred. Revert to last rigid state.
@@ -1415,8 +1455,6 @@ class VelocityAction(SimulatorTaskAction):
         ) / self.time_step
         if kwargs.get('num_steps', -1) != -1:
             agent_observations["num_steps"] = kwargs["num_steps"]
-        # agent_observations["z"] = task.robot_wrapper.z
-        # agent_observations["z_model"] = task.robot_wrapper.z_model
 
         self.prev_ang_vel = ang_vel
         return agent_observations
@@ -1437,7 +1475,7 @@ class DynamicVelocityAction(VelocityAction):
         self.raibert_controller = Raibert_controller_turn_stable(
             control_frequency=self.ctrl_freq,
             num_timestep_per_HL_action=self.time_per_step,
-            robot="Spot"
+            robot='Spot'
         )
 
     @property
