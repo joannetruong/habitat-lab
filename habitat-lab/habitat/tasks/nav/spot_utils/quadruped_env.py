@@ -40,16 +40,16 @@ class A1():
         )
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.24, 0.0])
+        self.spawn_offset = np.array([0.0, 0.40, -0.1335])
         self.robot_specific_reset()
         self.z_in = torch.rand(1).requires_grad_(True)
-        self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
-        params_to_train = [self.z_in]
-        params_to_train += list(self.z_model.parameters())
-        self.z_optim = torch.optim.Adam(params_to_train,
-                                            lr=1e-4,
-                                            betas=[0.9, 0.999],
-                                            weight_decay=1e-2)
+        # self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
+        # params_to_train = [self.z_in]
+        # params_to_train += list(self.z_model.parameters())
+        # self.z_optim = torch.optim.Adam(params_to_train,
+        #                                     lr=1e-4,
+        #                                     betas=[0.9, 0.999],
+                                            # weight_decay=1e-2)
         # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
 
     def set_up_continuous_action_space(self):
@@ -299,7 +299,7 @@ class AlienGo(A1):
                                          -0.1, 0.6, -1.5,
                                          0.1, 0.6, -1.5]
 
-        self.spawn_offset = np.array([0.0, 0.30, 0.0])
+        self.spawn_offset = np.array([0.0, 0.47, -0.3235])
 
 class Laikago(A1):
     def __init__(self, sim=None, robot=None):
@@ -308,7 +308,7 @@ class Laikago(A1):
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2]
-        self.spawn_offset = np.array([0.0, 0.42, 0.0])
+        self.spawn_offset = np.array([0.0, 0.47, -0.3235])
 
 
 class Spot(A1):
@@ -320,7 +320,7 @@ class Spot(A1):
                                          -0.05, 0.7, -1.3]
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.425, 0.0])
+        self.spawn_offset = np.array([0.0, 0.425, -0.1778])
 
         # self._initial_joint_positions = [0.15, 0.7, -1.3,
         #                                  -0.4, 0.7, -1.3,

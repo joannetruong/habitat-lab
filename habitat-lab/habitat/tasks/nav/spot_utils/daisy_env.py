@@ -2,6 +2,7 @@ from .utils import rotate_vector_3d, euler_from_quaternion, get_rpy, quat_to_rad
 import gym, gym.spaces
 import numpy as np
 import magnum as mn
+import torch
 
 class Daisy():
     def __init__(self, sim=None, robot=None, dt=1/60):
@@ -12,7 +13,7 @@ class Daisy():
         self.torque_coef = 1.0
         self.high_level_action_dim = 2
         self.control = "position"
-        self.id = 0 
+        self.id = 0
         self._action_mapping = {
             'L_F_motor_1/X8_9': 0,
             'L_F_motor_2/X8_16': 1,
@@ -50,9 +51,10 @@ class Daisy():
                 mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
             )
         )
-        
+
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.42, 0.0])
+        self.spawn_offset = np.array([0.0, 0.30, -0.09])
+        self.z_in = torch.rand(1).requires_grad_(True)
 
     def joint_mapping(self, joint):
         index = [0, 1, 2, 9, 10, 11, 3, 4, 5, 12, 13, 14, 6, 7, 8, 15, 16, 17]

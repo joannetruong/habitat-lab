@@ -1300,7 +1300,7 @@ class VelocityAction(SimulatorTaskAction):
             )
             or not self.must_call_stop
             and task.measurements.measures['distance_to_goal'].get_metric()
-            < 0.2
+            < 0.425
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1409,9 +1409,7 @@ class VelocityAction(SimulatorTaskAction):
             )
         )
 
-        next_rs.translation = np.array(final_position) + np.array([
-            0.0, 0.425, 0.0,
-        ])
+        next_rs.translation = np.array(final_position) + task.robot_wrapper.spawn_offset
 
         # Check if next rigid state causes interpenetration
         curr_rs = task.robot_id.transformation
@@ -1433,17 +1431,25 @@ class VelocityAction(SimulatorTaskAction):
             self.prev_ang_vel = 0.0
             return self._sim.get_observations_at()
 
+        final_position = goal_rigid_state.translation
+        final_position_offset = goal_rigid_state.translation + task.robot_wrapper.spawn_offset
         final_rotation = [
             *goal_rigid_state.rotation.vector,
             goal_rigid_state.rotation.scalar,
         ]
-        final_position = goal_rigid_state.translation
 
+        # get observation at some height offset, depending on robot
         agent_observations = self._sim.get_observations_at(
-            position=final_position,
+            position=final_position_offset,
             rotation=final_rotation,
-            keep_agent_at_new_pose=True,
+            keep_agent_at_new_pose=False,
         )
+        # move agent along navmesh
+        _ = self._sim.set_agent_state(
+                position=final_position, 
+                rotation=final_rotation, 
+                reset_sensors=False
+            )
 
         # TODO: Make a better way to flag collisions
         self._sim._prev_sim_obs["collided"] = collided  # type: ignore
@@ -1550,7 +1556,7 @@ class DynamicVelocityAction(VelocityAction):
             )
             or not self.must_call_stop
             and task.measurements.measures['distance_to_goal'].get_metric()
-            < 0.2
+            < 0.425
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
