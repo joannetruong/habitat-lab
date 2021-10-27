@@ -7,10 +7,11 @@ Replaces the yaml file content with the location of the new directory.
 HABITAT_LAB = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/dan_res"
 EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
+EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
 TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
 EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
-SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/slurm_job_tempate.sh"
-EVAL_SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/eval_slurm_tempate.sh"
+SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/slurm_job_template.sh"
+EVAL_SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/eval_slurm_template.sh"
 
 import os
 import argparse
@@ -41,11 +42,13 @@ experiment_name = args.experiment_name
 
 dst_dir = os.path.join(RESULTS, experiment_name)
 exp_yaml_path  = os.path.join(HABITAT_LAB, EXP_YAML)
+eval_exp_yaml_path  = os.path.join(HABITAT_LAB, EVAL_EXP_YAML)
 task_yaml_path = os.path.join(HABITAT_LAB, TASK_YAML)
 eval_yaml_path = os.path.join(HABITAT_LAB, EVAL_YAML)
 new_task_yaml_path = os.path.join(dst_dir, os.path.basename(task_yaml_path))
 new_eval_yaml_path = os.path.join(dst_dir, os.path.basename(eval_yaml_path))
 new_exp_yaml_path  = os.path.join(dst_dir, os.path.basename(exp_yaml_path))
+new_eval_exp_yaml_path  = os.path.join(dst_dir, os.path.basename(eval_exp_yaml_path))
 
 # Training
 if not args.eval:
@@ -68,13 +71,21 @@ if not args.eval:
 
     robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
                         'AlienGo': "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-                        'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
+                        'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
                         'Spot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
                         }
 
+    robot_heights_dict = {'A1': [0.0, 0.40, -0.1335],
+                          'AlienGo': [0.0, 0.47, -0.3235],
+                          'Daisy': [0.0, 0.425, -0.1778],
+                          'Spot': [0.0, 0.30, -0.09]
+                         }
+
+                          
     robots = args.robots
     num_robots = len(robots)
     robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+    robots_heights = [robot_heights_dict[robot] for robot in robots]
 
     for idx, i in enumerate(task_yaml_data):
         if i.startswith('  TYPE: Nav-v0'):
@@ -104,6 +115,9 @@ if not args.eval:
         elif i.startswith('      ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
             task_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+        elif i.startswith('    POSITION:'):
+            task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
+
         # elif i.startswith('    POSITION: '):
             # task_yaml_data[idx] = "    POSITION: [0.0, {}, -0.1778]".format(robot_camera_pos)
         elif i.startswith('SEED:'):
@@ -167,30 +181,87 @@ else:
     with open(eval_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
 
+    robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+                        'AlienGo': "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+                        'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
+                        'Spot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+                        }
+
+    robots = args.robots
+    num_robots = len(robots)
+    robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+
+    for idx, i in enumerate(eval_yaml_data):
+        if i.startswith('  TYPE: Nav-v0'):
+            eval_yaml_data[idx] = "  TYPE: MultiNav-v0"
+        elif i.startswith('  ROBOTS:'):
+            eval_yaml_data[idx] = "  ROBOTS: {}".format(robots)
+        elif i.startswith('  ROBOT_URDFS:'):
+            eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith('  POSSIBLE_ACTIONS:'):
+            if args.control_type == 'dynamic':
+                control_type = "DYNAMIC_VELOCITY_CONTROL"
+            else:
+                control_type = "VELOCITY_CONTROL"
+            eval_yaml_data[idx] = "  POSSIBLE_ACTIONS: [\"{}\"]".format(control_type)
+        elif i.startswith('    VELOCITY_CONTROL:'):
+            if args.control_type == 'dynamic':
+                eval_yaml_data[idx] = "    DYNAMIC_VELOCITY_CONTROL:"
+        elif i.startswith('    DYNAMIC_VELOCITY_CONTROL:'):
+            if not args.control_type == 'dynamic':
+                eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
+        elif i.startswith('      LIN_VEL_RANGES:'):
+            lin_vel_ranges = [ast.literal_eval(n) for n in args.lin_vel_ranges]
+            eval_yaml_data[idx] = "      LIN_VEL_RANGES: {}".format(lin_vel_ranges)
+        elif i.startswith('      HOR_VEL_RANGES:'):
+            hor_vel_ranges = [ast.literal_eval(n) for n in args.hor_vel_ranges]
+            eval_yaml_data[idx] = "      HOR_VEL_RANGES: {}".format(hor_vel_ranges)
+        elif i.startswith('      ANG_VEL_RANGES:'):
+            ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
+            eval_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+        elif i.startswith('SEED:'):
+            eval_yaml_data[idx] = "SEED: {}".format(args.seed)
+
     with open(new_eval_yaml_path,'w') as f:
         f.write('\n'.join(eval_yaml_data))
     print("Created "+new_eval_yaml_path)
-    
+
     # Edit the stored experiment yaml file
-    with open(new_exp_yaml_path) as f:
+    with open(eval_exp_yaml_path) as f:
         exp_yaml_data = f.read().splitlines()
 
+    robots_underscore = '_'.join(robots)
     for idx, i in enumerate(exp_yaml_data):
         if i.startswith('BASE_TASK_CONFIG_PATH:'):
             exp_yaml_data[idx] = "BASE_TASK_CONFIG_PATH: '{}'".format(new_eval_yaml_path)
         elif i.startswith('TENSORBOARD_DIR:'):
-            tb_dir = 'tb_eval' if args.ckpt == -1 else 'tb_eval_{}'.format(args.ckpt)
+            tb_dir = 'tb_eval_{}'.format(robots_underscore) if args.ckpt == -1 else 'tb_eval_{}_ckpt={}'.format(robots_underscore, args.ckpt)
+            if args.video:
+                tb_dir = 'tb_eval_{}_video'.format(robots_underscore) if args.ckpt == -1 else 'tb_eval_{}_ckpt={}_video'.format(robots_underscore, args.ckpt)
             tb_dir = os.path.join(dst_dir, tb_dir)
             exp_yaml_data[idx] = "TENSORBOARD_DIR:    '{}'".format(tb_dir)
         elif i.startswith('NUM_PROCESSES:'):
             exp_yaml_data[idx] = "NUM_PROCESSES: 13"
         elif i.startswith('CHECKPOINT_FOLDER:'):
-            ckpt_dir = i.split()[-1][1:-1]
+            ckpt_dir = os.path.join(dst_dir,'checkpoints')
+        elif i.startswith('EVAL_CKPT_PATH_DIR:'):
+            if args.ckpt == -1:
+                exp_yaml_data[idx] = "EVAL_CKPT_PATH_DIR: '{}'".format(os.path.join(dst_dir,'checkpoints'))
+            else:
+                exp_yaml_data[idx] = "EVAL_CKPT_PATH_DIR: '{}/ckpt.{}.pth'".format(os.path.join(dst_dir,'checkpoints'), args.ckpt)
+        elif i.startswith('TXT_DIR:'):
+            exp_yaml_data[idx] = "TXT_DIR:            '{}'".format(os.path.join(dst_dir,'txts'))
         elif i.startswith('VIDEO_OPTION:'):
             if args.video:
                 exp_yaml_data[idx] = "VIDEO_OPTION: ['disk']"
             else:
                 exp_yaml_data[idx] = "VIDEO_OPTION: []"
+        elif i.startswith('SENSORS:'):
+            if args.video:
+                exp_yaml_data[idx] = "SENSORS: ['RGB_SENSOR','DEPTH_SENSOR']"
+        elif i.startswith('VIDEO_DIR:'):
+            if args.video:
+                exp_yaml_data[idx] = "VIDEO_DIR:          '{}_{}'".format(os.path.join(dst_dir,'video_dir'),robots_underscore)
         elif args.ckpt != -1:
             if i.startswith('EVAL_CKPT_PATH_DIR:'):
                 new_ckpt_dir = os.path.join(dst_dir, f'checkpoints/ckpt.{args.ckpt}.pth')
@@ -220,8 +291,13 @@ else:
     # Create slurm job
     with open(EVAL_SLURM_TEMPLATE) as f:
         slurm_data = f.read()
-        slurm_data = slurm_data.replace('YAML_PATH', new_exp_eval_yaml_path)
-        slurm_data = slurm_data.replace('JOB_NAME',  f'eval_{experiment_name}')
+        slurm_data = slurm_data.replace('TEMPLATE', f'eval_{experiment_name}_{robots_underscore}')
+        slurm_data = slurm_data.replace('HABITAT_REPO_PATH', HABITAT_LAB)
+        slurm_data = slurm_data.replace('CONFIG_YAML', new_exp_eval_yaml_path)
+        slurm_data = slurm_data.replace('PARTITION', args.partition)
+        if args.partition == 'overcap':
+            slurm_data = slurm_data.replace('# ACCOUNT', '#SBATCH --account overcap')
+
     slurm_path = os.path.join(dst_dir, experiment_name+'_eval.sh')
     with open(slurm_path,'w') as f:
         f.write(slurm_data)
@@ -230,7 +306,7 @@ else:
     # Submit slurm job
     cmd = 'sbatch '+slurm_path
     subprocess.check_call(cmd.split(), cwd=dst_dir)
-    print('\nSee output with:\ntail -F {}'.format(os.path.join(dst_dir, 'eval_'+experiment_name+'_eval.err')))
+    print('\nSee output with:\ntail -F {}'.format(os.path.join(dst_dir, 'eval_'+experiment_name+'_'+robots_underscore+'.err')))
 
     # cmd = 'tmuxs eval_{}\n'.format(experiment_name)
     # cmd += 'srun --gres gpu:1 --nodes 1 --partition long --job-name eval_{} --exclude calculon --pty bash \n'.format(experiment_name)
