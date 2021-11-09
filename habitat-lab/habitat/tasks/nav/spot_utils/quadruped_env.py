@@ -12,12 +12,13 @@ from .z_model import *
 import torch
 
 class A1():
-    def __init__(self, sim=None, robot=None):
+    def __init__(self, sim=None, robot=None, rand_id=None, reset=True):
         # self.torque = config.get("torque", 1.0)
+        self.name = 'A1'
+        self.id = rand_id
         self.robot = robot
         self.high_level_action_dim = 2
         self.sim = sim
-        self.id = 0
         self.control = "position"
         self.ordered_joints = np.arange(12)  # hip out, hip forward, knee
         self.linear_velocity = 0.35
@@ -26,7 +27,12 @@ class A1():
                                          0.05, 0.60, -1.5,
                                          -0.05, 0.65, -1.5,
                                          0.05, 0.65, -1.5]
-        # Spot needs to rolled 90 deg then yaw'd 180 deg relative to agent
+        self.feet_link_ids = [5, 9, 13, 17]
+        # Spawn the URDF 0.18 meters above the navmesh upon reset
+        self.robot_spawn_offset = np.array([0.0, 0.28, 0])
+        self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
+        self.z_in = torch.rand(1).requires_grad_(True)
+        # The robots need to rolled 90 deg then yaw'd 180 deg relative to agent
         self.rotation_offset = mn.Matrix4.rotation_y(
             mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
         ).__matmul__(
@@ -38,19 +44,16 @@ class A1():
                 mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
             )
         )
-
-        # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.40, -0.1335])
-        self.robot_specific_reset()
-        self.z_in = torch.rand(1).requires_grad_(True)
-        # self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
-        # params_to_train = [self.z_in]
-        # params_to_train += list(self.z_model.parameters())
-        # self.z_optim = torch.optim.Adam(params_to_train,
-        #                                     lr=1e-4,
-        #                                     betas=[0.9, 0.999],
-                                            # weight_decay=1e-2)
-        # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
+        if reset:
+            self.robot_specific_reset()
+            # self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
+            # params_to_train = [self.z_in]
+            # params_to_train += list(self.z_model.parameters())
+            # self.z_optim = torch.optim.Adam(params_to_train,
+            #                                     lr=1e-4,
+            #                                     betas=[0.9, 0.999],
+                                                # weight_decay=1e-2)
+            # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
 
     def set_up_continuous_action_space(self):
         self.high_level_action_space = gym.spaces.Box(
@@ -292,37 +295,56 @@ class A1():
 
 
 class AlienGo(A1):
-    def __init__(self, sim=None, robot=None):
-        super().__init__(sim=sim, robot=robot)
+    def __init__(self, sim=None, robot=None, rand_id=None):
+        super().__init__(sim=sim, robot=robot, rand_id=None)
+        self.name = 'AlienGo'
         self._initial_joint_positions = [-0.1, 0.60, -1.5,
                                          0.1, 0.60, -1.5,
                                          -0.1, 0.6, -1.5,
                                          0.1, 0.6, -1.5]
 
-        self.spawn_offset = np.array([0.0, 0.47, -0.3235])
+        self.feet_link_ids = [4, 8, 12, 16] ### FL, FR, RL, RR
+        # self.feet_link_ids = [12]
+        self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
+
 
 class Laikago(A1):
-    def __init__(self, sim=None, robot=None):
-        super().__init__(sim=sim, robot=robot)
+    def __init__(self, sim=None, robot=None, rand_id=None):
+        super().__init__(sim=sim, robot=robot, rand_id=None)
+        self.name = 'Laikago'
         self._initial_joint_positions = [-0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2]
-        self.spawn_offset = np.array([0.0, 0.47, -0.3235])
+        self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
 
 
 class Spot(A1):
-    def __init__(self, sim=None, robot=None):
-        super().__init__(sim=sim, robot=robot)
+    def __init__(self, sim=None, robot=None, rand_id=None):
+        super().__init__(sim=sim, robot=robot, rand_id=None)
+        self.name = 'Spot'
         self._initial_joint_positions = [0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3,
                                          0.05, 0.7, -1.3,
                                          -0.05, 0.7, -1.3]
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.425, -0.1778])
+        self.robot_spawn_offset = np.array([0.0, 0.525, 0])
+        self.camera_spawn_offset = np.array([0.0, 0.425, -0.425])
 
         # self._initial_joint_positions = [0.15, 0.7, -1.3,
         #                                  -0.4, 0.7, -1.3,
         #                                  0.15, 0.7, -1.3,
         #                                  -0.4, 0.7, -1.3]
+
+class Locobot(A1):
+    def __init__(self, sim=None, robot=None, rand_id=None):
+        super().__init__(sim=sim, robot=robot, rand_id=None, reset=False)
+        self.name = 'Locobot'
+        self._initial_joint_positions = []
+
+        # Spawn the URDF 0.425 meters above the navmesh upon reset
+        self.robot_spawn_offset = np.array([0.0, -0.02, 0])
+        self.camera_spawn_offset = np.array([0.0, 0.31, -0.55])

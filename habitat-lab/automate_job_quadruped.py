@@ -50,6 +50,23 @@ new_eval_yaml_path = os.path.join(dst_dir, os.path.basename(eval_yaml_path))
 new_exp_yaml_path  = os.path.join(dst_dir, os.path.basename(exp_yaml_path))
 new_eval_exp_yaml_path  = os.path.join(dst_dir, os.path.basename(eval_exp_yaml_path))
 
+robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+                    'AlienGo': "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+                    'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
+                    'Spot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf",
+                    'Locobot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/locobot/urdf/locobot_description2.urdf"
+                    }
+
+# robot_heights_dict = {'A1': [0.0, 0.18, -0.24],
+#                       'AlienGo': [0.0, 0.25, -0.3235],
+#                       'Daisy': [0.0, 0.14, -0.27],
+#                       'Spot': [0.0, 0.425, -0.425]
+#                      }
+robots = args.robots
+num_robots = len(robots)
+robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+robots_underscore = '_'.join(robots)
+
 # Training
 if not args.eval:
 
@@ -68,24 +85,8 @@ if not args.eval:
     # Create task yaml file, using file within Habitat Lab repo as a template
     with open(task_yaml_path) as f:
         task_yaml_data = f.read().splitlines()
-
-    robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-                        'AlienGo': "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-                        'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
-                        'Spot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
-                        }
-
-    robot_heights_dict = {'A1': [0.0, 0.40, -0.1335],
-                          'AlienGo': [0.0, 0.47, -0.3235],
-                          'Daisy': [0.0, 0.425, -0.1778],
-                          'Spot': [0.0, 0.30, -0.09]
-                         }
-
                           
-    robots = args.robots
-    num_robots = len(robots)
-    robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
-    robots_heights = [robot_heights_dict[robot] for robot in robots]
+    # robots_heights = [robot_heights_dict[robot] for robot in robots]
 
     for idx, i in enumerate(task_yaml_data):
         if i.startswith('  TYPE: Nav-v0'):
@@ -115,8 +116,8 @@ if not args.eval:
         elif i.startswith('      ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
             task_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
-        elif i.startswith('    POSITION:'):
-            task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
+        # elif i.startswith('    POSITION:'):
+            # task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
 
         # elif i.startswith('    POSITION: '):
             # task_yaml_data[idx] = "    POSITION: [0.0, {}, -0.1778]".format(robot_camera_pos)
@@ -181,16 +182,6 @@ else:
     with open(eval_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
 
-    robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-                        'AlienGo': "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-                        'Daisy': "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
-                        'Spot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
-                        }
-
-    robots = args.robots
-    num_robots = len(robots)
-    robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
-
     for idx, i in enumerate(eval_yaml_data):
         if i.startswith('  TYPE: Nav-v0'):
             eval_yaml_data[idx] = "  TYPE: MultiNav-v0"
@@ -222,6 +213,7 @@ else:
         elif i.startswith('SEED:'):
             eval_yaml_data[idx] = "SEED: {}".format(args.seed)
 
+    new_eval_yaml_path = new_eval_yaml_path[:-len('.yaml')]+'_'+robots_underscore+'.yaml'
     with open(new_eval_yaml_path,'w') as f:
         f.write('\n'.join(eval_yaml_data))
     print("Created "+new_eval_yaml_path)
@@ -230,7 +222,6 @@ else:
     with open(eval_exp_yaml_path) as f:
         exp_yaml_data = f.read().splitlines()
 
-    robots_underscore = '_'.join(robots)
     for idx, i in enumerate(exp_yaml_data):
         if i.startswith('BASE_TASK_CONFIG_PATH:'):
             exp_yaml_data[idx] = "BASE_TASK_CONFIG_PATH: '{}'".format(new_eval_yaml_path)
@@ -284,7 +275,7 @@ else:
         ckpt_file = os.path.join(ckpt_dir, 'ckpt.{}.pth'.format(args.ckpt))
         assert os.path.isfile(ckpt_file), '{} does not exist'.format(ckpt_file)
 
-    new_exp_eval_yaml_path = new_exp_yaml_path[:-len('.yaml')]+'_eval.yaml'
+    new_exp_eval_yaml_path = new_exp_yaml_path[:-len('.yaml')]+'_eval_'+robots_underscore+'.yaml'
     with open(new_exp_eval_yaml_path,'w') as f:
         f.write('\n'.join(exp_yaml_data))
 
@@ -298,7 +289,7 @@ else:
         if args.partition == 'overcap':
             slurm_data = slurm_data.replace('# ACCOUNT', '#SBATCH --account overcap')
 
-    slurm_path = os.path.join(dst_dir, experiment_name+'_eval.sh')
+    slurm_path = os.path.join(dst_dir, experiment_name+'_eval_'+robots_underscore+'.sh')
     with open(slurm_path,'w') as f:
         f.write(slurm_data)
     print("Generated slurm job: "+slurm_path)

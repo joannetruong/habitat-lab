@@ -1179,11 +1179,12 @@ class VelocityAction(SimulatorTaskAction):
         self.min_ang_vel, self.max_ang_vel = self.ang_vels[0]
         self.min_hor_vel, self.max_hor_vel = self.hor_vels[0]
 
-        self.has_hor_vel = self.min_hor_vel != 0.0 and self.max_hor_vel != 0.0
+        # self.has_hor_vel = self.min_hor_vel != 0.0 and self.max_hor_vel != 0.0
         self.min_abs_hor_speed = config.MIN_ABS_HOR_SPEED
 
         self.ctrl_freq = config.CTRL_FREQ
         self.dt = 1.0/self.ctrl_freq
+        print('VELOCITY CONTROL INIT')
 
     @property
     def action_space(self):
@@ -1200,12 +1201,12 @@ class VelocityAction(SimulatorTaskAction):
             ),
         }
 
-        if self.has_hor_vel:
-            action_dict['horizontal_velocity'] = spaces.Box(
-                low=np.array([self.min_hor_vel]),
-                high=np.array([self.max_hor_vel]),
-                dtype=np.float32,
-            )
+        # if self.has_hor_vel:
+        action_dict['horizontal_velocity'] = spaces.Box(
+            low=np.array([self.min_hor_vel]),
+            high=np.array([self.max_hor_vel]),
+            dtype=np.float32,
+        )
 
         return ActionSpace(action_dict)
 
@@ -1214,33 +1215,34 @@ class VelocityAction(SimulatorTaskAction):
         self.prev_ang_vel = 0.0
 
     def _reset_robot(self, task, agent_pos, agent_rot):
-        # Spawn robot to agent location
         task.robot_id.transformation = mn.Matrix4.from_(
-            agent_rot.__matmul__(
-                task.robot_wrapper.rotation_offset
-            ).rotation(),  # 3x3 rotation
-            agent_pos + task.robot_wrapper.spawn_offset  # translation vector
-        )  # 4x4 homogenous transform
+                agent_rot.__matmul__(
+                    task.robot_wrapper.rotation_offset
+                ).rotation(),  # 3x3 rotation
+                agent_pos + task.robot_wrapper.robot_spawn_offset  # translation vector
+            )  # 4x4 homogenous transform
 
-        # Set joints to default positions
-        task.robot_wrapper.robot_specific_reset()
+        # Spawn robot to agent location
+        if task.robot_wrapper.name != 'Locobot':
+            # Set joints to default positions
+            task.robot_wrapper.robot_specific_reset()
 
-        # Reset joint motor controllers
-        for i in range(12):
-            task.robot_id.update_joint_motor(i,
-                habitat_sim.physics.JointMotorSettings(
-                    task.robot_wrapper._initial_joint_positions[i],  # position_target
-                    self.pos_gain[i % 3],  # position_gain
-                    0,  # velocity_target
-                    self.vel_gain[i % 3],  # velocity_gain
-                    10.0,  # max_impulse
+            # Reset joint motor controllers
+            for i in range(12):
+                task.robot_id.update_joint_motor(i,
+                    habitat_sim.physics.JointMotorSettings(
+                        task.robot_wrapper._initial_joint_positions[i],  # position_target
+                        self.pos_gain[i % 3],  # position_gain
+                        0,  # velocity_target
+                        self.vel_gain[i % 3],  # velocity_gain
+                        10.0,  # max_impulse
+                    )
                 )
-            )
 
-        # Reset raibert controller
-        self.raibert_controller.set_init_state(
-            task.robot_wrapper.calc_state()
-        )
+            # Reset raibert controller
+            self.raibert_controller.set_init_state(
+                task.robot_wrapper.calc_state()
+            )
 
     def rescale_actions(self, task: EmbodiedTask, lin_vel: float, ang_vel: float, hor_vel: float):
         # Convert from [-1, 1] to [0, 1] range
@@ -1266,6 +1268,18 @@ class VelocityAction(SimulatorTaskAction):
 
         return lin_vel, ang_vel, hor_vel
 
+    def get_curr_rigid_state(self):
+        agent_state = self._sim.get_agent_state()
+        normalized_quaternion = np.normalized(agent_state.rotation)
+        agent_mn_quat = mn.Quaternion(
+            normalized_quaternion.imag, normalized_quaternion.real
+        )
+        current_rigid_state = RigidState(
+            agent_mn_quat,
+            agent_state.position,
+        )
+        return current_rigid_state
+
     def step(
         self,
         *args: Any,
@@ -1288,6 +1302,8 @@ class VelocityAction(SimulatorTaskAction):
             time_step: amount of time to move the agent for
             allow_sliding: whether the agent will slide on collision
         """
+        curr_rs = task.robot_id.transformation
+
         if time_step is None:
             time_step = self.time_step
         lin_vel, ang_vel, hor_vel = self.rescale_actions(task, lin_vel, ang_vel, hor_vel)
@@ -1320,6 +1336,9 @@ class VelocityAction(SimulatorTaskAction):
             [0.0, ang_vel, 0.0]
         )
         agent_state = self._sim.get_agent_state()
+        # agent_state.depth.position[2] = agent_state.depth.position[2] - 0.3235
+        
+
         normalized_quaternion = np.normalized(agent_state.rotation)
         agent_mn_quat = mn.Quaternion(
             normalized_quaternion.imag, normalized_quaternion.real
@@ -1328,7 +1347,7 @@ class VelocityAction(SimulatorTaskAction):
             agent_mn_quat,
             agent_state.position,
         )
-
+        start_rigid_state = current_rigid_state
         # manually integrate the rigid state
         goal_rigid_state = self.vel_control.integrate_transform(
             time_step, current_rigid_state
@@ -1351,8 +1370,11 @@ class VelocityAction(SimulatorTaskAction):
         # filter.
         EPS = 1e-5
         collided = (dist_moved_after_filter + EPS) < dist_moved_before_filter
+
         if collided:
             agent_observations = self._sim.get_observations_at()
+
+            # agent_observations = self._sim.get_observations_at()
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
             agent_observations["hit_navmesh"] = True
             agent_observations["moving_backwards"] = False
@@ -1362,7 +1384,7 @@ class VelocityAction(SimulatorTaskAction):
                 agent_observations["num_steps"] = kwargs["num_steps"]
 
             self.prev_ang_vel = 0.0
-            return self._sim.get_observations_at()
+            return agent_observations
 
         """See if goal state causes interpenetration with surroundings"""
 
@@ -1409,16 +1431,11 @@ class VelocityAction(SimulatorTaskAction):
             )
         )
 
-        next_rs.translation = np.array(final_position) + task.robot_wrapper.spawn_offset
-
-        # Check if next rigid state causes interpenetration
-        curr_rs = task.robot_id.transformation
+        next_rs.translation = np.array(final_position) + task.robot_wrapper.robot_spawn_offset
         task.robot_id.transformation = next_rs
         collided = self._sim.contact_test(task.robot_id.object_id)
         if collided:
-            # Interpenetration occurred. Revert to last rigid state.
             task.robot_id.transformation = curr_rs
-
             agent_observations = self._sim.get_observations_at()
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
             agent_observations["hit_navmesh"] = True
@@ -1429,28 +1446,21 @@ class VelocityAction(SimulatorTaskAction):
                 agent_observations["num_steps"] = kwargs["num_steps"]
 
             self.prev_ang_vel = 0.0
-            return self._sim.get_observations_at()
+            return agent_observations
 
         final_position = goal_rigid_state.translation
-        final_position_offset = goal_rigid_state.translation + task.robot_wrapper.spawn_offset
+        
         final_rotation = [
             *goal_rigid_state.rotation.vector,
             goal_rigid_state.rotation.scalar,
         ]
 
-        # get observation at some height offset, depending on robot
+        print('FINAL POSITIONS: ', final_position)
         agent_observations = self._sim.get_observations_at(
-            position=final_position_offset,
+            position=final_position,
             rotation=final_rotation,
-            keep_agent_at_new_pose=False,
+            keep_agent_at_new_pose=True,
         )
-        # move agent along navmesh
-        _ = self._sim.set_agent_state(
-                position=final_position, 
-                rotation=final_rotation, 
-                reset_sensors=False
-            )
-
         # TODO: Make a better way to flag collisions
         self._sim._prev_sim_obs["collided"] = collided  # type: ignore
         agent_observations["hit_navmesh"] = collided
@@ -1617,6 +1627,7 @@ class DynamicVelocityAction(VelocityAction):
             )
 
         snapped_pt = self._sim.pathfinder.snap_point(final_position)
+        print('############: SNAPPED PT ############: ', snapped_pt)
         snapped_pts_nan = any([math.isnan(x) for x in snapped_pt])
 
 

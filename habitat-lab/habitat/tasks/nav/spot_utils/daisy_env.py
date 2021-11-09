@@ -7,6 +7,7 @@ import torch
 class Daisy():
     def __init__(self, sim=None, robot=None, dt=1/60):
         # config["urdf_path"] = "daisy/daisy_advanced_side.urdf"
+        self.name = 'Daisy'
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
         self.torque = 1.0
@@ -53,7 +54,8 @@ class Daisy():
         )
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.spawn_offset = np.array([0.0, 0.30, -0.09])
+        self.robot_spawn_offset = np.array([0.0, 0.14, 0.0])
+        self.camera_spawn_offset = np.array([0.0, 0.14, -0.27])
         self.z_in = torch.rand(1).requires_grad_(True)
 
     def joint_mapping(self, joint):
