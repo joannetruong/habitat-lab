@@ -6,10 +6,6 @@ Replaces the yaml file content with the location of the new directory.
 
 HABITAT_LAB = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/dan_res"
-EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
-EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
-TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
-EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
 SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/slurm_job_template.sh"
 EVAL_SLURM_TEMPLATE = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/eval_slurm_template.sh"
 
@@ -30,6 +26,7 @@ parser.add_argument('-vx','--lin_vel_ranges', nargs='+', required=True)
 parser.add_argument('-vy','--hor_vel_ranges', nargs='+', required=True)
 parser.add_argument('-vt','--ang_vel_ranges', nargs='+', required=True)
 parser.add_argument('-p','--partition', type=str, default='long')
+parser.add_argument('-ds','--dataset', type=str, default='gibson')
 # Evaluation
 parser.add_argument('-e','--eval', default=False, action='store_true')
 parser.add_argument('-cpt','--ckpt', type=int, default=-1)
@@ -37,6 +34,18 @@ parser.add_argument('-v','--video', default=False, action='store_true')
 
 parser.add_argument('-d','--debug', default=False, action='store_true')
 args = parser.parse_args()
+
+if args.dataset == 'hm3d':
+    EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train_hm3d_gibson.yaml"
+    EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval_hm3d_gibson.yaml"
+    TASK_YAML = "configs/tasks/pointnav_quadruped_train_hm3d_gibson.yaml"
+    EVAL_YAML = "configs/tasks/pointnav_quadruped_eval_hm3d_gibson.yaml"
+else:
+    EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
+    EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
+    TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
+    EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
+
 experiment_name = args.experiment_name
 
 
@@ -57,15 +66,21 @@ robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.u
                     'Locobot': "/coc/testnvme/jtruong33/data/URDF_demo_assets/locobot/urdf/locobot_description2.urdf"
                     }
 
-# robot_heights_dict = {'A1': [0.0, 0.18, -0.24],
-#                       'AlienGo': [0.0, 0.25, -0.3235],
-#                       'Daisy': [0.0, 0.14, -0.27],
-#                       'Spot': [0.0, 0.425, -0.425]
-#                      }
+robot_goal_dict = {'A1': 0.24,
+                   'AlienGo': 0.3235,
+                   'Locobot': 0.2,
+                   'Spot': 0.425
+                  }
 robots = args.robots
 num_robots = len(robots)
 robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+if num_robots > 1:
+    robot_goal = 0.425
+else: 
+    robot_goal = robot_goal_dict[robots[0]]
 robots_underscore = '_'.join(robots)
+if args.control_type == 'dynamic':
+    robots_underscore += '_dynamic'
 
 # Training
 if not args.eval:
@@ -116,6 +131,10 @@ if not args.eval:
         elif i.startswith('      ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
             task_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+        elif i.startswith('  SUCCESS_DISTANCE:'):
+            task_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal)
+        elif i.startswith('    SUCCESS_DISTANCE:'):
+            task_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(robot_goal)
         # elif i.startswith('    POSITION:'):
             # task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
 
@@ -210,6 +229,10 @@ else:
         elif i.startswith('      ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
             eval_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+        elif i.startswith('  SUCCESS_DISTANCE:'):
+            eval_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal)
+        elif i.startswith('    SUCCESS_DISTANCE:'):
+            eval_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(robot_goal)
         elif i.startswith('SEED:'):
             eval_yaml_data[idx] = "SEED: {}".format(args.seed)
 
@@ -279,6 +302,8 @@ else:
     with open(new_exp_eval_yaml_path,'w') as f:
         f.write('\n'.join(exp_yaml_data))
 
+    if args.video:
+        robots_underscore += '_video'
     # Create slurm job
     with open(EVAL_SLURM_TEMPLATE) as f:
         slurm_data = f.read()

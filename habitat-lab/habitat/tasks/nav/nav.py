@@ -541,6 +541,7 @@ class Success(Measure):
     def update_metric(
             self, episode, task: EmbodiedTask, *args: Any, **kwargs: Any
     ):
+        # print('SUCCESS: ', task.robot_wrapper.robot_dist_to_goal)
         distance_to_target = task.measurements.measures[
             DistanceToGoal.cls_uuid
         ].get_metric()
@@ -548,7 +549,7 @@ class Success(Measure):
         if (
                 hasattr(task, "is_stop_called")
                 and task.is_stop_called  # type: ignore
-                and distance_to_target < self._config.SUCCESS_DISTANCE
+                and distance_to_target < task.robot_wrapper.robot_dist_to_goal
         ):
             self._metric = 1.0
         else:
@@ -1316,7 +1317,7 @@ class VelocityAction(SimulatorTaskAction):
             )
             or not self.must_call_stop
             and task.measurements.measures['distance_to_goal'].get_metric()
-            < 0.425
+            < task.robot_wrapper.robot_dist_to_goal
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1487,13 +1488,6 @@ class DynamicVelocityAction(VelocityAction):
         self.pos_gain = np.ones((3,)) * 0.1  # 0.2
         self.vel_gain = np.ones((3,)) * 1.0  # 1.5
 
-        # Raibert controller
-        self.raibert_controller = Raibert_controller_turn_stable(
-            control_frequency=self.ctrl_freq,
-            num_timestep_per_HL_action=self.time_per_step,
-            robot='Spot'
-        )
-
     @property
     def action_space(self):
         action_dict = {
@@ -1509,12 +1503,12 @@ class DynamicVelocityAction(VelocityAction):
             ),
         }
 
-        if self.has_hor_vel:
-            action_dict['horizontal_velocity'] = spaces.Box(
-                low=np.array([self.min_hor_vel]),
-                high=np.array([self.max_hor_vel]),
-                dtype=np.float32,
-            )
+        # if self.has_hor_vel:
+        action_dict['horizontal_velocity'] = spaces.Box(
+            low=np.array([self.min_hor_vel]),
+            high=np.array([self.max_hor_vel]),
+            dtype=np.float32,
+        )
 
         return ActionSpace(action_dict)
 
@@ -1528,6 +1522,13 @@ class DynamicVelocityAction(VelocityAction):
             ).to_matrix(),
             mn.Vector3(0.0, 0.0, 0.0)
         )  # 4x4 homogenous transform with no translation
+
+        # Raibert controller
+        self.raibert_controller = Raibert_controller_turn_stable(
+            control_frequency=self.ctrl_freq,
+            num_timestep_per_HL_action=self.time_per_step,
+            robot=task.robot_wrapper.name
+        )
 
         self._reset_robot(task, agent_pos, agent_rot)
 
@@ -1566,7 +1567,7 @@ class DynamicVelocityAction(VelocityAction):
             )
             or not self.must_call_stop
             and task.measurements.measures['distance_to_goal'].get_metric()
-            < 0.425
+            < task.robot_wrapper.robot_dist_to_goal
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1617,9 +1618,9 @@ class DynamicVelocityAction(VelocityAction):
         ).to_euler()
         roll_fall = np.abs(roll) > 0.75 and np.abs(roll) < 2.39
         pitch_fall = np.abs(pitch) > 0.75 and np.abs(pitch) < 2.39
-        z_fall = final_position[1] < 0.49 or final_position[1] > 0.7
+        z_fall = final_position[1] < 0.1
 
-        if roll_fall or pitch_fall or z_fall:
+        if z_fall:
             print('terminating episode')
             task.is_stop_called = True
             return self._sim.get_observations_at(

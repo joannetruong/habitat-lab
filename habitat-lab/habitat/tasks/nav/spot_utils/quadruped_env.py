@@ -30,6 +30,7 @@ class A1():
         self.feet_link_ids = [5, 9, 13, 17]
         # Spawn the URDF 0.18 meters above the navmesh upon reset
         self.robot_spawn_offset = np.array([0.0, 0.28, 0])
+        self.robot_dist_to_goal = 0.24
         self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
         self.z_in = torch.rand(1).requires_grad_(True)
         # The robots need to rolled 90 deg then yaw'd 180 deg relative to agent
@@ -306,6 +307,7 @@ class AlienGo(A1):
         self.feet_link_ids = [4, 8, 12, 16] ### FL, FR, RL, RR
         # self.feet_link_ids = [12]
         self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.robot_dist_to_goal = 0.3235
         self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
 
 
@@ -318,6 +320,7 @@ class Laikago(A1):
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2]
         self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.robot_dist_to_goal = 0.3235
         self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
 
 
@@ -332,6 +335,7 @@ class Spot(A1):
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         self.robot_spawn_offset = np.array([0.0, 0.525, 0])
+        self.robot_dist_to_goal = 0.425
         self.camera_spawn_offset = np.array([0.0, 0.425, -0.425])
 
         # self._initial_joint_positions = [0.15, 0.7, -1.3,
@@ -347,4 +351,5 @@ class Locobot(A1):
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         self.robot_spawn_offset = np.array([0.0, -0.02, 0])
+        self.robot_dist_to_goal = 0.2
         self.camera_spawn_offset = np.array([0.0, 0.31, -0.55])
