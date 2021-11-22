@@ -1485,7 +1485,7 @@ class DynamicVelocityAction(VelocityAction):
         # Joint motor gains
         config = kwargs["config"]
         self.time_per_step = config.TIME_PER_STEP
-        self.pos_gain = np.ones((3,)) * 0.1  # 0.2
+        self.pos_gain = np.array([0.1, 0.1, 0.3])
         self.vel_gain = np.ones((3,)) * 1.0  # 1.5
 
     @property

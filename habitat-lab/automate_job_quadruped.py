@@ -275,7 +275,10 @@ else:
                 exp_yaml_data[idx] = "SENSORS: ['RGB_SENSOR','DEPTH_SENSOR']"
         elif i.startswith('VIDEO_DIR:'):
             if args.video:
-                exp_yaml_data[idx] = "VIDEO_DIR:          '{}_{}'".format(os.path.join(dst_dir,'video_dir'),robots_underscore)
+                if args.ckpt:
+                    exp_yaml_data[idx] = "VIDEO_DIR:          '{}_{}_ckpt={}'".format(os.path.join(dst_dir,'video_dir'),robots_underscore, args.ckpt)
+                else:
+                    exp_yaml_data[idx] = "VIDEO_DIR:          '{}_{}'".format(os.path.join(dst_dir,'video_dir'),robots_underscore)
         elif args.ckpt != -1:
             if i.startswith('EVAL_CKPT_PATH_DIR:'):
                 new_ckpt_dir = os.path.join(dst_dir, f'checkpoints/ckpt.{args.ckpt}.pth')

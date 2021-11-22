@@ -23,10 +23,10 @@ class A1():
         self.ordered_joints = np.arange(12)  # hip out, hip forward, knee
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
-        self._initial_joint_positions = [-0.05, 0.60, -1.5,
-                                         0.05, 0.60, -1.5,
-                                         -0.05, 0.65, -1.5,
-                                         0.05, 0.65, -1.5]
+        self._initial_joint_positions = [0.05, 0.60, -1.5,
+                                         -0.05, 0.60, -1.5,
+                                         0.05, 0.65, -1.5,
+                                         -0.05, 0.65, -1.5]
         self.feet_link_ids = [5, 9, 13, 17]
         # Spawn the URDF 0.18 meters above the navmesh upon reset
         self.robot_spawn_offset = np.array([0.0, 0.28, 0])
@@ -81,21 +81,22 @@ class A1():
     def set_up_discrete_action_space(self):
         assert False, "A1 does not support discrete actions"
 
-    def remap_joints(self, joints):
-        joint_remapped = [0] * len(joints)
-        joint_remapped[0] = joints[3]
-        joint_remapped[1] = joints[4]
-        joint_remapped[2] = joints[5]
-        joint_remapped[3] = joints[0]
-        joint_remapped[4] = joints[1]
-        joint_remapped[5] = joints[2]
-        joint_remapped[6] = joints[9]
-        joint_remapped[7] = joints[10]
-        joint_remapped[8] = joints[11]
-        joint_remapped[9] = joints[6]
-        joint_remapped[10] = joints[7]
-        joint_remapped[11] = joints[8]
-        return joint_remapped
+    def remap_gib_hab(self, habitat_mapping):
+        gibson_mapping = [0] * len(habitat_mapping)
+        # remap from Gibson mapping: FR, FL, RR, RL to Habitat mapping: FL, FR, RL, RR
+        gibson_mapping[0] = habitat_mapping[3]
+        gibson_mapping[1] = habitat_mapping[4]
+        gibson_mapping[2] = habitat_mapping[5]
+        gibson_mapping[3] = habitat_mapping[0]
+        gibson_mapping[4] = habitat_mapping[1]
+        gibson_mapping[5] = habitat_mapping[2]
+        gibson_mapping[6] = habitat_mapping[9]
+        gibson_mapping[7] = habitat_mapping[10]
+        gibson_mapping[8] = habitat_mapping[11]
+        gibson_mapping[9] = habitat_mapping[6]
+        gibson_mapping[10] = habitat_mapping[7]
+        gibson_mapping[11] = habitat_mapping[8]
+        return gibson_mapping
 
     def quat_to_rad(self, rotation):
         heading_vector = quaternion_rotate_vector(
@@ -156,8 +157,8 @@ class A1():
         """
         joint_positions = self.robot.joint_positions
         joint_velocities = self.robot.joint_velocities
-        joint_positions_remapped = self.remap_joints(joint_positions)
-        joint_velocities_remapped = self.remap_joints(joint_velocities)
+        joint_positions_remapped = self.remap_gib_hab(joint_positions)
+        joint_velocities_remapped = self.remap_gib_hab(joint_velocities)
 
         robot_state = self.robot.rigid_state
         base_pos = robot_state.translation
@@ -234,10 +235,11 @@ class A1():
         Args:
             a (list): List of floats. Length must be equal to len(self.ordered_joints).
         """
+        actions_remapped = self.remap_gib_hab(action)
         assert (np.isfinite(action).all())
         assert len(action) == len(self.ordered_joints)
         for n, j in enumerate(self.ordered_joints):
-            a = float(np.clip(action[n], -np.pi / 2, np.pi / 2))
+            a = float(np.clip(actions_remapped[n], -np.pi / 2, np.pi / 2))
             self.set_mtr_pos(n, a)
 
     def robot_specific_reset(self, joint_pos=None):
@@ -299,10 +301,10 @@ class AlienGo(A1):
     def __init__(self, sim=None, robot=None, rand_id=None):
         super().__init__(sim=sim, robot=robot, rand_id=None)
         self.name = 'AlienGo'
-        self._initial_joint_positions = [-0.1, 0.60, -1.5,
-                                         0.1, 0.60, -1.5,
-                                         -0.1, 0.6, -1.5,
-                                         0.1, 0.6, -1.5]
+        self._initial_joint_positions = [0.1, 0.60, -1.5,
+                                         -0.1, 0.60, -1.5,
+                                         0.1, 0.6, -1.5,
+                                         -0.1, 0.6, -1.5]
 
         self.feet_link_ids = [4, 8, 12, 16] ### FL, FR, RL, RR
         # self.feet_link_ids = [12]
@@ -315,10 +317,10 @@ class Laikago(A1):
     def __init__(self, sim=None, robot=None, rand_id=None):
         super().__init__(sim=sim, robot=robot, rand_id=None)
         self.name = 'Laikago'
-        self._initial_joint_positions = [-0.1, 0.65, -1.2,
-                                         0.1, 0.65, -1.2,
+        self._initial_joint_positions = [0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2,
-                                         0.1, 0.65, -1.2]
+                                         0.1, 0.65, -1.2,
+                                         -0.1, 0.65, -1.2]
         self.robot_spawn_offset = np.array([0.0, 0.35, 0])
         self.robot_dist_to_goal = 0.3235
         self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
@@ -337,11 +339,6 @@ class Spot(A1):
         self.robot_spawn_offset = np.array([0.0, 0.525, 0])
         self.robot_dist_to_goal = 0.425
         self.camera_spawn_offset = np.array([0.0, 0.425, -0.425])
-
-        # self._initial_joint_positions = [0.15, 0.7, -1.3,
-        #                                  -0.4, 0.7, -1.3,
-        #                                  0.15, 0.7, -1.3,
-        #                                  -0.4, 0.7, -1.3]
 
 class Locobot(A1):
     def __init__(self, sim=None, robot=None, rand_id=None):
