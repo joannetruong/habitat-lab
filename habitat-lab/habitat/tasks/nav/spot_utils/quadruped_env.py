@@ -23,10 +23,11 @@ class A1():
         self.ordered_joints = np.arange(12)  # hip out, hip forward, knee
         self.linear_velocity = 0.35
         self.angular_velocity = 0.15
-        self._initial_joint_positions = [0.05, 0.60, -1.5,
-                                         -0.05, 0.60, -1.5,
-                                         0.05, 0.65, -1.5,
-                                         -0.05, 0.65, -1.5]
+        # Gibson mapping: FR, FL, RR, RL 
+        self._initial_joint_positions = [0.05, 0.60, -1.5,    #FL
+                                         -0.05, 0.60, -1.5,   #FR
+                                         0.05, 0.65, -1.5,    #RL
+                                         -0.05, 0.65, -1.5]   #RR
         self.feet_link_ids = [5, 9, 13, 17]
         # Spawn the URDF 0.18 meters above the navmesh upon reset
         self.robot_spawn_offset = np.array([0.0, 0.28, 0])

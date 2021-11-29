@@ -57,7 +57,7 @@ try:
 except ImportError:
     pass
 
-from .spot_utils.raibert_controller import Raibert_controller_turn_stable
+from .spot_utils.raibert_controller import Raibert_controller_turn, Raibert_controller_turn_stable
 
 cv2 = try_cv2_import()
 
@@ -1528,11 +1528,15 @@ class DynamicVelocityAction(VelocityAction):
         )  # 4x4 homogenous transform with no translation
 
         # Raibert controller
-        self.raibert_controller = Raibert_controller_turn_stable(
-            control_frequency=self.ctrl_freq,
-            num_timestep_per_HL_action=self.time_per_step,
-            robot=task.robot_wrapper.name
-        )
+        self.raibert_controller = Raibert_controller_turn(
+            control_frequency=self.ctrl_freq, 
+            num_timestep_per_HL_action=self.time_per_step, 
+            robot=self.task.robot_wrapper.name)
+        # self.raibert_controller = Raibert_controller_turn_stable(
+        #     control_frequency=self.ctrl_freq,
+        #     num_timestep_per_HL_action=self.time_per_step,
+        #     robot=task.robot_wrapper.name
+        # )
 
         self._reset_robot(task, agent_pos, agent_rot)
 
