@@ -21,7 +21,7 @@ class MultiNavigationTask(NavigationTask):
         self.robot_id = None
         self.robots = self._config.ROBOTS
         self.robot_files = self._config.ROBOT_URDFS
-        print('MULTI NAV INIT')
+        print('MULTINAV INIT')
 
     def reset(self, episode: Episode):
          # If robot was never spawned or was removed with previous scene
@@ -35,6 +35,7 @@ class MultiNavigationTask(NavigationTask):
             self._load_robot(rand_robot)
 
         observations = super().reset(episode)
+        observations['robot_id'] = rand_robot
         return observations
 
     def _load_robot(self, rand_robot):
@@ -66,7 +67,6 @@ class MultiNavigationTask(NavigationTask):
 
 
     def step(self, action: Dict[str, Any], episode: Episode):
-        print('MULTI NAV STEP')
         if "action_args" not in action or action["action_args"] is None:
             action["action_args"] = {}
         action_name = action["action"]
@@ -86,7 +86,7 @@ class MultiNavigationTask(NavigationTask):
                 task=self,
             )
         )
-        observations['z_in'] = self.robot_wrapper.z_in
+        observations['robot_id'] = self.robot_wrapper.id
         # observations['z_model'] = self.robot_wrapper.z_model
 
         self._is_episode_active = self._check_episode_is_active(

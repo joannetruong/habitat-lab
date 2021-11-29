@@ -111,7 +111,7 @@ def generate_pointnav_episode(
     furthest_dist_limit: float = 30,
     geodesic_to_euclid_min_ratio: float = 1.1,
     number_retries_per_target: int = 10,
-    robot: str = 'Daisy'
+    robot: str = 'Spot'
 ) -> Generator[NavigationEpisode, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
 
@@ -148,17 +148,17 @@ def generate_pointnav_episode(
     # Load Spot model
     if robot == 'A1':
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"
-        init_joint_positions = [-0.05, 0.60, -1.5,
-                                0.05, 0.60, -1.5,
-                                -0.05, 0.65, -1.5,
-                                0.05, 0.65, -1.5]
+        init_joint_positions = [0.05, 0.60, -1.5,
+                                -0.05, 0.60, -1.5,
+                                0.05, 0.65, -1.5,
+                                -0.05, 0.65, -1.5]
         z_offset = 0.28
     elif robot == 'AlienGo':
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf"
-        init_joint_positions = [-0.1, 0.60, -1.5,
-                                0.1, 0.60, -1.5,
-                                -0.1, 0.6, -1.5,
-                                0.1, 0.6, -1.5]
+        init_joint_positions = [0.1, 0.60, -1.5,
+                                -0.1, 0.60, -1.5,
+                                0.1, 0.6, -1.5,
+                                -0.1, 0.6, -1.5]
         z_offset = 0.35
     elif robot == 'Daisy':
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf"

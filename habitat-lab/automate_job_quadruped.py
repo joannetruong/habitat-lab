@@ -27,6 +27,7 @@ parser.add_argument('-vy','--hor_vel_ranges', nargs='+', required=True)
 parser.add_argument('-vt','--ang_vel_ranges', nargs='+', required=True)
 parser.add_argument('-p','--partition', type=str, default='long')
 parser.add_argument('-ds','--dataset', type=str, default='gibson')
+parser.add_argument('-z','--use_z', default=False, action='store_true')
 # Evaluation
 parser.add_argument('-e','--eval', default=False, action='store_true')
 parser.add_argument('-cpt','--ckpt', type=int, default=-1)
@@ -301,7 +302,10 @@ else:
         ckpt_file = os.path.join(ckpt_dir, 'ckpt.{}.pth'.format(args.ckpt))
         assert os.path.isfile(ckpt_file), '{} does not exist'.format(ckpt_file)
 
-    new_exp_eval_yaml_path = new_exp_yaml_path[:-len('.yaml')]+'_eval_'+robots_underscore+'.yaml'
+    if args.video:
+        new_exp_eval_yaml_path = new_exp_yaml_path[:-len('.yaml')]+'_eval_'+robots_underscore+'_video.yaml'
+    else:
+        new_exp_eval_yaml_path = new_exp_yaml_path[:-len('.yaml')]+'_eval_'+robots_underscore+'.yaml'
     with open(new_exp_eval_yaml_path,'w') as f:
         f.write('\n'.join(exp_yaml_data))
 

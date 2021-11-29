@@ -365,7 +365,7 @@ class PPOTrainer(BaseRLTrainer):
         if self._static_encoder:
             with torch.no_grad():
                 batch["visual_features"] = self._encoder(batch)
-
+        batch['robot_id'] = batch['robot_id'].reshape(-1, 1)
         self.rollouts.buffers["observations"][0] = batch
 
         self.current_episode_reward = torch.zeros(self.envs.num_envs, 1)
@@ -473,7 +473,6 @@ class PPOTrainer(BaseRLTrainer):
                 self.rollouts.current_rollout_step_idxs[buffer_index],
                 env_slice,
             ]
-
             profiling_wrapper.range_push("compute actions")
             (
                 values,
@@ -553,6 +552,7 @@ class PPOTrainer(BaseRLTrainer):
         )
         batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
+        batch['robot_id'] = batch['robot_id'].reshape(-1, 1)
         rewards = torch.tensor(
             rewards_l,
             dtype=torch.float,

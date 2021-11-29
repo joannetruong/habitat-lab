@@ -53,6 +53,15 @@ class PPO(nn.Module):
             lr=lr,
             eps=eps,
         )
+
+        # self.use_z = False
+        # if self.actor_critic.net.z_network is not None:
+        #     self.use_z = True
+        #     self.z_optimizer = torch.optim.Adam(list(filter(lambda p: p.requires_grad, self.actor_critic.net.z_network.parameters())),
+        #                                         lr=1e-4,
+        #                                         betas=[0.9, 0.999],
+        #                                         weight_decay=1e-2)
+
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
 

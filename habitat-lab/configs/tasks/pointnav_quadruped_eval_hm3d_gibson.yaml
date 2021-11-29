@@ -4,7 +4,7 @@ SIMULATOR:
   AGENT_0:
     SENSORS: ['DEPTH_SENSOR']
     HEIGHT: 0.60
-    RADIUS: 0.1
+    RADIUS: 0.0
   HABITAT_SIM_V0:
     ALLOW_SLIDING: False
   RGB_SENSOR:
@@ -25,6 +25,7 @@ SIMULATOR:
     POSITION: [0.0, 0.0, 0.0]
 TASK:
   TYPE: MultiNav-v0
+  USE_Z: False
   ROBOTS: ['Spot']
 #  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
   ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
@@ -55,4 +56,4 @@ TASK:
 DATASET:
   TYPE: PointNav-v1
   SPLIT: val
-  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_aliengo_0.4/{split}/{split}.json.gz
+  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.6/{split}/{split}.json.gz

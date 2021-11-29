@@ -32,6 +32,7 @@ from habitat_baselines.rl.ddppo.policy.running_mean_and_var import (
 from habitat_baselines.rl.models.rnn_state_encoder import (
     build_rnn_state_encoder,
 )
+from habitat_baselines.rl.models.z_model import ZEncoderNet 
 from habitat_baselines.rl.ppo import Net, Policy
 
 
@@ -49,6 +50,8 @@ class PointNavResNetPolicy(Policy):
         normalize_visual_inputs: bool = False,
         force_blind_policy: bool = False,
         action_distribution_type: str = "categorical",
+        robots: list = ['A1'],
+        use_z: bool = True,
         **kwargs
     ):
         discrete_actions = action_distribution_type == "categorical"
@@ -64,6 +67,8 @@ class PointNavResNetPolicy(Policy):
                 normalize_visual_inputs=normalize_visual_inputs,
                 force_blind_policy=force_blind_policy,
                 discrete_actions=discrete_actions,
+                robots=robots,
+                use_z=use_z,
             ),
             dim_actions=action_space.n,  # for action distribution
             action_distribution_type=action_distribution_type,
@@ -84,6 +89,8 @@ class PointNavResNetPolicy(Policy):
             normalize_visual_inputs="rgb" in observation_space.spaces,
             force_blind_policy=config.FORCE_BLIND_POLICY,
             action_distribution_type=config.RL.POLICY.action_distribution_type,
+            robots=config.TASK_CONFIG.TASK.ROBOTS,
+            use_z=config.TASK_CONFIG.TASK.USE_Z,
         )
 
 
@@ -208,10 +215,14 @@ class PointNavResNetNet(Net):
         normalize_visual_inputs: bool,
         force_blind_policy: bool = False,
         discrete_actions: bool = True,
+        robots: list = ['A1'],
+        use_z: bool = True,
     ):
         super().__init__()
 
         self.discrete_actions = discrete_actions
+        self.z_network = None
+        self.use_z = use_z
         if discrete_actions:
             self.prev_action_embedding = nn.Embedding(action_space.n + 1, 32)
         else:
@@ -326,6 +337,27 @@ class PointNavResNetNet(Net):
                 nn.ReLU(True),
             )
 
+        if self.use_z:
+            print('USING Z')
+            rnn_input_size += 1
+            num_prev = 50
+            # states are goal observations: r, cos_t, sin_t
+            self.prev_states = torch.zeros([3, 3 * num_prev])
+            # actions are vx, vy, vt
+            self.prev_actions = torch.zeros([3, 3 * num_prev])
+
+            num_inputs = (3 * num_prev * 2) + 4
+            self.z_network = ZEncoderNet(num_inputs=num_inputs, num_outputs=1)
+            # self.z_networks = []
+            # self.z_optims = []
+            self.z_ins = torch.rand((3,1)).requires_grad_(True)
+            ## URDF parameters for A1, AlienGo, LoCoBot
+            ## URDF parameters are speficied as: Mass (kg), Leg Length (m), Length (m), Width (m)
+            self.urdf_params = [torch.tensor([12.46, 0.4, 0.62, 0.3]), 
+                                torch.tensor([20.64, 0.5, 0.7, 0.4]), 
+                                torch.tensor([4.19, 0, 0.35, 0.35])]
+
+
         self.state_encoder = build_rnn_state_encoder(
             (0 if self.is_blind else self._hidden_size) + rnn_input_size,
             self._hidden_size,
@@ -379,6 +411,10 @@ class PointNavResNetNet(Net):
                     ],
                     -1,
                 )
+                if self.use_z:
+                    for curr_robot_id in observations['robot_id']:
+                        self.prev_states[int(curr_robot_id)] = torch.cat((self.prev_states[int(curr_robot_id)][3:], goal_observations[int(curr_robot_id)].cpu()), 0)
+
             else:
                 assert (
                     goal_observations.shape[1] == 3
@@ -397,7 +433,6 @@ class PointNavResNetNet(Net):
                     ],
                     -1,
                 )
-
             x.append(self.tgt_embeding(goal_observations))
 
         if PointGoalSensor.cls_uuid in observations:
@@ -452,9 +487,25 @@ class PointNavResNetNet(Net):
                 torch.where(masks.view(-1), prev_actions + 1, start_token)
             )
         else:
+            if self.use_z:
+                for curr_robot_id in observations['robot_id']:
+                    self.prev_actions[int(curr_robot_id)] = torch.cat((self.prev_actions[int(curr_robot_id)][3:], prev_actions[int(curr_robot_id)].cpu()), 0)
+
             prev_actions = self.prev_action_embedding(prev_actions.float())
 
         x.append(prev_actions)
+
+        if self.use_z:
+            z_out = []
+            for curr_robot_id in observations['robot_id']:
+                z_concat = torch.cat((
+                                      self.urdf_params[int(curr_robot_id)].to(curr_robot_id[0].device), 
+                                      self.prev_states[int(curr_robot_id)].to(curr_robot_id[0].device), 
+                                      self.prev_actions[int(curr_robot_id)].to(curr_robot_id[0].device)
+                                     ),
+                                      0)
+                z_out.append(self.z_network(z_concat))
+            x.append(torch.tensor(z_out, device=curr_robot_id[0].device).reshape(-1, 1))
 
         out = torch.cat(x, dim=1)
         out, rnn_hidden_states = self.state_encoder(

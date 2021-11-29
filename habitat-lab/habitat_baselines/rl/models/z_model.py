@@ -10,11 +10,11 @@ class ZEncoderNet(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.z_net = torch.nn.Sequential(torch.nn.Linear(num_inputs, 100),
+        self.z_net = torch.nn.Sequential(torch.nn.Linear(num_inputs, 256),
                             torch.nn.ReLU(),
-                            torch.nn.Linear(100, 100),
+                            torch.nn.Linear(256, 128),
                             torch.nn.ReLU(),
-                            torch.nn.Linear(100, num_outputs),
+                            torch.nn.Linear(128, num_outputs),
                             )
 
     def forward(self, x: Tensor):

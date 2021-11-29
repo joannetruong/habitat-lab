@@ -546,14 +546,18 @@ class Success(Measure):
             DistanceToGoal.cls_uuid
         ].get_metric()
 
-        if (
-                hasattr(task, "is_stop_called")
-                and task.is_stop_called  # type: ignore
-                and distance_to_target < task.robot_wrapper.robot_dist_to_goal
-        ):
-            self._metric = 1.0
-        else:
+        if distance_to_target == 999.99:
+            task.is_stop_called = True
             self._metric = 0.0
+        else:
+            if (
+                    hasattr(task, "is_stop_called")
+                    and task.is_stop_called  # type: ignore
+                    and distance_to_target < task.robot_wrapper.robot_dist_to_goal
+            ):
+                self._metric = 1.0
+            else:
+                self._metric = 0.0
 
 
 @registry.register_measure
@@ -1024,6 +1028,8 @@ class DistanceToGoal(Measure):
                     [goal.position for goal in episode.goals],
                     episode,
                 )
+                if distance_to_target == np.inf:
+                    distance_to_target = 999.99
             elif self._config.DISTANCE_TO == "VIEW_POINTS":
                 distance_to_target = self._sim.geodesic_distance(
                     current_position, self._episode_view_points, episode
@@ -1185,7 +1191,6 @@ class VelocityAction(SimulatorTaskAction):
 
         self.ctrl_freq = config.CTRL_FREQ
         self.dt = 1.0/self.ctrl_freq
-        print('VELOCITY CONTROL INIT')
 
     @property
     def action_space(self):
@@ -1456,7 +1461,6 @@ class VelocityAction(SimulatorTaskAction):
             goal_rigid_state.rotation.scalar,
         ]
 
-        print('FINAL POSITIONS: ', final_position)
         agent_observations = self._sim.get_observations_at(
             position=final_position,
             rotation=final_rotation,

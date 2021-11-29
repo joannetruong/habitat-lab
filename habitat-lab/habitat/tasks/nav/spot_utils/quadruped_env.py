@@ -32,7 +32,6 @@ class A1():
         self.robot_spawn_offset = np.array([0.0, 0.28, 0])
         self.robot_dist_to_goal = 0.24
         self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
-        self.z_in = torch.rand(1).requires_grad_(True)
         # The robots need to rolled 90 deg then yaw'd 180 deg relative to agent
         self.rotation_offset = mn.Matrix4.rotation_y(
             mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
@@ -47,13 +46,6 @@ class A1():
         )
         if reset:
             self.robot_specific_reset()
-            # self.z_model = ZEncoderNet(num_inputs=1, num_outputs=1)
-            # params_to_train = [self.z_in]
-            # params_to_train += list(self.z_model.parameters())
-            # self.z_optim = torch.optim.Adam(params_to_train,
-            #                                     lr=1e-4,
-            #                                     betas=[0.9, 0.999],
-                                                # weight_decay=1e-2)
             # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
 
     def set_up_continuous_action_space(self):
