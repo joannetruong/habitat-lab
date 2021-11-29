@@ -353,9 +353,9 @@ class PointNavResNetNet(Net):
             self.z_ins = torch.rand((3,1)).requires_grad_(True)
             ## URDF parameters for A1, AlienGo, LoCoBot
             ## URDF parameters are speficied as: Mass (kg), Leg Length (m), Length (m), Width (m)
-            self.urdf_params = [torch.tensor([12.46, 0.4, 0.62, 0.3]), 
-                                torch.tensor([20.64, 0.5, 0.7, 0.4]), 
-                                torch.tensor([4.19, 0, 0.35, 0.35])]
+            self.urdf_params = [torch.tensor([12.46, 0.40, 0.62, 0.30]), 
+                                torch.tensor([20.64, 0.50, 0.89, 0.34]), 
+                                torch.tensor([4.19, 0.0, 0.35, 0.35])]
 
 
         self.state_encoder = build_rnn_state_encoder(
