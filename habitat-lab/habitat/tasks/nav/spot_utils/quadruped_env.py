@@ -8,7 +8,6 @@ from habitat.tasks.utils import cartesian_to_polar
 from .utils import euler_from_quaternion, get_rpy, rotate_pos_from_hab, \
     scalar_vector_to_quat, rotate_vector_2d
 import squaternion
-from .z_model import *
 import torch
 
 class A1():
