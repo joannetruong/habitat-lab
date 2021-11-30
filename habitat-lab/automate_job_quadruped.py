@@ -69,14 +69,16 @@ robot_urdfs_dict = {'A1': "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.u
 
 robot_goal_dict = {'A1': 0.24,
                    'AlienGo': 0.3235,
-                   'Locobot': 0.2,
+                   'Locobot': 0.20,
                    'Spot': 0.425
                   }
 robots = args.robots
 num_robots = len(robots)
 robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+# print('robots: ', robots)
+# print('robot_goal_dict: ', robot_goal_dict)
 if num_robots > 1:
-    robot_goal = 0.425
+    robot_goal = min([robot_goal_dict[robot] for robot in robots])
 else: 
     robot_goal = robot_goal_dict[robots[0]]
 robots_underscore = '_'.join(robots)
@@ -111,6 +113,8 @@ if not args.eval:
             task_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith('  ROBOT_URDFS:'):
             task_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith('  USE_Z:'):
+            task_yaml_data[idx] = "  USE_Z: {}".format(args.use_z)
         elif i.startswith('  POSSIBLE_ACTIONS:'):
             if args.control_type == 'dynamic':
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -209,6 +213,8 @@ else:
             eval_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith('  ROBOT_URDFS:'):
             eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith('  USE_Z:'):
+            task_yaml_data[idx] = "  USE_Z: {}".format(args.use_z)
         elif i.startswith('  POSSIBLE_ACTIONS:'):
             if args.control_type == 'dynamic':
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
