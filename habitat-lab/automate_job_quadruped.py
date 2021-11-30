@@ -214,7 +214,7 @@ else:
         elif i.startswith('  ROBOT_URDFS:'):
             eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
         elif i.startswith('  USE_Z:'):
-            task_yaml_data[idx] = "  USE_Z: {}".format(args.use_z)
+            eval_yaml_data[idx] = "  USE_Z: {}".format(args.use_z)
         elif i.startswith('  POSSIBLE_ACTIONS:'):
             if args.control_type == 'dynamic':
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
