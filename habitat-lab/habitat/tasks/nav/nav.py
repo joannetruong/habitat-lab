@@ -1309,7 +1309,9 @@ class VelocityAction(SimulatorTaskAction):
             allow_sliding: whether the agent will slide on collision
         """
         curr_rs = task.robot_id.transformation
-
+        non_scale_lin = lin_vel
+        non_scale_horr = hor_vel
+        non_scale_ang = ang_vel
         if time_step is None:
             time_step = self.time_step
         lin_vel, ang_vel, hor_vel = self.rescale_actions(task, lin_vel, ang_vel, hor_vel)
@@ -1478,6 +1480,20 @@ class VelocityAction(SimulatorTaskAction):
             agent_observations["num_steps"] = kwargs["num_steps"]
 
         self.prev_ang_vel = ang_vel
+
+        try:
+            img = np.copy(agent_observations['rgb'])
+            font = cv2.FONT_HERSHEY_PLAIN
+            for_vel_text = 'Forw Vel: ' + str(np.round(non_scale_lin, 3)) 
+            hor_vel_text = 'Hori Vel: ' + str(np.round(non_scale_horr, 3)) 
+            ang_vel_text = 'Ang Vel: ' + str(np.round(non_scale_ang, 3)) 
+            cv2.putText(img, for_vel_text, (10,20), font, 1,(255,255,255),1)
+            cv2.putText(img, hor_vel_text, (10,40), font, 1,(255,255,255),1)
+            cv2.putText(img, ang_vel_text, (10,60), font, 1,(255,255,255),1)
+            agent_observations['rgb'] = img
+        except:
+            pass
+
         return agent_observations
 
 @registry.register_task_action
@@ -1564,7 +1580,9 @@ class DynamicVelocityAction(VelocityAction):
             time_step: amount of time to move the agent for
             allow_sliding: whether the agent will slide on collision
         """
-
+        non_scale_lin = lin_vel
+        non_scale_horr = hor_vel
+        non_scale_ang = ang_vel
         lin_vel, ang_vel, hor_vel = self.rescale_actions(task, lin_vel, ang_vel, hor_vel)
 
         if (
@@ -1669,6 +1687,19 @@ class DynamicVelocityAction(VelocityAction):
             agent_observations["num_steps"] = kwargs["num_steps"]
 
         self.prev_ang_vel = ang_vel
+
+        try:
+            img = np.copy(agent_observations['rgb'])
+            font = cv2.FONT_HERSHEY_PLAIN
+            for_vel_text = 'Forw Vel: ' + str(np.round(non_scale_lin, 3)) 
+            hor_vel_text = 'Hori Vel: ' + str(np.round(non_scale_horr, 3)) 
+            ang_vel_text = 'Ang Vel: ' + str(np.round(non_scale_ang, 3)) 
+            cv2.putText(img, for_vel_text, (10,20), font, 1,(255,255,255),1)
+            cv2.putText(img, hor_vel_text, (10,40), font, 1,(255,255,255),1)
+            cv2.putText(img, ang_vel_text, (10,60), font, 1,(255,255,255),1)
+            agent_observations['rgb'] = img
+        except:
+            pass
         return agent_observations
 
 @registry.register_task(name="Nav-v0")
