@@ -261,6 +261,12 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
                 "sensors",
                 "start_position",
                 "start_rotation",
+                "mass",
+                "linear_acceleration",
+                "angular_acceleration",
+                "linear_friction",
+                "angular_friction",
+                "coefficient_of_restitution",
             },
         )
 
