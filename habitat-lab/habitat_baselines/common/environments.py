@@ -115,6 +115,11 @@ class NavRLEnv(habitat.RLEnv):
             reward -= self._rl_config.BACKWARDS_PENALTY
         if observations.get("moving_sideways", False):
             reward -= self._rl_config.BACKWARDS_PENALTY
+        if "velocity_error" in observations:
+            velocity_error =  observations["velocity_error"]
+            vel_err_penalty = velocity_error * self._rl_config.VEL_ERR_PENALTY
+            print('reward: ', reward, ' penalty: ', vel_err_penalty)
+            reward -= vel_err_penalty
 
         if 'ang_accel' in observations:
             reward -= min(
@@ -136,3 +141,4 @@ class NavRLEnv(habitat.RLEnv):
 
     def get_info(self, observations):
         return self.habitat_env.get_metrics()
+        

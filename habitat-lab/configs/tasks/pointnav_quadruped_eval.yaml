@@ -45,6 +45,9 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
+      MAX_LIN_VEL_RANGE: [-0.50, 0.50]
+      MAX_HOR_VEL_RANGE: [-0.50, 0.50]
+      MAX_ANG_VEL_RANGE: [-17.19, 17.19]
       LIN_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]
@@ -55,5 +58,5 @@ TASK:
 
 DATASET:
   TYPE: PointNav-v1
-  SPLIT: train_contacttest
-  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_spot/gibson/v2/{split}/{split}.json.gz
+  SPLIT: train
+  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3/{split}/{split}.json.gz

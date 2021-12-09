@@ -79,5 +79,5 @@ RL:
     rnn_type: LSTM
     num_recurrent_layers: 2
 EVAL:
-    SPLIT: "val_contacttest"
+    SPLIT: "val"
     
