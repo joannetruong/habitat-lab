@@ -118,7 +118,7 @@ class NavRLEnv(habitat.RLEnv):
         if "velocity_error" in observations:
             velocity_error =  observations["velocity_error"]
             vel_err_penalty = velocity_error * self._rl_config.VEL_ERR_PENALTY
-            print('reward: ', reward, ' penalty: ', vel_err_penalty)
+            # print('reward: ', reward, ' penalty: ', vel_err_penalty)
             reward -= vel_err_penalty
 
         if 'ang_accel' in observations:

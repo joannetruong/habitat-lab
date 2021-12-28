@@ -29,6 +29,7 @@ parser.add_argument('-mvt','--max_ang_vel', type=float, default=17.19, required=
 parser.add_argument('-vx','--lin_vel_ranges', nargs='+', required=True)
 parser.add_argument('-vy','--hor_vel_ranges', nargs='+', required=True)
 parser.add_argument('-vt','--ang_vel_ranges', nargs='+', required=True)
+parser.add_argument('-nd','--noisy_depth', default=False, action='store_true')
 parser.add_argument('-p','--partition', type=str, default='long')
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument('-ds','--dataset', type=str, default='gibson')
@@ -49,8 +50,12 @@ if args.user == 'max':
 else:
     EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
     EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
-    TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
-    EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
+    if args.noisy_depth:
+        TASK_YAML = "configs/tasks/pointnav_quadruped_train_noisy.yaml"
+        EVAL_YAML = "configs/tasks/pointnav_quadruped_eval_noisy.yaml"
+    else:
+        TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
+        EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
 
 experiment_name = args.experiment_name
 
@@ -77,6 +82,9 @@ robot_goal_dict = {'A1': 0.24,
                    'Locobot': 0.20,
                    'Spot': 0.425
                   }
+
+# Threshold to subtract from training goal success radius 
+GOAL_THRESH = 0.05
 
 robot_data_dict = {'A1': 'pointnav_a1_0.2',
                    'AlienGo': 'pointnav_aliengo_0.22',
@@ -157,25 +165,25 @@ if not args.eval:
         elif i.startswith('    DYNAMIC_VELOCITY_CONTROL:'):
             if not args.control_type == 'dynamic':
                 task_yaml_data[idx] = "    VELOCITY_CONTROL:"
-        elif i.startswith('      MAX_LIN_VEL_RANGE:'):
-            task_yaml_data[idx] = "      MAX_LIN_VEL_RANGE: [{}, {}]".format(-args.max_lin_vel, args.max_lin_vel)
-        elif i.startswith('      MAX_HOR_VEL_RANGE:'):
-            task_yaml_data[idx] = "      MAX_HOR_VEL_RANGE: [{}, {}]".format(-args.max_hor_vel, args.max_hor_vel)
-        elif i.startswith('      MAX_ANG_VEL_RANGE:'):
-            task_yaml_data[idx] = "      MAX_ANG_VEL_RANGE: [{}, {}]".format(-args.max_ang_vel, args.max_ang_vel)
-        elif i.startswith('      LIN_VEL_RANGES:'):
+        elif i.startswith('      POLICY_LIN_VEL_RANGE:'):
+            task_yaml_data[idx] = "      POLICY_LIN_VEL_RANGE: [{}, {}]".format(-args.max_lin_vel, args.max_lin_vel)
+        elif i.startswith('      POLICY_HOR_VEL_RANGE:'):
+            task_yaml_data[idx] = "      POLICY_HOR_VEL_RANGE: [{}, {}]".format(-args.max_hor_vel, args.max_hor_vel)
+        elif i.startswith('      POLICY_ANG_VEL_RANGE:'):
+            task_yaml_data[idx] = "      POLICY_ANG_VEL_RANGE: [{}, {}]".format(-args.max_ang_vel, args.max_ang_vel)
+        elif i.startswith('      ROBOT_LIN_VEL_RANGES:'):
             lin_vel_ranges = [ast.literal_eval(n) for n in args.lin_vel_ranges]
-            task_yaml_data[idx] = "      LIN_VEL_RANGES: {}".format(lin_vel_ranges)
-        elif i.startswith('      HOR_VEL_RANGES:'):
+            task_yaml_data[idx] = "      ROBOT_LIN_VEL_RANGES: {}".format(lin_vel_ranges)
+        elif i.startswith('      ROBOT_HOR_VEL_RANGES:'):
             hor_vel_ranges = [ast.literal_eval(n) for n in args.hor_vel_ranges]
-            task_yaml_data[idx] = "      HOR_VEL_RANGES: {}".format(hor_vel_ranges)
-        elif i.startswith('      ANG_VEL_RANGES:'):
+            task_yaml_data[idx] = "      ROBOT_HOR_VEL_RANGES: {}".format(hor_vel_ranges)
+        elif i.startswith('      ROBOT_ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
-            task_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+            task_yaml_data[idx] = "      ROBOT_ANG_VEL_RANGES: {}".format(ang_vel_ranges)
         elif i.startswith('  SUCCESS_DISTANCE:'):
-            task_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal)
+            task_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal-GOAL_THRESH)
         elif i.startswith('    SUCCESS_DISTANCE:'):
-            task_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(robot_goal)
+            task_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(robot_goal-GOAL_THRESH)
         # elif i.startswith('    POSITION:'):
             # task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
 
@@ -271,15 +279,15 @@ else:
         elif i.startswith('    DYNAMIC_VELOCITY_CONTROL:'):
             if not args.control_type == 'dynamic':
                 eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
-        elif i.startswith('      LIN_VEL_RANGES:'):
+        elif i.startswith('      ROBOT_LIN_VEL_RANGES:'):
             lin_vel_ranges = [ast.literal_eval(n) for n in args.lin_vel_ranges]
-            eval_yaml_data[idx] = "      LIN_VEL_RANGES: {}".format(lin_vel_ranges)
-        elif i.startswith('      HOR_VEL_RANGES:'):
+            eval_yaml_data[idx] = "      ROBOT_LIN_VEL_RANGES: {}".format(lin_vel_ranges)
+        elif i.startswith('      ROBOT_HOR_VEL_RANGES:'):
             hor_vel_ranges = [ast.literal_eval(n) for n in args.hor_vel_ranges]
-            eval_yaml_data[idx] = "      HOR_VEL_RANGES: {}".format(hor_vel_ranges)
-        elif i.startswith('      ANG_VEL_RANGES:'):
+            eval_yaml_data[idx] = "      ROBOT_HOR_VEL_RANGES: {}".format(hor_vel_ranges)
+        elif i.startswith('      ROBOT_ANG_VEL_RANGES:'):
             ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
-            eval_yaml_data[idx] = "      ANG_VEL_RANGES: {}".format(ang_vel_ranges)
+            eval_yaml_data[idx] = "      ROBOT_ANG_VEL_RANGES: {}".format(ang_vel_ranges)
         elif i.startswith('  SUCCESS_DISTANCE:'):
             eval_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal)
         elif i.startswith('    SUCCESS_DISTANCE:'):

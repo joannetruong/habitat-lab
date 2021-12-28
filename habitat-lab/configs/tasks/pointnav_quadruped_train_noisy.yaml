@@ -23,6 +23,7 @@ SIMULATOR:
     HFOV: 70
     ORIENTATION: [0.0, 0.0, 0.0]
     POSITION: [0.0, 0.0, 0.0]
+    NOISE_MODEL: "RedwoodDepthNoiseModel"
 TASK:
   TYPE: MultiNav-v0
   USE_Z: False

@@ -31,6 +31,7 @@ class PointNavDatasetV1(Dataset):
 
     @staticmethod
     def check_config_paths_exist(config: Config) -> bool:
+        print('DATA PATH: ', config.DATA_PATH.format(split=config.SPLIT))
         return os.path.exists(
             config.DATA_PATH.format(split=config.SPLIT)
         ) and os.path.exists(config.SCENES_DIR)

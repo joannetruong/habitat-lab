@@ -21,7 +21,6 @@ class MultiNavigationTask(NavigationTask):
         self.robot_id = None
         self.robots = self._config.ROBOTS
         self.robot_files = self._config.ROBOT_URDFS
-        print('MULTINAV INIT')
 
     def reset(self, episode: Episode):
          # If robot was never spawned or was removed with previous scene
@@ -36,11 +35,11 @@ class MultiNavigationTask(NavigationTask):
 
         observations = super().reset(episode)
         observations['robot_id'] = rand_robot
+        observations['urdf_params'] = self.robot_wrapper.urdf_params
         return observations
 
     def _load_robot(self, rand_robot):
         # Add robot into the simulator
-        print('LOADING ROBOT: ', rand_robot)
 
         self.art_obj_mgr = self._sim.get_articulated_object_manager()
         self.robot_id = self.art_obj_mgr.add_articulated_object_from_urdf(
@@ -65,7 +64,6 @@ class MultiNavigationTask(NavigationTask):
         depth_sensor._spec.position = depth_pos_offset
         depth_sensor._sensor_object.set_transformation_from_spec()
 
-
     def step(self, action: Dict[str, Any], episode: Episode):
         if "action_args" not in action or action["action_args"] is None:
             action["action_args"] = {}
@@ -87,6 +85,7 @@ class MultiNavigationTask(NavigationTask):
             )
         )
         observations['robot_id'] = self.robot_wrapper.id
+        observations['urdf_params'] = self.robot_wrapper.urdf_params
         # observations['z_model'] = self.robot_wrapper.z_model
 
         self._is_episode_active = self._check_episode_is_active(

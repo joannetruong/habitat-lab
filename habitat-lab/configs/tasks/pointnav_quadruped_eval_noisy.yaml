@@ -23,6 +23,7 @@ SIMULATOR:
     HFOV: 70
     ORIENTATION: [0.0, 0.0, 0.0]
     POSITION: [0.0, 0.0, 0.0]
+    NOISE_MODEL: "RedwoodDepthNoiseModel"
 TASK:
   TYPE: MultiNav-v0
   USE_Z: False
@@ -45,9 +46,9 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-      POLICY_LIN_VEL_RANGE: [-0.50, 0.50]
-      POLICY_HOR_VEL_RANGE: [-0.50, 0.50]
-      POLICY_ANG_VEL_RANGE: [-17.19, 17.19]
+      POLICY_MAX_LIN_VEL_RANGE: [-0.50, 0.50]
+      POLICY_MAX_HOR_VEL_RANGE: [-0.50, 0.50]
+      POLICY_MAX_ANG_VEL_RANGE: [-17.19, 17.19]
       ROBOT_LIN_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ROBOT_HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ROBOT_ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]

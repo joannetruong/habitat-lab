@@ -32,7 +32,8 @@ from habitat_baselines.rl.ddppo.policy.running_mean_and_var import (
 from habitat_baselines.rl.models.rnn_state_encoder import (
     build_rnn_state_encoder,
 )
-from habitat_baselines.rl.models.z_model import ZEncoderNet 
+from habitat_baselines.rl.models.z_model import * 
+from habitat_baselines.utils.common import GaussianNet 
 from habitat_baselines.rl.ppo import Net, Policy
 
 
@@ -337,6 +338,7 @@ class PointNavResNetNet(Net):
                 nn.ReLU(True),
             )
 
+        self.use_mlp=False
         if self.use_z:
             print('USING Z')
             rnn_input_size += 1
@@ -346,16 +348,21 @@ class PointNavResNetNet(Net):
             # actions are vx, vy, vt
             self.prev_actions = torch.zeros([3, 3 * num_prev])
 
-            num_inputs = (3 * num_prev * 2) + 4
-            self.z_network = ZEncoderNet(num_inputs=num_inputs, num_outputs=1)
+            # 3 ROBOTS, 50 PREV STATES, 50 PREV ACTIONS, 4 URDF PARAMS, 1 LEARNABLE PARAMETER
+            num_inputs = (3 * num_prev * 2) + 4 
+            if self.use_mlp:
+                self.z_network = ZEncoderNet(num_inputs=num_inputs, num_outputs=1)
+            else:
+                self.z_network = ZVarEncoderNet(num_inputs, 1)
+                # self.z_network = GaussianNet(num_inputs, 1)
+
             # self.z_networks = []
             # self.z_optims = []
-            self.z_ins = torch.rand((3,1)).requires_grad_(True)
             ## URDF parameters for A1, AlienGo, LoCoBot
             ## URDF parameters are speficied as: Mass (kg), Leg Length (m), Length (m), Width (m)
-            self.urdf_params = [torch.tensor([12.46, 0.40, 0.62, 0.30]), 
-                                torch.tensor([20.64, 0.50, 0.89, 0.34]), 
-                                torch.tensor([4.19, 0.0, 0.35, 0.35])]
+            # self.urdf_params = [torch.tensor([12.46, 0.40, 0.62, 0.30]), 
+            #                     torch.tensor([20.64, 0.50, 0.89, 0.34]), 
+            #                     torch.tensor([4.19, 0.0, 0.35, 0.35])]
 
 
         self.state_encoder = build_rnn_state_encoder(
@@ -392,7 +399,6 @@ class PointNavResNetNet(Net):
                 visual_feats = observations["visual_features"]
             else:
                 visual_feats = self.visual_encoder(observations)
-
             visual_feats = self.visual_fc(visual_feats)
             x.append(visual_feats)
 
@@ -413,8 +419,10 @@ class PointNavResNetNet(Net):
                 )
                 if self.use_z:
                     for curr_robot_id in observations['robot_id']:
-                        self.prev_states[int(curr_robot_id)] = torch.cat((self.prev_states[int(curr_robot_id)][3:], goal_observations[int(curr_robot_id)].cpu()), 0)
-
+                        self.prev_states[int(curr_robot_id)] = torch.cat((
+                                                                          self.prev_states[int(curr_robot_id)][3:].to(curr_robot_id.squeeze().device), 
+                                                                          goal_observations[int(curr_robot_id)]), 
+                                                                          0)
             else:
                 assert (
                     goal_observations.shape[1] == 3
@@ -489,7 +497,10 @@ class PointNavResNetNet(Net):
         else:
             if self.use_z:
                 for curr_robot_id in observations['robot_id']:
-                    self.prev_actions[int(curr_robot_id)] = torch.cat((self.prev_actions[int(curr_robot_id)][3:], prev_actions[int(curr_robot_id)].cpu()), 0)
+                    self.prev_actions[int(curr_robot_id)] = torch.cat((
+                                                                        self.prev_actions[int(curr_robot_id)][3:].to(curr_robot_id.squeeze().device), 
+                                                                        prev_actions[int(curr_robot_id)]), 
+                                                                        0)
 
             prev_actions = self.prev_action_embedding(prev_actions.float())
 
@@ -497,15 +508,21 @@ class PointNavResNetNet(Net):
 
         if self.use_z:
             z_out = []
-            for curr_robot_id in observations['robot_id']:
+            for idx, curr_robot_id in enumerate(observations['robot_id']):
                 z_concat = torch.cat((
-                                      self.urdf_params[int(curr_robot_id)].to(curr_robot_id[0].device), 
-                                      self.prev_states[int(curr_robot_id)].to(curr_robot_id[0].device), 
-                                      self.prev_actions[int(curr_robot_id)].to(curr_robot_id[0].device)
+                                      observations['urdf_params'][idx],# self.urdf_params[int(curr_robot_id)].to(curr_robot_id.squeeze().device), 
+                                      self.prev_states[int(curr_robot_id)].to(curr_robot_id.squeeze().device), 
+                                      self.prev_actions[int(curr_robot_id)].to(curr_robot_id.squeeze().device)
                                      ),
                                       0)
-                z_out.append(self.z_network(z_concat))
-            x.append(torch.tensor(z_out, device=curr_robot_id[0].device).reshape(-1, 1))
+                z_dist = self.z_network(z_concat)
+                if self.use_mlp:
+                    z_out.append(z_dist)
+                else:
+                    sample = z_dist.sample()
+                    z_out.append(sample)
+            z_outs = torch.tensor(z_out, device=curr_robot_id.squeeze().device).reshape(-1, 1)
+            x.append(z_outs)
 
         out = torch.cat(x, dim=1)
         out, rnn_hidden_states = self.state_encoder(

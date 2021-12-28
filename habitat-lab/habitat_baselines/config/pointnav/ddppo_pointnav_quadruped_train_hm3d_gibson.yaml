@@ -1,4 +1,4 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_quadruped_train.yaml"
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_quadruped_train_hm3d_gibson.yaml"
 TOTAL_NUM_STEPS: 5e8
 
 VERBOSE: False
@@ -28,7 +28,6 @@ RL:
   COLLISION_PENALTY: 0.003
   BACKWARDS_PENALTY: 0.003
   FULL_GEODESIC_DECAY: -1.0
-  VEL_ERR_PENALTY: 0.03
 
   POLICY:
     name: "PointNavResNetPolicy"

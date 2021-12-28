@@ -54,14 +54,6 @@ class PPO(nn.Module):
             eps=eps,
         )
 
-        # self.use_z = False
-        # if self.actor_critic.net.z_network is not None:
-        #     self.use_z = True
-        #     self.z_optimizer = torch.optim.Adam(list(filter(lambda p: p.requires_grad, self.actor_critic.net.z_network.parameters())),
-        #                                         lr=1e-4,
-        #                                         betas=[0.9, 0.999],
-        #                                         weight_decay=1e-2)
-
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
 
@@ -142,6 +134,7 @@ class PPO(nn.Module):
                 self.before_backward(total_loss)
                 total_loss.backward()
                 self.after_backward(total_loss)
+
 
                 self.before_step()
                 self.optimizer.step()

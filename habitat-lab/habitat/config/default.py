@@ -82,12 +82,12 @@ ACTIONS.VELOCITY_CONTROL = CN()
 
 # KINEMATIC VELOCITY ACTION
 ACTIONS.VELOCITY_CONTROL.TYPE = "VelocityAction"
-ACTIONS.VELOCITY_CONTROL.MAX_LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.MAX_HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.MAX_ANG_VEL_RANGE = [-17.19, 17.19]  # deg per sec
-ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ANG_VEL_RANGES = [[-7.81, 7.81], [-9.77, 9.77], [-30, -30]]  # deg per sec
+ACTIONS.VELOCITY_CONTROL.POLICY_LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.POLICY_HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [-17.19, 17.19]  # deg per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [[-7.81, 7.81], [-9.77, 9.77], [-30, -30]]  # deg per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
@@ -225,6 +225,11 @@ _C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 # -----------------------------------------------------------------------------
 _C.TASK.COLLISIONS = CN()
 _C.TASK.COLLISIONS.TYPE = "Collisions"
+# -----------------------------------------------------------------------------
+# VELOCITY TRACKING ERROR MEASUREMENT
+# -----------------------------------------------------------------------------
+_C.TASK.VEL_TRK_ERR = CN()
+_C.TASK.VEL_TRK_ERR.TYPE = "VelTrkErr"
 # -----------------------------------------------------------------------------
 # HUMAN_COLLISION MEASUREMENT
 # -----------------------------------------------------------------------------
