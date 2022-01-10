@@ -41,9 +41,7 @@ class RolloutStorage:
                     dtype=observation_space.spaces[sensor].dtype,
                 )
             )
-        self.buffers["observations"]["robot_id"] = torch.zeros(numsteps +1, num_envs, 1)
-        self.buffers["observations"]["urdf_params"] = torch.zeros(numsteps +1, num_envs, 4)
-
+            
         self.buffers["recurrent_hidden_states"] = torch.zeros(
             numsteps + 1,
             num_envs,

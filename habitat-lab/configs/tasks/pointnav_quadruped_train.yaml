@@ -30,6 +30,9 @@ TASK:
 #  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
   ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
 
+  PREV_STATE_WINDOW: 50
+  PREV_ACTION_WINDOW: 50
+
   SUCCESS_DISTANCE: 0.425
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']

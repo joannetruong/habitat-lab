@@ -1,4 +1,5 @@
 from typing import Any, Dict, Optional
+from collections import deque
 
 import numpy as np
 
@@ -12,6 +13,8 @@ from habitat.utils.visualizations import maps
 from .spot_utils.quadruped_env import *
 from .spot_utils.daisy_env import *
 
+from habitat.tasks.nav.nav import IntegratedPointGoalGPSAndCompassSensor
+
 @registry.register_task(name="MultiNav-v0")
 class MultiNavigationTask(NavigationTask):
     def __init__(
@@ -21,6 +24,10 @@ class MultiNavigationTask(NavigationTask):
         self.robot_id = None
         self.robots = self._config.ROBOTS
         self.robot_files = self._config.ROBOT_URDFS
+        # if task reset happens everytime episode is reset, then create previous state deck here
+        ## init prev states
+        self.prev_states = deque(maxlen=self._config.PREV_STATE_WINDOW)
+        self.prev_actions = deque(maxlen=self._config.PREV_ACTION_WINDOW)
 
     def reset(self, episode: Episode):
          # If robot was never spawned or was removed with previous scene
@@ -36,6 +43,19 @@ class MultiNavigationTask(NavigationTask):
         observations = super().reset(episode)
         observations['robot_id'] = rand_robot
         observations['urdf_params'] = self.robot_wrapper.urdf_params
+
+        self.default_state_shape = 2  # for rho, phi
+        default_state = np.zeros(self.default_state_shape)
+        default_states = [default_state] * self._config.PREV_STATE_WINDOW
+        self.prev_states = deque(default_states, maxlen=self._config.PREV_STATE_WINDOW)
+
+        self.default_action_shape = 3  # for vx, vy, vt
+        default_action = np.zeros(self.default_action_shape)
+        default_actions = [default_action] * self._config.PREV_ACTION_WINDOW
+        self.prev_actions = deque(default_actions, maxlen=self._config.PREV_ACTION_WINDOW)
+        
+        observations['prev_states'] = self.prev_states
+        observations['prev_actions'] = self.prev_actions
         return observations
 
     def _load_robot(self, rand_robot):
@@ -86,6 +106,23 @@ class MultiNavigationTask(NavigationTask):
         )
         observations['robot_id'] = self.robot_wrapper.id
         observations['urdf_params'] = self.robot_wrapper.urdf_params
+
+        prev_states_array = np.array(self.prev_states)
+        # assert len(prev_states_array) == self.default_state_shape * len(self.prev_states)
+        observations['prev_states'] = prev_states_array
+
+        current_state = observations[IntegratedPointGoalGPSAndCompassSensor.cls_uuid]
+        self.prev_states.append(current_state)
+
+        prev_actions_array = np.array(self.prev_actions)
+        # assert len(prev_actions_array) == self.default_action_shape * len(self.prev_actions)
+        observations['prev_actions'] = prev_actions_array
+
+        current_action = np.array([action["action_args"]["lin_vel"],
+                                   action["action_args"]["hor_vel"], 
+                                   action["action_args"]["ang_vel"]
+                                  ])
+        self.prev_actions.append(current_action)
         # observations['z_model'] = self.robot_wrapper.z_model
 
         self._is_episode_active = self._check_episode_is_active(

@@ -6,6 +6,7 @@
 
 
 from typing import Dict, Tuple
+from collections import OrderedDict, deque
 
 import numpy as np
 import torch
@@ -36,6 +37,7 @@ from habitat_baselines.rl.models.z_model import *
 from habitat_baselines.utils.common import GaussianNet 
 from habitat_baselines.rl.ppo import Net, Policy
 
+DEQUE_LENGTH = 150
 
 @baseline_registry.register_policy
 class PointNavResNetPolicy(Policy):
@@ -93,6 +95,43 @@ class PointNavResNetPolicy(Policy):
             robots=config.TASK_CONFIG.TASK.ROBOTS,
             use_z=config.TASK_CONFIG.TASK.USE_Z,
         )
+
+
+    def get_metrics(self):
+
+        def get_mean(deq):
+            if not deq:
+                return -1
+            return np.mean(deq)
+
+        z_encodings_dict = {
+            k: get_mean(v)
+            for k, v in self.net.z_deques.items()
+        }
+
+        name = "z_encodings"
+
+        z_inputs_dict = {
+            k: v.z_in.clone().detach()
+            for k, v in self.net.z_networks.items()
+        }
+
+        z_in_name = "z_inputs"
+        ac_metrics = [(name, z_encodings_dict), (z_in_name, z_inputs_dict)]
+
+
+        return ac_metrics
+
+    def act(self, *args, **kwargs):
+        self.net.acting = True
+        ret = super().act(*args, **kwargs)
+        self.net.acting = False
+        return ret
+
+    def to(self, device):
+        super().to(device)
+        for z_net in self.net.z_networks.values():
+            z_net.to(device)
 
 
 class ResNetEncoder(nn.Module):
@@ -198,7 +237,6 @@ class ResNetEncoder(nn.Module):
         x = self.compression(x)
         return x
 
-
 class PointNavResNetNet(Net):
     """Network which passes the input image through CNN and concatenates
     goal vector with CNN's output and passes that through RNN.
@@ -221,6 +259,14 @@ class PointNavResNetNet(Net):
     ):
         super().__init__()
 
+        self.acting = False
+        self.z_deques = OrderedDict(
+            {
+                "a1_z_out": deque(maxlen=DEQUE_LENGTH),
+                "aliengo_z_out": deque(maxlen=DEQUE_LENGTH),
+                "locobot_z_out": deque(maxlen=DEQUE_LENGTH),
+            }
+        )
         self.discrete_actions = discrete_actions
         self.z_network = None
         self.use_z = use_z
@@ -339,31 +385,34 @@ class PointNavResNetNet(Net):
             )
 
         self.use_mlp=False
+        # self.z_enc = ['urdf', 'prev_states', 'prev_actions']
+        self.z_enc = ['urdf']
+        # self.z_enc = []
         if self.use_z:
-            print('USING Z')
-            rnn_input_size += 1
+            print('USING Z: ', self.z_enc)
+            z_in_dim = 1
+            num_outputs = 1
+            rnn_input_size += num_outputs
+
             num_prev = 50
-            # states are goal observations: r, cos_t, sin_t
-            self.prev_states = torch.zeros([3, 3 * num_prev])
-            # actions are vx, vy, vt
-            self.prev_actions = torch.zeros([3, 3 * num_prev])
-
+            num_inputs = z_in_dim
             # 3 ROBOTS, 50 PREV STATES, 50 PREV ACTIONS, 4 URDF PARAMS, 1 LEARNABLE PARAMETER
-            num_inputs = (3 * num_prev * 2) + 4 
+            if 'urdf' in self.z_enc:
+                num_inputs += 4
+            if 'prev_states' in self.z_enc:
+                num_inputs += 3 * num_prev
+            if 'prev_actions' in self.z_enc:
+                num_inputs += 3 * num_prev
+            # num_inputs = (3 * num_prev * 2) + 4 + z_in_dim
             if self.use_mlp:
-                self.z_network = ZEncoderNet(num_inputs=num_inputs, num_outputs=1)
+                net_cls = ZEncoderNet
             else:
-                self.z_network = ZVarEncoderNet(num_inputs, 1)
+                net_cls = ZVarEncoderNet
+            self.z_networks = {
+                k: net_cls(num_inputs, num_outputs)
+                for k in ["a1", "aliengo", "locobot"]
+            }
                 # self.z_network = GaussianNet(num_inputs, 1)
-
-            # self.z_networks = []
-            # self.z_optims = []
-            ## URDF parameters for A1, AlienGo, LoCoBot
-            ## URDF parameters are speficied as: Mass (kg), Leg Length (m), Length (m), Width (m)
-            # self.urdf_params = [torch.tensor([12.46, 0.40, 0.62, 0.30]), 
-            #                     torch.tensor([20.64, 0.50, 0.89, 0.34]), 
-            #                     torch.tensor([4.19, 0.0, 0.35, 0.35])]
-
 
         self.state_encoder = build_rnn_state_encoder(
             (0 if self.is_blind else self._hidden_size) + rnn_input_size,
@@ -417,12 +466,6 @@ class PointNavResNetNet(Net):
                     ],
                     -1,
                 )
-                if self.use_z:
-                    for curr_robot_id in observations['robot_id']:
-                        self.prev_states[int(curr_robot_id)] = torch.cat((
-                                                                          self.prev_states[int(curr_robot_id)][3:].to(curr_robot_id.squeeze().device), 
-                                                                          goal_observations[int(curr_robot_id)]), 
-                                                                          0)
             else:
                 assert (
                     goal_observations.shape[1] == 3
@@ -495,38 +538,99 @@ class PointNavResNetNet(Net):
                 torch.where(masks.view(-1), prev_actions + 1, start_token)
             )
         else:
-            if self.use_z:
-                for curr_robot_id in observations['robot_id']:
-                    self.prev_actions[int(curr_robot_id)] = torch.cat((
-                                                                        self.prev_actions[int(curr_robot_id)][3:].to(curr_robot_id.squeeze().device), 
-                                                                        prev_actions[int(curr_robot_id)]), 
-                                                                        0)
-
             prev_actions = self.prev_action_embedding(prev_actions.float())
 
         x.append(prev_actions)
 
         if self.use_z:
-            z_out = []
-            for idx, curr_robot_id in enumerate(observations['robot_id']):
-                z_concat = torch.cat((
-                                      observations['urdf_params'][idx],# self.urdf_params[int(curr_robot_id)].to(curr_robot_id.squeeze().device), 
-                                      self.prev_states[int(curr_robot_id)].to(curr_robot_id.squeeze().device), 
-                                      self.prev_actions[int(curr_robot_id)].to(curr_robot_id.squeeze().device)
-                                     ),
-                                      0)
-                z_dist = self.z_network(z_concat)
-                if self.use_mlp:
-                    z_out.append(z_dist)
-                else:
-                    sample = z_dist.sample()
-                    z_out.append(sample)
-            z_outs = torch.tensor(z_out, device=curr_robot_id.squeeze().device).reshape(-1, 1)
-            x.append(z_outs)
+            z_in = []
+            use_params = self.z_enc != []
+            num_envs = observations['prev_states'].shape[0]
+
+            if 'urdf' in self.z_enc:
+                z_in.append(observations['urdf_params'])
+            if 'prev_states' in self.z_enc:
+                prev_states_enc = torch.stack(
+                        [
+                            observations['prev_states'][:, :, 0],
+                            torch.cos(-observations['prev_states'][:, :, 1]),
+                            torch.sin(-observations['prev_states'][:, :, 1]),
+                        ],
+                        -1,
+                    )
+                z_in.append(prev_states_enc.reshape(num_envs, -1))
+            if 'prev_actions' in self.z_enc:
+                z_in.append(observations['prev_actions'].reshape(num_envs, -1))
+
+            if z_in == []:
+                z_in = [torch.zeros(num_envs, 1)]
+            z_concat = torch.cat(z_in,
+                                 dim=1)
+
+            # z_concat = torch.cat([
+            #                       observations['urdf_params'],
+            #                       prev_states_enc.reshape(num_envs, -1),
+            #                       observations['prev_actions'].reshape(num_envs, -1)
+            #                      ],
+            #                      dim=1)
+
+            robot_id_mask = observations['robot_id'].squeeze(-1)
+            # robot_id_mask = observations['robot_id']
+            # z_inputs = [
+            #     z_concat[robot_id_mask == z_idx] 
+            #     for z_idx in range(3)
+            # ]
+            z_inputs = OrderedDict(
+                {
+                    k: z_concat[robot_id_mask == z_idx] 
+                    for z_idx, k in enumerate(self.z_networks.keys())
+                }
+            )
+            z_inputs_data = list(z_inputs.values())
+
+            if self.use_mlp:
+                z_outputs = OrderedDict(
+                    {
+                        z_name: z_net(z_inputs[z_name], use_params=use_params)
+                        for z_name, z_net in self.z_networks.items()
+                        if z_inputs[z_name].nelement() != 0
+                    }
+                )
+            else:
+                z_outputs = OrderedDict(
+                    {
+                        z_name: z_net(z_inputs[z_name], use_params=use_params).sample()
+                        for z_name, z_net in self.z_networks.items()
+                        if z_inputs[z_name].nelement() != 0
+                    }
+                )
+
+            for k, v in z_outputs.items():
+                current_z_vals = [i.clone().item() for i in v.squeeze(-1)]
+                self.z_deques[k + '_z_out'].extend(current_z_vals)
+
+            # self.z_outs = [
+
+            #         for z_idx, z_out in enumerate(z_outputs)
+            # ]
+
+
+            # if self.use_mlp:
+            #     z_outputs = [
+            #         self.z_networks[z_idx](z_input, use_params=use_params)
+            #         for z_idx, z_input in enumerate(z_inputs)
+            #     ]
+            # else:
+            #     z_outputs = [
+            #         self.z_networks[z_idx](z_input, use_params=use_params).sample()
+            #         for z_idx, z_input in enumerate(z_inputs)
+            #     ]
+
+            z_outputs = torch.cat(list(z_outputs.values()), dim=0)
+            x.append(z_outputs)
 
         out = torch.cat(x, dim=1)
         out, rnn_hidden_states = self.state_encoder(
             out, rnn_hidden_states, masks
         )
-
         return out, rnn_hidden_states

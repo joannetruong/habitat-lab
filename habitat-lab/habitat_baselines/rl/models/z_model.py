@@ -38,14 +38,15 @@ class ZEncoderNet(nn.Module):
         #                     nn.Linear(64, num_outputs),
         #                     )
         # self.z_ins = nn.Parameter(torch.rand((3,1), requires_grad=True))
-        self.z_ins = nn.Parameter(torch.zeros((3,1)))
+        # self.z_ins = nn.Parameter(torch.zeros((3,1)))
+        # self.z_in = nn.Parameter(torch.rand(1))
+        self.z_in = nn.Parameter(torch.rand(1))
+        # self.z_in = torch.rand(1, device='cuda:0').requires_grad_(True)
 
     def forward(self, x):
-        # robot_z_in = self.z_ins[int(curr_robot_id)]
-
-        # x_cat = torch.cat((x, robot_z_in), 0)
-        # return self.z_net(x_cat)
-        return self.z_encoder(x)
+        z_column = self.z_in.repeat(x.shape[0], 1)
+        x_cat = torch.cat([z_column, x], dim=1)
+        return self.z_encoder(x_cat)
 
 class ZVarEncoderNet(nn.Module):
     def __init__(
@@ -63,10 +64,16 @@ class ZVarEncoderNet(nn.Module):
                                 nn.Linear(128, num_outputs),
                                 )
         self.std = nn.Linear(num_inputs, num_outputs)
+        self.z_in = nn.Parameter(torch.rand(1))
 
-    def forward(self, x):
-        mu = torch.tanh(self.mu(x))
-        std = torch.clamp(self.std(x), min=1e-6, max=1)
+    def forward(self, x, use_params=False):
+        z_column = self.z_in.repeat(x.shape[0], 1)
+        if use_params:
+            x_cat = torch.cat([z_column, x], dim=1)
+        else:
+            x_cat = z_column
+        mu = torch.tanh(self.mu(x_cat))
+        std = torch.clamp(self.std(x_cat), min=1e-6, max=1)
 
         return CustomNormal(mu, std)
 

@@ -349,6 +349,7 @@ class Spot(A1):
         self.robot_spawn_offset = np.array([0.0, 0.525, 0])
         self.robot_dist_to_goal = 0.425
         self.camera_spawn_offset = np.array([0.0, 0.425, -0.425])
+        self.urdf_params = np.array([32.70, 0.88, 1.10, 0.50])
 
 class Locobot(A1):
     def __init__(self, sim=None, robot=None, rand_id=None):
@@ -360,5 +361,5 @@ class Locobot(A1):
         self.robot_spawn_offset = np.array([0.0, -0.02, 0])
         self.robot_dist_to_goal = 0.2
         self.camera_spawn_offset = np.array([0.0, 0.31, -0.55])
-        self.urdf_params = np.array([4.19, 0.0, 0.35, 0.35])
+        self.urdf_params = np.array([4.19, 0.00, 0.35, 0.35])
 

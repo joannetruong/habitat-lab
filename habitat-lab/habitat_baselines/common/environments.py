@@ -11,6 +11,7 @@ in habitat. Customized environments should be registered using
 """
 
 from typing import Optional, Type
+from gym.spaces import Box
 
 import habitat
 from habitat import Config, Dataset
@@ -142,3 +143,31 @@ class NavRLEnv(habitat.RLEnv):
     def get_info(self, observations):
         return self.habitat_env.get_metrics()
         
+@baseline_registry.register_env(name="MultiNavRLEnv")
+class MultiNavRLEnv(NavRLEnv):
+    def __init__(self, config: Config, dataset: Optional[Dataset] = None):
+        super().__init__(config, dataset)
+        self.observation_space["robot_id"] = Box(
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            shape=(1,),
+            dtype=np.float32,
+        )
+        self.observation_space["urdf_params"] = Box(
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            shape=(4,),
+            dtype=np.float32,
+        )
+        self.observation_space["prev_states"] = Box(
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            shape=(config.TASK_CONFIG.TASK.PREV_STATE_WINDOW, 2),
+            dtype=np.float32,
+        )
+        self.observation_space["prev_actions"] = Box(
+            low=np.finfo(np.float32).min,
+            high=np.finfo(np.float32).max,
+            shape=(config.TASK_CONFIG.TASK.PREV_ACTION_WINDOW, 3),
+            dtype=np.float32,
+        )

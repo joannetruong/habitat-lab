@@ -158,27 +158,6 @@ class PPOTrainer(BaseRLTrainer):
         observation_space = apply_obs_transforms_obs_space(
             observation_space, self.obs_transforms
         )
-        from gym.spaces import Dict, Box
-        if self.config.TASK_CONFIG.SIMULATOR.get('PEOPLE_MASK', False):
-            observation_space = Dict(
-                {
-                    'depth': Box(
-                        low=0., high=1., shape=(
-                            self.envs.observation_spaces[0].spaces['depth'].shape[0],
-                            self.envs.observation_spaces[0].spaces['depth'].shape[1],
-                            2,
-                        )
-                    ),
-                    'pointgoal_with_gps_compass': self.envs.observation_spaces[0].spaces['pointgoal_with_gps_compass']
-                }
-            )
-        else:
-            observation_space = Dict(
-                {
-                    'depth': self.envs.observation_spaces[0].spaces['depth'],
-                    'pointgoal_with_gps_compass': self.envs.observation_spaces[0].spaces['pointgoal_with_gps_compass']
-                }
-            )
         self.actor_critic = policy.from_config(
             self.config, observation_space, self.policy_action_space
         )
@@ -713,6 +692,12 @@ class PPOTrainer(BaseRLTrainer):
             losses,
             self.num_steps_done,
         )
+        if hasattr(self.actor_critic, "get_metrics"):
+            ac_metrics = self.actor_critic.get_metrics()
+            for name, metrics_data in ac_metrics:
+                writer.add_scalars(
+                    name, metrics_data, self.num_steps_done
+                )
 
         # log stats
         if self.num_updates_done % self.config.LOG_INTERVAL == 0:
