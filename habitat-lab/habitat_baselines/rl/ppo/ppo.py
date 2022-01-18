@@ -48,10 +48,27 @@ class PPO(nn.Module):
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
 
+        self.actor_critic = actor_critic
+        self.z_networks = actor_critic.net.z_networks
+
+        self.ac_parameters = list(filter(lambda p: p.requires_grad, actor_critic.parameters()))
+        
+        if actor_critic.net.use_z:
+            self.z_net_params = []
+            for robo, net in actor_critic.net.z_networks.items():
+                self.z_net_params += list(filter(lambda p: p.requires_grad, net.parameters()))
+
         self.optimizer = optim.Adam(
-            list(filter(lambda p: p.requires_grad, actor_critic.parameters())),
+            self.ac_parameters,
             lr=lr,
             eps=eps,
+        )
+
+        self.z_optimizer = optim.Adam(
+            self.z_net_params,
+            lr=1e-4,
+            betas=[0.9, 0.999],
+            weight_decay=1e-2
         )
 
         self.device = next(actor_critic.parameters()).device
@@ -125,20 +142,50 @@ class PPO(nn.Module):
                 dist_entropy = dist_entropy.mean()
 
                 self.optimizer.zero_grad()
+                self.z_optimizer.zero_grad()
                 total_loss = (
                     value_loss * self.value_loss_coef
                     + action_loss
                     - dist_entropy * self.entropy_coef
                 )
 
+                # for name, p in list(self.z_networks['a1'].named_parameters()):
+                #     if name == 'z_in':
+                #         a1_b1 = p.clone()
+                # for name, p in list(self.z_networks['aliengo'].named_parameters()):
+                #     if name == 'z_in':
+                #         ag_b1 = p.clone()
+                # for name, p in list(self.z_networks['locobot'].named_parameters()):
+                #     if name == 'z_in':
+                #         l_b1 = p.clone()
+
                 self.before_backward(total_loss)
                 total_loss.backward()
                 self.after_backward(total_loss)
 
-
                 self.before_step()
                 self.optimizer.step()
+                self.z_optimizer.step()
                 self.after_step()
+
+                # for p in self.actor_critic.parameters():
+                #     if p.requires_grad:
+                #         ac_after = p.data
+                #         # print('ac after grad: ', p.grad)
+
+                # for name, p in list(self.z_networks['a1'].named_parameters()):
+                #     if name == 'z_in':
+                #         a1_a1 = p.clone()
+                # for name, p in list(self.z_networks['aliengo'].named_parameters()):
+                #     if name == 'z_in':
+                #         ag_a1 = p.clone()
+                # for name, p in list(self.z_networks['locobot'].named_parameters()):
+                #     if name == 'z_in':
+                #         l_a1 = p.clone()
+
+                # print('A1 EQUAL :', a1_b1, a1_a1, torch.equal(a1_b1.data, a1_a1.data))                
+                # print('AG EQUAL :', ag_b1, ag_a1, torch.equal(ag_b1.data, ag_a1.data))                
+                # print('L EQUAL :', l_b1, l_a1, torch.equal(l_b1.data, l_a1.data))                
 
                 value_loss_epoch += value_loss.item()
                 action_loss_epoch += action_loss.item()

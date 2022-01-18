@@ -158,6 +158,10 @@ class PPOTrainer(BaseRLTrainer):
         observation_space = apply_obs_transforms_obs_space(
             observation_space, self.obs_transforms
         )
+        # hack to prevent training with RGB; but still be able to evaluate / generate videos with RGB
+        if 'rgb' in observation_space.spaces:
+            del observation_space.spaces['rgb'] 
+
         self.actor_critic = policy.from_config(
             self.config, observation_space, self.policy_action_space
         )
@@ -1215,4 +1219,10 @@ class PPOTrainer(BaseRLTrainer):
         if len(metrics) > 0:
             writer.add_scalars("eval_metrics", metrics, step_id)
 
+        if hasattr(self.actor_critic, "get_metrics"):
+            ac_metrics = self.actor_critic.get_metrics()
+            for name, metrics_data in ac_metrics:
+                writer.add_scalars(
+                    name, metrics_data, self.num_steps_done
+                )
         self.envs.close()

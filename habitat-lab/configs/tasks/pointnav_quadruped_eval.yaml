@@ -1,5 +1,6 @@
 ENVIRONMENT:
   MAX_EPISODE_STEPS: 150
+  CURRICULUM: False
 SIMULATOR:
   AGENT_0:
     SENSORS: ['DEPTH_SENSOR']
@@ -25,14 +26,17 @@ SIMULATOR:
     POSITION: [0.0, 0.0, 0.0]
 TASK:
   TYPE: MultiNav-v0
-  USE_Z: False
+  Z:
+    USE_Z: False
+    USE_MLP: False
+    ADAPT_Z: null
+    Z_OUT_DIM: 1
+    PREV_WINDOW: 50
+    Z_ENC_INPUTS: ['urdf', 'prev_states', 'prev_actions']
   ROBOTS: ['Spot']
 #  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
   ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
 
-  PREV_STATE_WINDOW: 50
-  PREV_ACTION_WINDOW: 50
-  
   SUCCESS_DISTANCE: 0.425
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
@@ -48,9 +52,9 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-      POLICY_MAX_LIN_VEL_RANGE: [-0.50, 0.50]
-      POLICY_MAX_HOR_VEL_RANGE: [-0.50, 0.50]
-      POLICY_MAX_ANG_VEL_RANGE: [-17.19, 17.19]
+      POLICY_LIN_VEL_RANGE: [-0.50, 0.50]
+      POLICY_HOR_VEL_RANGE: [-0.50, 0.50]
+      POLICY_ANG_VEL_RANGE: [-17.19, 17.19]
       ROBOT_LIN_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ROBOT_HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ROBOT_ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]

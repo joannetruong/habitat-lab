@@ -340,6 +340,7 @@ class EpisodeIterator(Iterator):
         episodes: Sequence[T],
         cycle: bool = True,
         shuffle: bool = False,
+        curriculum: bool = False,
         group_by_scene: bool = True,
         max_scene_repeat_episodes: int = -1,
         max_scene_repeat_steps: int = -1,
@@ -385,6 +386,10 @@ class EpisodeIterator(Iterator):
         self.cycle = cycle
         self.group_by_scene = group_by_scene
         self.shuffle = shuffle
+
+        if curriculum:
+            shuffle = False
+            self.episodes = sorted(self.episodes, key=lambda x: x.info['geodesic_distance'])
 
         if shuffle:
             random.shuffle(self.episodes)

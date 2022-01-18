@@ -109,6 +109,10 @@ class NavRLEnv(habitat.RLEnv):
         if self._episode_success():
             reward += self._rl_config.SUCCESS_REWARD
 
+        if observations.get('fell_over', False):
+            reward -= self._rl_config.FALL_PENALTY
+
+
         if observations.get("hit_navmesh", False):
             reward -= self._rl_config.COLLISION_PENALTY
 
@@ -162,12 +166,12 @@ class MultiNavRLEnv(NavRLEnv):
         self.observation_space["prev_states"] = Box(
             low=np.finfo(np.float32).min,
             high=np.finfo(np.float32).max,
-            shape=(config.TASK_CONFIG.TASK.PREV_STATE_WINDOW, 2),
+            shape=(config.TASK_CONFIG.TASK.Z.PREV_WINDOW, 2),
             dtype=np.float32,
         )
         self.observation_space["prev_actions"] = Box(
             low=np.finfo(np.float32).min,
             high=np.finfo(np.float32).max,
-            shape=(config.TASK_CONFIG.TASK.PREV_ACTION_WINDOW, 3),
+            shape=(config.TASK_CONFIG.TASK.Z.PREV_WINDOW, 3),
             dtype=np.float32,
         )

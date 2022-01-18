@@ -26,8 +26,8 @@ class MultiNavigationTask(NavigationTask):
         self.robot_files = self._config.ROBOT_URDFS
         # if task reset happens everytime episode is reset, then create previous state deck here
         ## init prev states
-        self.prev_states = deque(maxlen=self._config.PREV_STATE_WINDOW)
-        self.prev_actions = deque(maxlen=self._config.PREV_ACTION_WINDOW)
+        self.prev_states = deque(maxlen=self._config.Z.PREV_WINDOW)
+        self.prev_actions = deque(maxlen=self._config.Z.PREV_WINDOW)
 
     def reset(self, episode: Episode):
          # If robot was never spawned or was removed with previous scene
@@ -46,13 +46,13 @@ class MultiNavigationTask(NavigationTask):
 
         self.default_state_shape = 2  # for rho, phi
         default_state = np.zeros(self.default_state_shape)
-        default_states = [default_state] * self._config.PREV_STATE_WINDOW
-        self.prev_states = deque(default_states, maxlen=self._config.PREV_STATE_WINDOW)
+        default_states = [default_state] * self._config.Z.PREV_WINDOW
+        self.prev_states = deque(default_states, maxlen=self._config.Z.PREV_WINDOW)
 
         self.default_action_shape = 3  # for vx, vy, vt
         default_action = np.zeros(self.default_action_shape)
-        default_actions = [default_action] * self._config.PREV_ACTION_WINDOW
-        self.prev_actions = deque(default_actions, maxlen=self._config.PREV_ACTION_WINDOW)
+        default_actions = [default_action] * self._config.Z.PREV_WINDOW
+        self.prev_actions = deque(default_actions, maxlen=self._config.Z.PREV_WINDOW)
         
         observations['prev_states'] = self.prev_states
         observations['prev_actions'] = self.prev_actions

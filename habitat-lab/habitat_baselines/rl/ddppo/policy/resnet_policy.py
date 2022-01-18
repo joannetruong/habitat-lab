@@ -54,10 +54,16 @@ class PointNavResNetPolicy(Policy):
         force_blind_policy: bool = False,
         action_distribution_type: str = "categorical",
         robots: list = ['A1'],
-        use_z: bool = True,
+        use_z: bool = False,
+        adapt_z_out: float = None,
+        z_out_dim: int = 1,
+        prev_window: int = 50,
+        use_mlp: bool = False,
+        z_enc_inputs: list = [],
         **kwargs
     ):
         discrete_actions = action_distribution_type == "categorical"
+        self.adapt_z_out = adapt_z_out
         super().__init__(
             PointNavResNetNet(
                 observation_space=observation_space,
@@ -72,6 +78,11 @@ class PointNavResNetPolicy(Policy):
                 discrete_actions=discrete_actions,
                 robots=robots,
                 use_z=use_z,
+                adapt_z_out=adapt_z_out,
+                z_out_dim=z_out_dim,
+                prev_window=prev_window,
+                use_mlp=use_mlp,
+                z_enc_inputs=z_enc_inputs
             ),
             dim_actions=action_space.n,  # for action distribution
             action_distribution_type=action_distribution_type,
@@ -93,7 +104,12 @@ class PointNavResNetPolicy(Policy):
             force_blind_policy=config.FORCE_BLIND_POLICY,
             action_distribution_type=config.RL.POLICY.action_distribution_type,
             robots=config.TASK_CONFIG.TASK.ROBOTS,
-            use_z=config.TASK_CONFIG.TASK.USE_Z,
+            use_z=config.TASK_CONFIG.TASK.Z.USE_Z,
+            adapt_z_out=config.TASK_CONFIG.TASK.Z.ADAPT_Z,
+            z_out_dim=config.TASK_CONFIG.TASK.Z.Z_OUT_DIM,
+            prev_window=config.TASK_CONFIG.TASK.Z.PREV_WINDOW,
+            use_mlp=config.TASK_CONFIG.TASK.Z.USE_MLP,
+            z_enc_inputs= config.TASK_CONFIG.TASK.Z.Z_ENC_INPUTS
         )
 
 
@@ -103,22 +119,28 @@ class PointNavResNetPolicy(Policy):
             if not deq:
                 return -1
             return np.mean(deq)
+            
+        ac_metrics = []
+        if self.net.use_z:
+            if not self.adapt_z_out:
+                z_encodings_dict = {
+                    k: get_mean(v)
+                    for k, v in self.net.z_deques.items()
+                }
 
-        z_encodings_dict = {
-            k: get_mean(v)
-            for k, v in self.net.z_deques.items()
-        }
+                name = "z_encodings"
 
-        name = "z_encodings"
+                z_inputs_dict = {
+                    k: v.z_in.clone().detach()
+                    for k, v in self.net.z_networks.items()
+                }
 
-        z_inputs_dict = {
-            k: v.z_in.clone().detach()
-            for k, v in self.net.z_networks.items()
-        }
-
-        z_in_name = "z_inputs"
-        ac_metrics = [(name, z_encodings_dict), (z_in_name, z_inputs_dict)]
-
+                z_in_name = "z_inputs"
+                ac_metrics = [(name, z_encodings_dict), (z_in_name, z_inputs_dict)]
+            else:
+                name = 'z_encodings'
+                value = {'z_out': self.net.adapt_z_out.clone().detach()}
+                ac_metrics = [(name, value)]
 
         return ac_metrics
 
@@ -130,9 +152,12 @@ class PointNavResNetPolicy(Policy):
 
     def to(self, device):
         super().to(device)
-        for z_net in self.net.z_networks.values():
-            z_net.to(device)
-
+        if self.net.use_z:
+            if not self.adapt_z_out:
+                for z_net in self.net.z_networks.values():
+                    z_net.to(device)
+            else:
+                self.net.adapt_z_out = self.net.adapt_z_out.to(device)
 
 class ResNetEncoder(nn.Module):
     def __init__(
@@ -255,7 +280,12 @@ class PointNavResNetNet(Net):
         force_blind_policy: bool = False,
         discrete_actions: bool = True,
         robots: list = ['A1'],
-        use_z: bool = True,
+        use_z: bool = False,
+        adapt_z_out: float = None,
+        z_out_dim: int = 1,
+        prev_window: int = 50,
+        use_mlp: bool = False,
+        z_enc_inputs: list = []
     ):
         super().__init__()
 
@@ -270,6 +300,7 @@ class PointNavResNetNet(Net):
         self.discrete_actions = discrete_actions
         self.z_network = None
         self.use_z = use_z
+        self.adapt_z_out = adapt_z_out
         if discrete_actions:
             self.prev_action_embedding = nn.Embedding(action_space.n + 1, 32)
         else:
@@ -384,35 +415,37 @@ class PointNavResNetNet(Net):
                 nn.ReLU(True),
             )
 
-        self.use_mlp=False
-        # self.z_enc = ['urdf', 'prev_states', 'prev_actions']
-        self.z_enc = ['urdf']
-        # self.z_enc = []
-        if self.use_z:
-            print('USING Z: ', self.z_enc)
-            z_in_dim = 1
-            num_outputs = 1
-            rnn_input_size += num_outputs
+        self.use_mlp = use_mlp
+        self.z_enc = z_enc_inputs
 
-            num_prev = 50
-            num_inputs = z_in_dim
-            # 3 ROBOTS, 50 PREV STATES, 50 PREV ACTIONS, 4 URDF PARAMS, 1 LEARNABLE PARAMETER
-            if 'urdf' in self.z_enc:
-                num_inputs += 4
-            if 'prev_states' in self.z_enc:
-                num_inputs += 3 * num_prev
-            if 'prev_actions' in self.z_enc:
-                num_inputs += 3 * num_prev
-            # num_inputs = (3 * num_prev * 2) + 4 + z_in_dim
-            if self.use_mlp:
-                net_cls = ZEncoderNet
-            else:
-                net_cls = ZVarEncoderNet
-            self.z_networks = {
-                k: net_cls(num_inputs, num_outputs)
-                for k in ["a1", "aliengo", "locobot"]
-            }
+        print('USING Z: ', self.use_z)
+        
+        if self.use_z:
+            print('Z ENC: ', self.z_enc, 'Z OUT: ', self.adapt_z_out)
+            z_in_dim = 1
+            rnn_input_size += z_out_dim
+
+            if not self.adapt_z_out:
+                num_inputs = z_in_dim
+                # 3 ROBOTS, 50 PREV STATES, 50 PREV ACTIONS, 4 URDF PARAMS, 1 LEARNABLE PARAMETER
+                if 'urdf' in self.z_enc:
+                    num_inputs += 4
+                if 'prev_states' in self.z_enc:
+                    num_inputs += 3 * prev_window
+                if 'prev_actions' in self.z_enc:
+                    num_inputs += 3 * prev_window
+                # num_inputs = (3 * num_prev * 2) + 4 + z_in_dim
+                if self.use_mlp:
+                    net_cls = ZEncoderNet
+                else:
+                    net_cls = ZVarEncoderNet
+                self.z_networks = {
+                    k: net_cls(num_inputs, z_out_dim)
+                    for k in ["a1", "aliengo", "locobot"]
+                }
                 # self.z_network = GaussianNet(num_inputs, 1)
+            else:
+                self.adapt_z_out = torch.tensor(self.adapt_z_out)
 
         self.state_encoder = build_rnn_state_encoder(
             (0 if self.is_blind else self._hidden_size) + rnn_input_size,
@@ -543,90 +576,76 @@ class PointNavResNetNet(Net):
         x.append(prev_actions)
 
         if self.use_z:
-            z_in = []
-            use_params = self.z_enc != []
             num_envs = observations['prev_states'].shape[0]
+            if not self.adapt_z_out:
+                z_in = []
+                use_params = self.z_enc != []
 
-            if 'urdf' in self.z_enc:
-                z_in.append(observations['urdf_params'])
-            if 'prev_states' in self.z_enc:
-                prev_states_enc = torch.stack(
-                        [
-                            observations['prev_states'][:, :, 0],
-                            torch.cos(-observations['prev_states'][:, :, 1]),
-                            torch.sin(-observations['prev_states'][:, :, 1]),
-                        ],
-                        -1,
+                if 'urdf' in self.z_enc:
+                    z_in.append(observations['urdf_params'])
+                if 'prev_states' in self.z_enc:
+                    prev_states_enc = torch.stack(
+                            [
+                                observations['prev_states'][:, :, 0],
+                                torch.cos(-observations['prev_states'][:, :, 1]),
+                                torch.sin(-observations['prev_states'][:, :, 1]),
+                            ],
+                            -1,
+                        )
+                    z_in.append(prev_states_enc.reshape(num_envs, -1))
+                if 'prev_actions' in self.z_enc:
+                    z_in.append(observations['prev_actions'].reshape(num_envs, -1))
+
+                if z_in == []:
+                    z_in = [torch.zeros(num_envs, 1)]
+                z_concat = torch.cat(z_in,
+                                     dim=1)
+
+                # z_concat = torch.cat([
+                #                       observations['urdf_params'],
+                #                       prev_states_enc.reshape(num_envs, -1),
+                #                       observations['prev_actions'].reshape(num_envs, -1)
+                #                      ],
+                #                      dim=1)
+
+                robot_id_mask = observations['robot_id'].squeeze(-1)
+                # robot_id_mask = observations['robot_id']
+                # z_inputs = [
+                #     z_concat[robot_id_mask == z_idx] 
+                #     for z_idx in range(3)
+                # ]
+                z_inputs = OrderedDict(
+                    {
+                        k: z_concat[robot_id_mask == z_idx] 
+                        for z_idx, k in enumerate(self.z_networks.keys())
+                    }
+                )
+                z_inputs_data = list(z_inputs.values())
+
+                if self.use_mlp:
+                    z_outputs = OrderedDict(
+                        {
+                            z_name: z_net(z_inputs[z_name], use_params=use_params)
+                            for z_name, z_net in self.z_networks.items()
+                            if z_inputs[z_name].nelement() != 0
+                        }
                     )
-                z_in.append(prev_states_enc.reshape(num_envs, -1))
-            if 'prev_actions' in self.z_enc:
-                z_in.append(observations['prev_actions'].reshape(num_envs, -1))
+                else:
+                    z_outputs = OrderedDict(
+                        {
+                            z_name: z_net(z_inputs[z_name], use_params=use_params).sample()
+                            for z_name, z_net in self.z_networks.items()
+                            if z_inputs[z_name].nelement() != 0
+                        }
+                    )
 
-            if z_in == []:
-                z_in = [torch.zeros(num_envs, 1)]
-            z_concat = torch.cat(z_in,
-                                 dim=1)
+                for k, v in z_outputs.items():
+                    current_z_vals = [i.clone().item() for i in v.squeeze(-1)]
+                    self.z_deques[k + '_z_out'].extend(current_z_vals)
 
-            # z_concat = torch.cat([
-            #                       observations['urdf_params'],
-            #                       prev_states_enc.reshape(num_envs, -1),
-            #                       observations['prev_actions'].reshape(num_envs, -1)
-            #                      ],
-            #                      dim=1)
-
-            robot_id_mask = observations['robot_id'].squeeze(-1)
-            # robot_id_mask = observations['robot_id']
-            # z_inputs = [
-            #     z_concat[robot_id_mask == z_idx] 
-            #     for z_idx in range(3)
-            # ]
-            z_inputs = OrderedDict(
-                {
-                    k: z_concat[robot_id_mask == z_idx] 
-                    for z_idx, k in enumerate(self.z_networks.keys())
-                }
-            )
-            z_inputs_data = list(z_inputs.values())
-
-            if self.use_mlp:
-                z_outputs = OrderedDict(
-                    {
-                        z_name: z_net(z_inputs[z_name], use_params=use_params)
-                        for z_name, z_net in self.z_networks.items()
-                        if z_inputs[z_name].nelement() != 0
-                    }
-                )
+                z_outputs = torch.cat(list(z_outputs.values()), dim=0)
             else:
-                z_outputs = OrderedDict(
-                    {
-                        z_name: z_net(z_inputs[z_name], use_params=use_params).sample()
-                        for z_name, z_net in self.z_networks.items()
-                        if z_inputs[z_name].nelement() != 0
-                    }
-                )
-
-            for k, v in z_outputs.items():
-                current_z_vals = [i.clone().item() for i in v.squeeze(-1)]
-                self.z_deques[k + '_z_out'].extend(current_z_vals)
-
-            # self.z_outs = [
-
-            #         for z_idx, z_out in enumerate(z_outputs)
-            # ]
-
-
-            # if self.use_mlp:
-            #     z_outputs = [
-            #         self.z_networks[z_idx](z_input, use_params=use_params)
-            #         for z_idx, z_input in enumerate(z_inputs)
-            #     ]
-            # else:
-            #     z_outputs = [
-            #         self.z_networks[z_idx](z_input, use_params=use_params).sample()
-            #         for z_idx, z_input in enumerate(z_inputs)
-            #     ]
-
-            z_outputs = torch.cat(list(z_outputs.values()), dim=0)
+                z_outputs = self.adapt_z_out.repeat(num_envs, 1)
             x.append(z_outputs)
 
         out = torch.cat(x, dim=1)

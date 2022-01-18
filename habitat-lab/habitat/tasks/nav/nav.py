@@ -1636,6 +1636,7 @@ class DynamicVelocityAction(VelocityAction):
         agent_pos = kwargs['episode'].start_position
         agent_rot = kwargs['episode'].start_rotation
 
+        self.start_height = agent_pos[1]
         squat = np.normalized(np.quaternion(agent_rot[3], *agent_rot[:3]))
 
         agent_rot = mn.Matrix4.from_(
@@ -1718,11 +1719,10 @@ class DynamicVelocityAction(VelocityAction):
         # in terms of if the quaternion it represents is normalized, which
         # throws an error as habitat-sim/habitat_sim/utils/validators.py has a
         # tolerance of 1e-5. It is thus explicitly re-normalized here.
-        robot_start_rigid_state = task.robot_id.rigid_state
-        agent_start_pose = self._sim.get_agent_state()
-        agent_start_pos_copy = agent_start_pose.position.copy()
-        agent_start_rot_copy = agent_start_pose.rotation.copy()
 
+        ## STEP ROBOT
+        ## QUADRUPEDS:
+        robot_start_rigid_state = task.robot_id.rigid_state
 
         state = task.robot_wrapper.calc_state()
         lin_hor = np.array([lin_vel, hor_vel])
@@ -1739,9 +1739,11 @@ class DynamicVelocityAction(VelocityAction):
             self._sim.step_physics(self.dt)
             state = task.robot_wrapper.calc_state()
 
-        robot_rigid_state = task.robot_id.rigid_state
+        ## LOCOBOT
 
-        final_position = robot_rigid_state.translation
+        final_robot_rigid_state = task.robot_id.rigid_state
+
+        final_position = final_robot_rigid_state.translation
 
         final_rotation = mn.Quaternion.from_matrix(
             task.robot_id.transformation.__matmul__(
@@ -1756,32 +1758,36 @@ class DynamicVelocityAction(VelocityAction):
         roll, yaw, pitch = squaternion.Quaternion(
             final_rotation[3], *final_rotation[:3]
         ).to_euler()
+
         roll_fall = np.abs(roll) > 0.75 and np.abs(roll) < 2.39
         pitch_fall = np.abs(pitch) > 0.75 and np.abs(pitch) < 2.39
-        z_fall = final_position[1] < task.robot_wrapper.robot_dist_to_goal / 2
+        z_fall = final_position[1] < self.start_height + 0.1
 
         if z_fall:
-            print('terminating episode')
+            print('fell over')
             task.is_stop_called = True
-            return self._sim.get_observations_at(
+            agent_observations = self._sim.get_observations_at(
                 position=None, rotation=None,
             )
 
-        snapped_pt = self._sim.pathfinder.snap_point(final_position)
-        # print('############: SNAPPED PT ############: ', snapped_pt)
-        snapped_pts_nan = any([math.isnan(x) for x in snapped_pt])
+            agent_observations['fell_over'] = True
+            return agent_observations
+
+        # snapped_pt = self._sim.pathfinder.snap_point(final_position)
+        # # print('############: SNAPPED PT ############: ', snapped_pt)
+        # snapped_pts_nan = any([math.isnan(x) for x in snapped_pt])
 
 
-        navigable = self._sim.pathfinder.is_navigable(
-            final_position, max_y_delta=0.6
-        )
+        # navigable = self._sim.pathfinder.is_navigable(
+        #     final_position, max_y_delta=0.6
+        # )
 
-        if snapped_pts_nan or not navigable:
-            print('nans, setting to previous state', snapped_pts_nan, navigable)
-            final_position = agent_start_pos_copy
-            final_rotation = agent_start_rot_copy
+        # if snapped_pts_nan or not navigable:
+        #     print('nans, setting to previous state', snapped_pts_nan, navigable, 'final pos: ', final_position, 'prev pos: ', agent_start_pos_copy)
+        #     final_position = agent_start_pos_copy
+        #     final_rotation = agent_start_rot_copy
 
-            task.robot_id.rigid_state = robot_start_rigid_state
+        #     task.robot_id.rigid_state = robot_start_rigid_state
 
         # assert navigable, 'navigable failed'
         # assert not snapped_pts_nan, 'snapped pts nan'
@@ -1803,6 +1809,7 @@ class DynamicVelocityAction(VelocityAction):
 
         self.prev_ang_vel = ang_vel
         contacts = self._sim.get_physics_contact_points()
+        num_contacts = self._sim.get_physics_num_active_contact_points()
         contacting_feet = set()
         for c in contacts:
             for link in [c.link_id_a, c.link_id_b]:
@@ -1812,9 +1819,11 @@ class DynamicVelocityAction(VelocityAction):
         b = ' '
         cont = b.join(li_cont)
 
-        collided = self._sim.contact_test(task.robot_id.object_id)
-        if collided:
+        # collided = self._sim.contact_test(task.robot_id.object_id)
+        if num_contacts > 5:
+        # if collided:
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
+            agent_observations["hit_navmesh"] = True
             self.num_collisions += 1
         try:
             img = np.copy(agent_observations['rgb'])
@@ -1833,7 +1842,6 @@ class DynamicVelocityAction(VelocityAction):
             cv2.putText(img, dist_to_goal_text, (10,80), font, 1,(0,0,0),1)
             cv2.putText(img, num_actions_text, (10,100), font, 1,(0,0,0),1)
             cv2.putText(img, num_collisions_text, (10,120), font, 1,(0,0,0),1)
-            cv2.putText(img, str(len(cont)), (10,140), font, 1,(0,0,0),1)
 
             agent_observations['rgb'] = img
         except:
