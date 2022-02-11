@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node GPUS
 #SBATCH --partition PARTITION
 #SBATCH --cpus-per-task=6
-#SBATCH --constraint=rtx_6000
+###SBATCH --constraint=rtx_6000
 ###SBATCH --exclude dave
 ###SBATCH --exclude calculon,alexa,bmo,cortana
 ###SBATCH -w olivaw

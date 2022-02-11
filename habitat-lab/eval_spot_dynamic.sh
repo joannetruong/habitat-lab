@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=spot_kinematic_urdf
-#SBATCH --output=spot_kinematic_urdf.out
-#SBATCH --error=spot_kinematic_urdf.err
-#SBATCH --gres gpu:8
+#SBATCH --job-name=eval_spot_dynamic
+#SBATCH --output=eval_spot_dynamic.out
+#SBATCH --error=eval_spot_dynamic.err
+#SBATCH --gres gpu:1
 #SBATCH --nodes 1
-#SBATCH --ntasks-per-node 8
+#SBATCH --ntasks-per-node 1
 #SBATCH --partition long
 #SBATCH --cpus-per-task=6
-#SBATCH --constraint=rtx_6000
+###SBATCH --constraint=rtx_6000
 ###SBATCH --exclude calculon,alexa,bmo,cortana
 ###SBATCH -w olivaw
 
@@ -26,6 +26,6 @@ conda activate habitat-spot
 cd /coc/testnvme/jtruong33/habitat_spot/habitat-lab
 export CUDA_LAUNCH_BLOCKING=1
 srun python -u -m habitat_baselines.run \
-    --exp-config habitat_baselines/config/pointnav/ddppo_pointnav_single_kinematic_train.yaml \
-    --run-type train
-
+    --exp-config habitat_baselines/config/pointnav/ddppo_pointnav_spot_dynamic_eval.yaml \
+    --run-type eval
+#    TASK_CONFIG.ENVIRONMENT.MAX_EPISODE_STEPS 5

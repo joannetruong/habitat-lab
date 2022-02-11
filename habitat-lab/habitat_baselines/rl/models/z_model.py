@@ -17,13 +17,11 @@ class ZEncoderNet(nn.Module):
         #                     nn.ReLU(),
         #                     nn.Linear(128, num_outputs),
         #                     )
-        self.z_encoder = nn.Sequential(nn.Linear(num_inputs, 256),
-                         nn.Dropout(0.5),
+        self.z_encoder = nn.Sequential(nn.Linear(num_inputs, 100),
                          nn.ReLU(),
-                         nn.Linear(256, 128),
-                         nn.Dropout(0.25),
+                         nn.Linear(100, 100),
                          nn.ReLU(),
-                         nn.Linear(128, num_outputs),
+                         nn.Linear(100, num_outputs),
                          )
         # self.z_encoder = nn.Sequential(nn.Linear(num_inputs, 1024),
         #                     nn.ReLU(),
@@ -69,6 +67,7 @@ class ZVarEncoderNet(nn.Module):
     def forward(self, x, use_params=False):
         # print('std: ', self.std, self.std.weight)
         # print('z_in: ', self.z_in, self.z_in.is_leaf, self.z_in.grad)
+        print('Z_IN: ', self.z_in)
         z_column = self.z_in.repeat(x.shape[0], 1)
         if use_params:
             x_cat = torch.cat([z_column, x], dim=1)

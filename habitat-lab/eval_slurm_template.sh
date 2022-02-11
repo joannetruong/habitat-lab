@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=TEMPLATE
-#SBATCH --output=TEMPLATE.out
-#SBATCH --error=TEMPLATE.err
+#SBATCH --output=output_err/TEMPLATE.out
+#SBATCH --error=output_err/TEMPLATE.err
 #SBATCH --gres gpu:1
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node 1

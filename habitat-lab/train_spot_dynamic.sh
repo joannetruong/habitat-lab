@@ -22,7 +22,7 @@
 source ~/.bashrc
 unset PYTHONPATH
 
-conda activate habitat-urdf
+conda activate habitat-spot
 cd /coc/testnvme/jtruong33/habitat_spot/habitat-lab
 export CUDA_LAUNCH_BLOCKING=1
 srun python -u -m habitat_baselines.run \

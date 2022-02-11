@@ -112,7 +112,6 @@ class NavRLEnv(habitat.RLEnv):
         if observations.get('fell_over', False):
             reward -= self._rl_config.FALL_PENALTY
 
-
         if observations.get("hit_navmesh", False):
             reward -= self._rl_config.COLLISION_PENALTY
 

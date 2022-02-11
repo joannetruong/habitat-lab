@@ -29,23 +29,11 @@ class A1():
                                          -0.05, 0.65, -1.5]   #RR
         self.feet_link_ids = [5, 9, 13, 17]
         # Spawn the URDF 0.18 meters above the navmesh upon reset
-        self.robot_spawn_offset = np.array([0.0, 0.32, 0])
+        self.robot_spawn_offset = np.array([0.0, 0.35, 0])
         self.robot_dist_to_goal = 0.24
         self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
         self.urdf_params = [12.46, 0.40, 0.62, 0.30]
         # The robots need to rolled 90 deg then yaw'd 180 deg relative to agent
-        # self.rotation_offset = mn.Matrix4.rotation_y(
-        #     mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
-        # ).__matmul__(
-        #     mn.Matrix4.rotation_y(
-        #         mn.Rad(np.pi),  # Rotate 180 deg yaw
-        #     )
-        # ).__matmul__(
-        #     mn.Matrix4.rotation_x(
-        #         mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
-        #     )
-        # )
-
         self.rotation_offset = mn.Matrix4.rotation_y(
             mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
         ).__matmul__(
@@ -57,7 +45,6 @@ class A1():
                 mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
             )
         )
-
 
         if reset:
             self.robot_specific_reset()
@@ -223,8 +210,6 @@ class A1():
             'j_pos': joint_positions_remapped,
             'j_vel': joint_velocities_remapped
         }
-        # 'base_velocity': rotate_vector_3d(base_velocity, *base_orientation_euler),
-        # 'base_ang_vel': rotate_vector_3d(base_angular_velocity_euler, *base_orientation_euler),
 
     def set_mtr_pos(self, joint, ctrl):
         jms = self.robot.get_joint_motor_settings(joint)
@@ -315,7 +300,7 @@ class AlienGo(A1):
 
         self.feet_link_ids = [4, 8, 12, 16] ### FL, FR, RL, RR
         # self.feet_link_ids = [12]
-        self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.robot_spawn_offset = np.array([0.0, 0.475, 0])
         self.robot_dist_to_goal = 0.3235
         self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
         self.urdf_params = np.array([20.64, 0.50, 0.89, 0.34])
@@ -329,7 +314,7 @@ class Laikago(A1):
                                          -0.1, 0.65, -1.2,
                                          0.1, 0.65, -1.2,
                                          -0.1, 0.65, -1.2]
-        self.robot_spawn_offset = np.array([0.0, 0.35, 0])
+        self.robot_spawn_offset = np.array([0.0, 0.475, 0])
         self.robot_dist_to_goal = 0.3235
         self.camera_spawn_offset = np.array([0.0, 0.25, -0.3235])
 
@@ -346,9 +331,9 @@ class Spot(A1):
         # Spawn the URDF 0.425 meters above the navmesh upon reset
         ## if evaluating coda episodes, manually increase offset by an extra 0.1m
         # self.robot_spawn_offset = np.array([0.0, 0.60, 0])
-        self.robot_spawn_offset = np.array([0.0, 0.525, 0])
+        self.robot_spawn_offset = np.array([0.0, 0.625, 0])
         self.robot_dist_to_goal = 0.425
-        self.camera_spawn_offset = np.array([0.0, 0.425, -0.425])
+        self.camera_spawn_offset = np.array([0.0, 0.325, -0.325])
         self.urdf_params = np.array([32.70, 0.88, 1.10, 0.50])
 
 class Locobot(A1):
@@ -358,7 +343,7 @@ class Locobot(A1):
         self._initial_joint_positions = []
 
         # Spawn the URDF 0.425 meters above the navmesh upon reset
-        self.robot_spawn_offset = np.array([0.0, -0.02, 0])
+        self.robot_spawn_offset = np.array([0.0, 0.25, 0])
         self.robot_dist_to_goal = 0.2
         self.camera_spawn_offset = np.array([0.0, 0.31, -0.55])
         self.urdf_params = np.array([4.19, 0.00, 0.35, 0.35])

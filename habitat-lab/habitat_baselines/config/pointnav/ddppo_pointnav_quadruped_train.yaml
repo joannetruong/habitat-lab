@@ -1,4 +1,4 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_quadruped_train.yaml"
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_yamls/pointnav_quadruped_train.yaml"
 TOTAL_NUM_STEPS: 5e8
 
 VERBOSE: False
@@ -28,7 +28,7 @@ RL:
   COLLISION_PENALTY: 0.003
   BACKWARDS_PENALTY: 0.003
   FULL_GEODESIC_DECAY: -1.0
-  VEL_ERR_PENALTY: 0.03
+  VEL_ERR_PENALTY: 0.01
   FALL_PENALTY: 5.0
 
   POLICY:

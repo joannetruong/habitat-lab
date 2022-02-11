@@ -74,14 +74,18 @@ class PPOTrainer(BaseRLTrainer):
     agent: PPO
     actor_critic: Policy
 
-    def __init__(self, config=None, runtype='train'):
-        if runtype == 'train':
+    def __init__(self, config=None, runtype="train"):
+        if runtype == "train":
             resume_state = load_resume_state(config)
             self.OVERRIDE_TOTAL_NUM_STEPS = None
             if resume_state is not None:
-                if 'OVERRIDE' in config:
-                    self.OVERRIDE_NUM_CHECKPOINTS = config.OVERRIDE.NUM_CHECKPOINTS
-                    self.OVERRIDE_TOTAL_NUM_STEPS = config.OVERRIDE.TOTAL_NUM_STEPS
+                if "OVERRIDE" in config:
+                    self.OVERRIDE_NUM_CHECKPOINTS = (
+                        config.OVERRIDE.NUM_CHECKPOINTS
+                    )
+                    self.OVERRIDE_TOTAL_NUM_STEPS = (
+                        config.OVERRIDE.TOTAL_NUM_STEPS
+                    )
                     config = resume_state["config"]
                     config.defrost()
                     config.NUM_CHECKPOINTS = self.OVERRIDE_NUM_CHECKPOINTS
@@ -137,9 +141,13 @@ class PPOTrainer(BaseRLTrainer):
 
         orig_device = t.device
         t = t.to(device=self.device)
+        print("ALL REDUCE 1: ", orig_device, self.device)
         torch.distributed.all_reduce(t)
+        print("ALL REDUCE 2: ", orig_device, self.device)
+        t = t.to(device=orig_device)
+        print("ALL REDUCE 3: ", orig_device, self.device)
 
-        return t.to(device=orig_device)
+        return t
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
         r"""Sets up actor critic and agent for PPO.
@@ -159,8 +167,8 @@ class PPOTrainer(BaseRLTrainer):
             observation_space, self.obs_transforms
         )
         # hack to prevent training with RGB; but still be able to evaluate / generate videos with RGB
-        if 'rgb' in observation_space.spaces:
-            del observation_space.spaces['rgb'] 
+        if "rgb" in observation_space.spaces:
+            del observation_space.spaces["rgb"]
 
         self.actor_critic = policy.from_config(
             self.config, observation_space, self.policy_action_space
@@ -348,7 +356,7 @@ class PPOTrainer(BaseRLTrainer):
         if self._static_encoder:
             with torch.no_grad():
                 batch["visual_features"] = self._encoder(batch)
-        batch['robot_id'] = batch['robot_id'].reshape(-1, 1)
+        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         self.rollouts.buffers["observations"][0] = batch
 
         self.current_episode_reward = torch.zeros(self.envs.num_envs, 1)
@@ -491,7 +499,7 @@ class PPOTrainer(BaseRLTrainer):
             elif len(self.discrete_actions) > 0:
                 act2 = torch.tensor(
                     self.discrete_actions[act.item()],
-                    device='cpu',
+                    device="cpu",
                 )
                 step_action = action_to_velocity_control(
                     act2, self.action_type, num_steps=self.num_steps_done
@@ -535,7 +543,7 @@ class PPOTrainer(BaseRLTrainer):
         )
         batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
-        batch['robot_id'] = batch['robot_id'].reshape(-1, 1)
+        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         rewards = torch.tensor(
             rewards_l,
             dtype=torch.float,
@@ -699,9 +707,7 @@ class PPOTrainer(BaseRLTrainer):
         if hasattr(self.actor_critic, "get_metrics"):
             ac_metrics = self.actor_critic.get_metrics()
             for name, metrics_data in ac_metrics:
-                writer.add_scalars(
-                    name, metrics_data, self.num_steps_done
-                )
+                writer.add_scalars(name, metrics_data, self.num_steps_done)
 
         # log stats
         if self.num_updates_done % self.config.LOG_INTERVAL == 0:
@@ -944,8 +950,10 @@ class PPOTrainer(BaseRLTrainer):
 
         if len(self.config.VIDEO_OPTION) > 0:
             config.defrost()
-            if config.TASK_CONFIG.TASK.TYPE == 'SocialNav-v0':
-                config.TASK_CONFIG.TASK.MEASUREMENTS.append("SOCIAL_TOP_DOWN_MAP")
+            if config.TASK_CONFIG.TASK.TYPE == "SocialNav-v0":
+                config.TASK_CONFIG.TASK.MEASUREMENTS.append(
+                    "SOCIAL_TOP_DOWN_MAP"
+                )
             else:
                 config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
             config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
@@ -1051,8 +1059,8 @@ class PPOTrainer(BaseRLTrainer):
                     test_recurrent_hidden_states,
                     prev_actions,
                     not_done_masks,
-                    # deterministic=False,
-                    deterministic=True,
+                    deterministic=False,
+                    # deterministic=True,
                 )
 
                 prev_actions.copy_(actions)  # type: ignore
@@ -1071,9 +1079,9 @@ class PPOTrainer(BaseRLTrainer):
                     action_to_velocity_control(
                         torch.tensor(
                             self.discrete_actions[a.item()],
-                            device='cpu',
+                            device="cpu",
                         ),
-                        self.action_type
+                        self.action_type,
                     )
                     for a in actions.to(device="cpu")
                 ]
@@ -1129,11 +1137,52 @@ class PPOTrainer(BaseRLTrainer):
                         )
                     ] = episode_stats
 
-                    episode_stats['num_steps'] = len(rgb_frames[i])
+                    episode_stats["num_steps"] = len(rgb_frames[i])
 
                     all_episode_stats[
                         current_episodes[i].episode_id
                     ] = episode_stats
+
+                    txt_dir = getattr(self.config, "TXT_DIR", "")
+                    if txt_dir != "":
+                        if not os.path.isdir(txt_dir):
+                            os.makedirs(txt_dir)
+                        episode_steps_filename = "{}.csv".format(
+                            os.path.basename(checkpoint_path[:-4]).replace(
+                                ".", "_"
+                            )
+                        )
+                        episode_steps_filename = os.path.join(
+                            txt_dir, episode_steps_filename
+                        )
+                        if not os.path.isfile(episode_steps_filename):
+                            episode_steps_data = "id,reward,distance_to_goal,episode_distance,success,spl,steps\n"
+                        else:
+                            with open(episode_steps_filename) as f:
+                                episode_steps_data = f.read()
+                        episode_steps_data += "{},{},{},{},{},{},{}\n".format(
+                            current_episodes[i].episode_id,
+                            episode_stats["reward"],
+                            episode_stats["distance_to_goal"],
+                            episode_stats["episode_distance"],
+                            episode_stats["success"],
+                            episode_stats["spl"],
+                            episode_stats["num_steps"],
+                        )  # number of steps taken
+                        lines = episode_steps_data.split("\n")
+                        if len(lines) >= 1074:
+                            episode_steps_data = (
+                                lines[0]
+                                + "\n".join(
+                                    sorted(
+                                        lines[1:-1],
+                                        key=lambda x: int(x.split(",")[0]),
+                                    )
+                                )
+                                + "\n"
+                            )
+                        with open(episode_steps_filename, "w") as f:
+                            f.write(episode_steps_data)
 
                     if len(self.config.VIDEO_OPTION) > 0:
                         generate_video(
@@ -1195,18 +1244,18 @@ class PPOTrainer(BaseRLTrainer):
         #     f.write(f"{step_id}\n")
         for k, v in aggregated_stats.items():
             logger.info(f"Average episode {k}: {v:.4f}")
-                # f.write(f"Average episode {k}: {v:.4f}\n")
+            # f.write(f"Average episode {k}: {v:.4f}\n")
 
         # Save JSON file
-        all_episode_stats['agg_stats'] = aggregated_stats
+        all_episode_stats["agg_stats"] = aggregated_stats
         json_dir = self.config.JSON_DIR
-        if json_dir != '':
+        if json_dir != "":
             os.makedirs(json_dir, exist_ok=True)
             json_path = os.path.join(
                 json_dir,
                 f"{os.path.basename(checkpoint_path[:-4]).replace('.','_')}.json",
             )
-            with open(json_path, 'w') as f:
+            with open(json_path, "w") as f:
                 json.dump(all_episode_stats, f)
 
         writer.add_scalars(
@@ -1222,7 +1271,5 @@ class PPOTrainer(BaseRLTrainer):
         if hasattr(self.actor_critic, "get_metrics"):
             ac_metrics = self.actor_critic.get_metrics()
             for name, metrics_data in ac_metrics:
-                writer.add_scalars(
-                    name, metrics_data, self.num_steps_done
-                )
+                writer.add_scalars(name, metrics_data, self.num_steps_done)
         self.envs.close()

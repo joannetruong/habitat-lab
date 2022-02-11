@@ -385,11 +385,12 @@ class EpisodeIterator(Iterator):
         self.episodes = episodes
         self.cycle = cycle
         self.group_by_scene = group_by_scene
-        self.shuffle = shuffle
 
         if curriculum:
             shuffle = False
             self.episodes = sorted(self.episodes, key=lambda x: x.info['geodesic_distance'])
+
+        self.shuffle = shuffle
 
         if shuffle:
             random.shuffle(self.episodes)

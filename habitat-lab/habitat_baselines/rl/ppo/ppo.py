@@ -49,14 +49,24 @@ class PPO(nn.Module):
         self.use_clipped_value_loss = use_clipped_value_loss
 
         self.actor_critic = actor_critic
-        self.z_networks = actor_critic.net.z_networks
 
         self.ac_parameters = list(filter(lambda p: p.requires_grad, actor_critic.parameters()))
         
         if actor_critic.net.use_z:
             self.z_net_params = []
             for robo, net in actor_critic.net.z_networks.items():
+                z_net_params_names = []
+                for name, param in net.named_parameters():
+                    if param.requires_grad:
+                        z_net_params_names.append(name)
                 self.z_net_params += list(filter(lambda p: p.requires_grad, net.parameters()))
+                print('Z NET PARAMS: ', z_net_params_names)
+            self.z_optimizer = optim.Adam(
+                self.z_net_params,
+                lr=1e-4,
+                betas=[0.9, 0.999],
+                weight_decay=1e-2
+            )
 
         self.optimizer = optim.Adam(
             self.ac_parameters,
@@ -64,12 +74,7 @@ class PPO(nn.Module):
             eps=eps,
         )
 
-        self.z_optimizer = optim.Adam(
-            self.z_net_params,
-            lr=1e-4,
-            betas=[0.9, 0.999],
-            weight_decay=1e-2
-        )
+        
 
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
@@ -142,7 +147,9 @@ class PPO(nn.Module):
                 dist_entropy = dist_entropy.mean()
 
                 self.optimizer.zero_grad()
-                self.z_optimizer.zero_grad()
+                if self.actor_critic.net.use_z:
+                    self.z_optimizer.zero_grad()
+
                 total_loss = (
                     value_loss * self.value_loss_coef
                     + action_loss
@@ -165,7 +172,8 @@ class PPO(nn.Module):
 
                 self.before_step()
                 self.optimizer.step()
-                self.z_optimizer.step()
+                if self.actor_critic.net.use_z:
+                    self.z_optimizer.step()
                 self.after_step()
 
                 # for p in self.actor_critic.parameters():
