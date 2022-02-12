@@ -43,7 +43,7 @@ SIMULATOR:
     MIN_DEPTH: 0.0
     NORMALIZE_DEPTH: True
 TASK:
-  TYPE: MultiNav-v0
+  TYPE: Nav-v0
   Z:
     USE_Z: False
     USE_MLP: False
