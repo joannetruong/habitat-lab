@@ -44,19 +44,9 @@ SIMULATOR:
     NORMALIZE_DEPTH: True
 TASK:
   TYPE: Nav-v0
-  Z:
-    USE_Z: False
-    USE_MLP: False
-    ADAPT_Z: null
-    Z_OUT_DIM: 1
-    PREV_WINDOW: 50
-    Z_ENC_INPUTS: ['urdf', 'prev_states', 'prev_actions']
+  ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
 
-  ROBOTS: ['Spot']
-#  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
-  ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
-
-  SUCCESS_DISTANCE: 0.425
+  SUCCESS_DISTANCE: 0.375
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
@@ -73,16 +63,13 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-      POLICY_LIN_VEL_RANGE: [-0.50, 0.50]
-      POLICY_HOR_VEL_RANGE: [-0.50, 0.50]
-      POLICY_ANG_VEL_RANGE: [-17.19, 17.19]
-      ROBOT_LIN_VEL_RANGES: [ [ -0.35, 0.35 ] ]
-      ROBOT_HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
-      ROBOT_ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]
+      LIN_VEL_RANGE: [ -0.5, 0.5 ]  # meters per sec
+      ANG_VEL_RANGE: [ -30.0, 30.0 ]  # deg per sec
+      HOR_VEL_RANGE: [ -0.5, 0.5 ] # meters per sec
 
   MEASUREMENTS: ['DISTANCE_TO_GOAL', 'EPISODE_DISTANCE', 'SUCCESS', 'SPL', 'COLLISIONS', 'VEL_TRK_ERR']
   SUCCESS:
-    SUCCESS_DISTANCE: 0.425
+    SUCCESS_DISTANCE: 0.375
 
 DATASET:
   TYPE: PointNav-v1
