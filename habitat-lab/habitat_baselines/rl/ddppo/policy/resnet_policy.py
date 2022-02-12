@@ -441,8 +441,8 @@ class PointNavResNetNet(Net):
             ## 4560 = 228 * 4 * 5 [for 320 x 240 imgs]
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(4096, hidden_size),
-                # nn.Linear(4560, hidden_size),
+                # nn.Linear(4096, hidden_size),
+                nn.Linear(4560, hidden_size),
                 # np.prod(self.visual_encoder.output_shape), hidden_size
                 nn.ReLU(True),
             )

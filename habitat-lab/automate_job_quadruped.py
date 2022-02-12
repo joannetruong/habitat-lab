@@ -87,16 +87,16 @@ if args.user == "max":
     EVAL_SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/eval_slurm_template_max.sh"
 else:
     EXP_YAML = (
-        "habitat_baselines/config/pointnav/ddppo_pointnav_spot_train.yaml"
+        "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
     )
     EVAL_EXP_YAML = (
-        "habitat_baselines/config/pointnav/ddppo_pointnav_spot_eval.yaml"
+        "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
     )
     if args.noisy_depth:
         TASK_YAML = "configs/tasks/pointnav_quadruped_train_noisy.yaml"
         EVAL_YAML = "configs/tasks/pointnav_quadruped_eval_noisy.yaml"
     else:
-        TASK_YAML = "configs/tasks/pointnav_spot_train.yaml"
+        TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
         EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
     EXP_YAML_SUBDIR = "ddppo_yamls"
     TASK_YAML_SUBDIR = "pointnav_yamls"
