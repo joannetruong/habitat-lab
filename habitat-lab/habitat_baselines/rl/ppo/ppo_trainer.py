@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import contextlib
+import json
 import os
 import random
 import time
@@ -12,7 +13,6 @@ from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-import json
 import torch
 import tqdm
 from gym import spaces
@@ -141,11 +141,8 @@ class PPOTrainer(BaseRLTrainer):
 
         orig_device = t.device
         t = t.to(device=self.device)
-        print("ALL REDUCE 1: ", orig_device, self.device)
         torch.distributed.all_reduce(t)
-        print("ALL REDUCE 2: ", orig_device, self.device)
         t = t.to(device=orig_device)
-        print("ALL REDUCE 3: ", orig_device, self.device)
 
         return t
 

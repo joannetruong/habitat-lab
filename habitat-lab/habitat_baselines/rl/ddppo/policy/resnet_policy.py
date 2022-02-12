@@ -5,8 +5,8 @@
 # LICENSE file in the root directory of this source tree.
 
 
-from typing import Dict, Tuple
 from collections import OrderedDict, deque
+from typing import Dict, Tuple
 
 import numpy as np
 import torch
@@ -33,11 +33,12 @@ from habitat_baselines.rl.ddppo.policy.running_mean_and_var import (
 from habitat_baselines.rl.models.rnn_state_encoder import (
     build_rnn_state_encoder,
 )
-from habitat_baselines.rl.models.z_model import * 
-from habitat_baselines.utils.common import GaussianNet 
+from habitat_baselines.rl.models.z_model import *
 from habitat_baselines.rl.ppo import Net, Policy
+from habitat_baselines.utils.common import GaussianNet
 
 DEQUE_LENGTH = 150
+
 
 @baseline_registry.register_policy
 class PointNavResNetPolicy(Policy):
@@ -53,7 +54,7 @@ class PointNavResNetPolicy(Policy):
         normalize_visual_inputs: bool = False,
         force_blind_policy: bool = False,
         action_distribution_type: str = "categorical",
-        robots: list = ['A1'],
+        robots: list = ["A1"],
         use_z: bool = False,
         adapt_z_out: float = None,
         z_out_dim: int = 1,
@@ -82,7 +83,7 @@ class PointNavResNetPolicy(Policy):
                 z_out_dim=z_out_dim,
                 prev_window=prev_window,
                 use_mlp=use_mlp,
-                z_enc_inputs=z_enc_inputs
+                z_enc_inputs=z_enc_inputs,
             ),
             dim_actions=action_space.n,  # for action distribution
             action_distribution_type=action_distribution_type,
@@ -109,23 +110,20 @@ class PointNavResNetPolicy(Policy):
             z_out_dim=config.TASK_CONFIG.TASK.Z.Z_OUT_DIM,
             prev_window=config.TASK_CONFIG.TASK.Z.PREV_WINDOW,
             use_mlp=config.TASK_CONFIG.TASK.Z.USE_MLP,
-            z_enc_inputs= config.TASK_CONFIG.TASK.Z.Z_ENC_INPUTS
+            z_enc_inputs=config.TASK_CONFIG.TASK.Z.Z_ENC_INPUTS,
         )
 
-
     def get_metrics(self):
-
         def get_mean(deq):
             if not deq:
                 return -1
             return np.mean(deq)
-            
+
         ac_metrics = []
         if self.net.use_z:
             if not self.adapt_z_out:
                 z_encodings_dict = {
-                    k: get_mean(v)
-                    for k, v in self.net.z_deques.items()
+                    k: get_mean(v) for k, v in self.net.z_deques.items()
                 }
 
                 name = "z_encodings"
@@ -136,10 +134,13 @@ class PointNavResNetPolicy(Policy):
                 }
 
                 z_in_name = "z_inputs"
-                ac_metrics = [(name, z_encodings_dict), (z_in_name, z_inputs_dict)]
+                ac_metrics = [
+                    (name, z_encodings_dict),
+                    (z_in_name, z_inputs_dict),
+                ]
             else:
-                name = 'z_encodings'
-                value = {'z_out': self.net.adapt_z_out.clone().detach()}
+                name = "z_encodings"
+                value = {"z_out": self.net.adapt_z_out.clone().detach()}
                 ac_metrics = [(name, value)]
 
         return ac_metrics
@@ -159,6 +160,7 @@ class PointNavResNetPolicy(Policy):
             else:
                 self.net.adapt_z_out = self.net.adapt_z_out.to(device)
 
+
 class ResNetEncoder(nn.Module):
     def __init__(
         self,
@@ -171,17 +173,20 @@ class ResNetEncoder(nn.Module):
     ):
         super().__init__()
 
-        if "rgb" in observation_space.spaces:
-            self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
-            spatial_size = observation_space.spaces["rgb"].shape[0] // 2
-        else:
-            self._n_input_rgb = 0
+        self.rgb_keys = [k for k in observation_space.spaces if "rgb" in k]
+        self.depth_keys = [k for k in observation_space.spaces if "depth" in k]
+        self.using_one_camera = "depth" in observation_space.spaces
+        self.using_two_cameras = any(
+            [k.endswith("_depth") for k in observation_space.spaces.keys()]
+        )
 
-        if "depth" in observation_space.spaces:
-            self._n_input_depth = observation_space.spaces["depth"].shape[2]
-            spatial_size = observation_space.spaces["depth"].shape[0] // 2
-        else:
-            self._n_input_depth = 0
+        self._n_input_rgb, self._n_input_depth = [
+            # sum() returns 0 for an empty list
+            sum([observation_space.spaces[k].shape[2] for k in keys])
+            for keys in [self.rgb_keys, self.depth_keys]
+        ]
+        if self.using_one_camera or self.using_two_cameras:
+            self._n_input_depth = 1
 
         if normalize_visual_inputs:
             self.running_mean_and_var: nn.Module = RunningMeanAndVar(
@@ -191,15 +196,28 @@ class ResNetEncoder(nn.Module):
             self.running_mean_and_var = nn.Sequential()
 
         if not self.is_blind:
+            all_keys = self.rgb_keys + self.depth_keys
+            spatial_size_h = (
+                observation_space.spaces[all_keys[0]].shape[0] // 2
+            )
+            spatial_size_w = (
+                observation_space.spaces[all_keys[0]].shape[1] // 2
+            )
             input_channels = self._n_input_depth + self._n_input_rgb
             self.backbone = make_backbone(input_channels, baseplanes, ngroups)
 
-            final_spatial = int(
-                spatial_size * self.backbone.final_spatial_compress
+            final_spatial_h = int(
+                np.ceil(spatial_size_h * self.backbone.final_spatial_compress)
+            )
+            final_spatial_w = int(
+                np.ceil(spatial_size_w * self.backbone.final_spatial_compress)
             )
             after_compression_flat_size = 2048
             num_compression_channels = int(
-                round(after_compression_flat_size / (final_spatial ** 2))
+                round(
+                    after_compression_flat_size
+                    / (final_spatial_h * final_spatial_w)
+                )
             )
             self.compression = nn.Sequential(
                 nn.Conv2d(
@@ -215,8 +233,8 @@ class ResNetEncoder(nn.Module):
 
             self.output_shape = (
                 num_compression_channels,
-                final_spatial,
-                final_spatial,
+                final_spatial_h,
+                final_spatial_w,
             )
 
     @property
@@ -247,7 +265,19 @@ class ResNetEncoder(nn.Module):
             cnn_input.append(rgb_observations)
 
         if self._n_input_depth > 0:
-            depth_observations = observations["depth"]
+            if self.using_one_camera:
+                depth_observations = observations["depth"]
+            elif self.using_two_cameras:
+                depth_observations = torch.cat(
+                    [
+                        # Spot is cross-eyed; right is on the left on the FOV
+                        observations["spot_right_depth"],
+                        observations["spot_left_depth"],
+                    ],
+                    dim=2,
+                )
+            else:
+                raise Exception("Not implemented")
 
             # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
             depth_observations = depth_observations.permute(0, 3, 1, 2)
@@ -261,6 +291,7 @@ class ResNetEncoder(nn.Module):
         x = self.backbone(x)
         x = self.compression(x)
         return x
+
 
 class PointNavResNetNet(Net):
     """Network which passes the input image through CNN and concatenates
@@ -279,13 +310,13 @@ class PointNavResNetNet(Net):
         normalize_visual_inputs: bool,
         force_blind_policy: bool = False,
         discrete_actions: bool = True,
-        robots: list = ['A1'],
+        robots: list = ["A1"],
         use_z: bool = False,
         adapt_z_out: float = None,
         z_out_dim: int = 1,
         prev_window: int = 50,
         use_mlp: bool = False,
-        z_enc_inputs: list = []
+        z_enc_inputs: list = [],
     ):
         super().__init__()
 
@@ -406,33 +437,34 @@ class PointNavResNetNet(Net):
         )
 
         if not self.visual_encoder.is_blind:
+            ## 4069 = 256 * 4 * 4 [for 256 x 256 imgs]
+            ## 4560 = 228 * 4 * 5 [for 320 x 240 imgs]
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(
-                    4560, hidden_size
-                    # np.prod(self.visual_encoder.output_shape), hidden_size
-                ),
+                nn.Linear(4096, hidden_size),
+                # nn.Linear(4560, hidden_size),
+                # np.prod(self.visual_encoder.output_shape), hidden_size
                 nn.ReLU(True),
             )
 
         self.use_mlp = use_mlp
         self.z_enc = z_enc_inputs
 
-        print('USING Z: ', self.use_z)
-        
+        print("USING Z: ", self.use_z)
+
         if self.use_z:
-            print('Z ENC: ', self.z_enc, 'Z OUT: ', self.adapt_z_out)
+            print("Z ENC: ", self.z_enc, "Z OUT: ", self.adapt_z_out)
             z_in_dim = 1
             rnn_input_size += z_out_dim
 
             if not self.adapt_z_out:
                 num_inputs = z_in_dim
                 # 3 ROBOTS, 50 PREV STATES, 50 PREV ACTIONS, 4 URDF PARAMS, 1 LEARNABLE PARAMETER
-                if 'urdf' in self.z_enc:
+                if "urdf" in self.z_enc:
                     num_inputs += 4
-                if 'prev_states' in self.z_enc:
+                if "prev_states" in self.z_enc:
                     num_inputs += 3 * prev_window
-                if 'prev_actions' in self.z_enc:
+                if "prev_actions" in self.z_enc:
                     num_inputs += 3 * prev_window
                 # num_inputs = (3 * num_prev * 2) + 4 + z_in_dim
                 if self.use_mlp:
@@ -576,30 +608,31 @@ class PointNavResNetNet(Net):
         x.append(prev_actions)
 
         if self.use_z:
-            num_envs = observations['prev_states'].shape[0]
+            num_envs = observations["prev_states"].shape[0]
             if not self.adapt_z_out:
                 z_in = []
                 use_params = self.z_enc != []
 
-                if 'urdf' in self.z_enc:
-                    z_in.append(observations['urdf_params'])
-                if 'prev_states' in self.z_enc:
+                if "urdf" in self.z_enc:
+                    z_in.append(observations["urdf_params"])
+                if "prev_states" in self.z_enc:
                     prev_states_enc = torch.stack(
-                            [
-                                observations['prev_states'][:, :, 0],
-                                torch.cos(-observations['prev_states'][:, :, 1]),
-                                torch.sin(-observations['prev_states'][:, :, 1]),
-                            ],
-                            -1,
-                        )
+                        [
+                            observations["prev_states"][:, :, 0],
+                            torch.cos(-observations["prev_states"][:, :, 1]),
+                            torch.sin(-observations["prev_states"][:, :, 1]),
+                        ],
+                        -1,
+                    )
                     z_in.append(prev_states_enc.reshape(num_envs, -1))
-                if 'prev_actions' in self.z_enc:
-                    z_in.append(observations['prev_actions'].reshape(num_envs, -1))
+                if "prev_actions" in self.z_enc:
+                    z_in.append(
+                        observations["prev_actions"].reshape(num_envs, -1)
+                    )
 
                 if z_in == []:
                     z_in = [torch.zeros(num_envs, 1)]
-                z_concat = torch.cat(z_in,
-                                     dim=1)
+                z_concat = torch.cat(z_in, dim=1)
 
                 # z_concat = torch.cat([
                 #                       observations['urdf_params'],
@@ -608,15 +641,15 @@ class PointNavResNetNet(Net):
                 #                      ],
                 #                      dim=1)
 
-                robot_id_mask = observations['robot_id'].squeeze(-1)
+                robot_id_mask = observations["robot_id"].squeeze(-1)
                 # robot_id_mask = observations['robot_id']
                 # z_inputs = [
-                #     z_concat[robot_id_mask == z_idx] 
+                #     z_concat[robot_id_mask == z_idx]
                 #     for z_idx in range(3)
                 # ]
                 z_inputs = OrderedDict(
                     {
-                        k: z_concat[robot_id_mask == z_idx] 
+                        k: z_concat[robot_id_mask == z_idx]
                         for z_idx, k in enumerate(self.z_networks.keys())
                     }
                 )
@@ -625,7 +658,9 @@ class PointNavResNetNet(Net):
                 if self.use_mlp:
                     z_outputs = OrderedDict(
                         {
-                            z_name: z_net(z_inputs[z_name], use_params=use_params)
+                            z_name: z_net(
+                                z_inputs[z_name], use_params=use_params
+                            )
                             for z_name, z_net in self.z_networks.items()
                             if z_inputs[z_name].nelement() != 0
                         }
@@ -633,7 +668,9 @@ class PointNavResNetNet(Net):
                 else:
                     z_outputs = OrderedDict(
                         {
-                            z_name: z_net(z_inputs[z_name], use_params=use_params).sample()
+                            z_name: z_net(
+                                z_inputs[z_name], use_params=use_params
+                            ).sample()
                             for z_name, z_net in self.z_networks.items()
                             if z_inputs[z_name].nelement() != 0
                         }
@@ -641,7 +678,7 @@ class PointNavResNetNet(Net):
 
                 for k, v in z_outputs.items():
                     current_z_vals = [i.clone().item() for i in v.squeeze(-1)]
-                    self.z_deques[k + '_z_out'].extend(current_z_vals)
+                    self.z_deques[k + "_z_out"].extend(current_z_vals)
 
                 z_outputs = torch.cat(list(z_outputs.values()), dim=0)
             else:

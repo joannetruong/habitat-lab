@@ -20,6 +20,7 @@ import os
 import numpy as np
 import squaternion
 from gym import spaces
+from gym.spaces.box import Box
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
@@ -2137,6 +2138,7 @@ class SpotGraySensor(HabitatSimRGBSensor):
         obs = sim_obs.get(self.uuid, None)
         assert isinstance(obs, np.ndarray)
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+        obs = cv2.resize(obs, (256, 126))
         obs = obs.reshape([*obs.shape[:2], 1])
         return obs
 
@@ -2158,11 +2160,22 @@ class SpotDepthSensor(HabitatSimDepthSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_depth"
 
+    ## Hack to get Spot cameras resized to 256,256 after concatenation
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
+        return spaces.Box(
+            low=self.min_depth_value,
+            high=self.max_depth_value,
+            shape=(256, 128, 1),
+            dtype=np.float32,
+        )
+
     def get_observation(self, sim_obs):
         obs = sim_obs.get(self.uuid, None)
         assert isinstance(obs, np.ndarray)
         obs[obs > self.config.MAX_DEPTH] = 0.0  # Spot blacks out far pixels
         obs = np.clip(obs, self.config.MIN_DEPTH, self.config.MAX_DEPTH)
+        obs = cv2.resize(obs, (128, 256))
+
         obs = np.expand_dims(obs, axis=2)  # make depth observation a 3D array
         if self.config.NORMALIZE_DEPTH:
             # normalize depth observation to [0, 1]
