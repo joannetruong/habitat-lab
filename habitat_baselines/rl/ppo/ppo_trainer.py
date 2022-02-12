@@ -16,9 +16,6 @@ import numpy as np
 import torch
 import tqdm
 from gym import spaces
-from torch import nn
-from torch.optim.lr_scheduler import LambdaLR
-
 from habitat import Config, VectorEnv, logger
 from habitat.core.spaces import ActionSpace, EmptySpace
 from habitat.utils import profiling_wrapper
@@ -45,9 +42,9 @@ from habitat_baselines.rl.ddppo.ddp_utils import (
     requeue_job,
     save_resume_state,
 )
-from habitat_baselines.rl.ddppo.policy import (  # noqa: F401.
+from habitat_baselines.rl.ddppo.policy import (
     PointNavResNetPolicy,
-)
+)  # noqa: F401.
 from habitat_baselines.rl.ppo import PPO
 from habitat_baselines.rl.ppo.policy import Policy
 from habitat_baselines.utils.common import (
@@ -57,6 +54,8 @@ from habitat_baselines.utils.common import (
     generate_video,
 )
 from habitat_baselines.utils.env_utils import construct_envs
+from torch import nn
+from torch.optim.lr_scheduler import LambdaLR
 
 
 @baseline_registry.register_trainer(name="ddppo")
@@ -353,7 +352,6 @@ class PPOTrainer(BaseRLTrainer):
         if self._static_encoder:
             with torch.no_grad():
                 batch["visual_features"] = self._encoder(batch)
-        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         self.rollouts.buffers["observations"][0] = batch
 
         self.current_episode_reward = torch.zeros(self.envs.num_envs, 1)
@@ -540,7 +538,6 @@ class PPOTrainer(BaseRLTrainer):
         )
         batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
-        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         rewards = torch.tensor(
             rewards_l,
             dtype=torch.float,

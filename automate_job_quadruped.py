@@ -4,8 +4,8 @@ Makes a new directory, and stores the two yaml files that generate the config.
 Replaces the yaml file content with the location of the new directory.
 """
 
-HABITAT_LAB = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab"
-RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/dan_res"
+HABITAT_LAB = "/coc/testnvme/jtruong33/google_nav/habitat-lab"
+RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/outdoor_nav_results"
 SLURM_TEMPLATE = (
     "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/slurm_job_template.sh"
 )
@@ -31,42 +31,12 @@ parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="gibson")
 parser.add_argument("-ts", "--time-step", type=float, default=1.0)
-
-parser.add_argument(
-    "-mvx", "--max_lin_vel", type=float, default=0.5, required=False
-)
-parser.add_argument(
-    "-mvy", "--max_hor_vel", type=float, default=0.5, required=False
-)
-parser.add_argument(
-    "-mvt", "--max_ang_vel", type=float, default=17.19, required=False
-)
-
 parser.add_argument("-vx", "--lin_vel_ranges", nargs="+", required=True)
 parser.add_argument("-vy", "--hor_vel_ranges", nargs="+", required=True)
 parser.add_argument("-vt", "--ang_vel_ranges", nargs="+", required=True)
 
 parser.add_argument("-nd", "--noisy_depth", default=False, action="store_true")
 parser.add_argument("-curr", "--curricium", default=False, action="store_true")
-parser.add_argument("-ft", "--fine-tune", default="")
-parser.add_argument("-pt", "--pretrained", default=False, action="store_true")
-parser.add_argument(
-    "-pte", "--pretrained-encoder", default=False, action="store_true"
-)
-parser.add_argument(
-    "-fe", "--freeze-encoder", default=False, action="store_true"
-)
-# z params
-parser.add_argument("-z", "--use_z", default=False, action="store_true")
-parser.add_argument("-zmlp", "--use_z_mlp", default=False, action="store_true")
-parser.add_argument("-az", "--adapt_z", default="null", required=False)
-parser.add_argument("-zod", "--z_out_dim", type=int, default=1, required=False)
-parser.add_argument(
-    "-pw", "--prev_window", type=int, default=50, required=False
-)
-parser.add_argument(
-    "-zei", "--z_enc_inputs", nargs="+", default=[], required=False
-)
 
 # Evaluation
 parser.add_argument("-e", "--eval", default=False, action="store_true")
@@ -76,30 +46,15 @@ parser.add_argument("-v", "--video", default=False, action="store_true")
 parser.add_argument("-d", "--debug", default=False, action="store_true")
 args = parser.parse_args()
 
-if args.user == "max":
-    HABITAT_LAB = (
-        "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab"
-    )
-    RESULTS = (
-        "/srv/share3/mrudolph8/develop/habitat_spot_results/dan_kinematic"
-    )
-    SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/slurm_job_template_max.sh"
-    EVAL_SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/eval_slurm_template_max.sh"
-else:
-    EXP_YAML = (
-        "habitat_baselines/config/pointnav/ddppo_pointnav_spot_train.yaml"
-    )
-    EVAL_EXP_YAML = (
-        "habitat_baselines/config/pointnav/ddppo_pointnav_spot_eval.yaml"
-    )
-    if args.noisy_depth:
-        TASK_YAML = "configs/tasks/pointnav_quadruped_train_noisy.yaml"
-        EVAL_YAML = "configs/tasks/pointnav_quadruped_eval_noisy.yaml"
-    else:
-        TASK_YAML = "configs/tasks/pointnav_spot_train.yaml"
-        EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
-    EXP_YAML_SUBDIR = "ddppo_yamls"
-    TASK_YAML_SUBDIR = "pointnav_yamls"
+
+EXP_YAML = "habitat_baselines/config/pointnav/ddppo_pointnav_spot_train.yaml"
+EVAL_EXP_YAML = (
+    "habitat_baselines/config/pointnav/ddppo_pointnav_spot_eval.yaml"
+)
+TASK_YAML = "configs/tasks/pointnav_spot_train.yaml"
+EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
+EXP_YAML_SUBDIR = "ddppo_yamls"
+TASK_YAML_SUBDIR = "pointnav_yamls"
 
 experiment_name = args.experiment_name
 
@@ -206,22 +161,6 @@ if not args.eval:
             task_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith("  ROBOT_URDFS:"):
             task_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
-        elif i.startswith("    USE_Z:"):
-            task_yaml_data[idx] = "    USE_Z: {}".format(args.use_z)
-        elif i.startswith("    USE_MLP:"):
-            task_yaml_data[idx] = "    USE_MLP: {}".format(args.use_z_mlp)
-        elif i.startswith("    ADAPT_Z:"):
-            task_yaml_data[idx] = "    ADAPT_Z: {}".format(args.adapt_z)
-        elif i.startswith("    Z_OUT_DIM:"):
-            task_yaml_data[idx] = "    Z_OUT_DIM: {}".format(args.z_out_dim)
-        elif i.startswith("    PREV_WINDOW:"):
-            task_yaml_data[idx] = "    PREV_WINDOW: {}".format(
-                args.prev_window
-            )
-        elif i.startswith("    Z_ENC_INPUTS:"):
-            task_yaml_data[idx] = "    Z_ENC_INPUTS: {}".format(
-                args.z_enc_inputs
-            )
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -238,39 +177,6 @@ if not args.eval:
                 task_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      TIME_STEP:"):
             task_yaml_data[idx] = "      TIME_STEP: {}".format(args.time_step)
-        elif i.startswith("      POLICY_LIN_VEL_RANGE:"):
-            task_yaml_data[
-                idx
-            ] = "      POLICY_LIN_VEL_RANGE: [{}, {}]".format(
-                -args.max_lin_vel, args.max_lin_vel
-            )
-        elif i.startswith("      POLICY_HOR_VEL_RANGE:"):
-            task_yaml_data[
-                idx
-            ] = "      POLICY_HOR_VEL_RANGE: [{}, {}]".format(
-                -args.max_hor_vel, args.max_hor_vel
-            )
-        elif i.startswith("      POLICY_ANG_VEL_RANGE:"):
-            task_yaml_data[
-                idx
-            ] = "      POLICY_ANG_VEL_RANGE: [{}, {}]".format(
-                -args.max_ang_vel, args.max_ang_vel
-            )
-        elif i.startswith("      ROBOT_LIN_VEL_RANGES:"):
-            lin_vel_ranges = [ast.literal_eval(n) for n in args.lin_vel_ranges]
-            task_yaml_data[idx] = "      ROBOT_LIN_VEL_RANGES: {}".format(
-                lin_vel_ranges
-            )
-        elif i.startswith("      ROBOT_HOR_VEL_RANGES:"):
-            hor_vel_ranges = [ast.literal_eval(n) for n in args.hor_vel_ranges]
-            task_yaml_data[idx] = "      ROBOT_HOR_VEL_RANGES: {}".format(
-                hor_vel_ranges
-            )
-        elif i.startswith("      ROBOT_ANG_VEL_RANGES:"):
-            ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
-            task_yaml_data[idx] = "      ROBOT_ANG_VEL_RANGES: {}".format(
-                ang_vel_ranges
-            )
         elif i.startswith("  SUCCESS_DISTANCE:"):
             task_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(
                 robot_goal - GOAL_THRESH
@@ -279,11 +185,6 @@ if not args.eval:
             task_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(
                 robot_goal - GOAL_THRESH
             )
-        # elif i.startswith('    POSITION:'):
-        # task_yaml_data[idx] = "    POSITION: {}".format(robots_heights[0])
-
-        # elif i.startswith('    POSITION: '):
-        # task_yaml_data[idx] = "    POSITION: [0.0, {}, -0.1778]".format(robot_camera_pos)
         elif i.startswith("SEED:"):
             task_yaml_data[idx] = "SEED: {}".format(args.seed)
         elif i.startswith("  DATA_PATH:"):
@@ -327,20 +228,6 @@ if not args.eval:
         elif i.startswith("TXT_DIR:"):
             exp_yaml_data[idx] = "TXT_DIR:            '{}'".format(
                 os.path.join(dst_dir, "txts")
-            )
-        elif i.startswith("    pretrained_weights:"):
-            exp_yaml_data[idx] = "    pretrained_weights: {}".format(
-                args.fine_tune
-            )
-        elif i.startswith("    pretrained:"):
-            exp_yaml_data[idx] = "    pretrained: {}".format(args.pretrained)
-        elif i.startswith("    pretrained_encoder:"):
-            exp_yaml_data[idx] = "    pretrained_encoder: {}".format(
-                args.pretrained_encoder
-            )
-        elif i.startswith("    train_encoder:"):
-            exp_yaml_data[idx] = "    train_encoder: {}".format(
-                not args.freeze_encoder
             )
 
     with open(new_exp_yaml_path, "w") as f:
@@ -402,22 +289,6 @@ else:
             eval_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith("  ROBOT_URDFS:"):
             eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
-        elif i.startswith("    USE_Z:"):
-            eval_yaml_data[idx] = "    USE_Z: {}".format(args.use_z)
-        elif i.startswith("    USE_MLP:"):
-            eval_yaml_data[idx] = "    USE_MLP: {}".format(args.use_z_mlp)
-        elif i.startswith("    ADAPT_Z:"):
-            eval_yaml_data[idx] = "    ADAPT_Z: {}".format(args.adapt_z)
-        elif i.startswith("    Z_OUT_DIM:"):
-            eval_yaml_data[idx] = "    Z_OUT_DIM: {}".format(args.z_out_dim)
-        elif i.startswith("    PREV_WINDOW:"):
-            eval_yaml_data[idx] = "    PREV_WINDOW: {}".format(
-                args.prev_window
-            )
-        elif i.startswith("    Z_ENC_INPUTS:"):
-            eval_yaml_data[idx] = "    Z_ENC_INPUTS: {}".format(
-                args.z_enc_inputs
-            )
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -434,21 +305,6 @@ else:
                 eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      TIME_STEP:"):
             eval_yaml_data[idx] = "      TIME_STEP: {}".format(args.time_step)
-        elif i.startswith("      ROBOT_LIN_VEL_RANGES:"):
-            lin_vel_ranges = [ast.literal_eval(n) for n in args.lin_vel_ranges]
-            eval_yaml_data[idx] = "      ROBOT_LIN_VEL_RANGES: {}".format(
-                lin_vel_ranges
-            )
-        elif i.startswith("      ROBOT_HOR_VEL_RANGES:"):
-            hor_vel_ranges = [ast.literal_eval(n) for n in args.hor_vel_ranges]
-            eval_yaml_data[idx] = "      ROBOT_HOR_VEL_RANGES: {}".format(
-                hor_vel_ranges
-            )
-        elif i.startswith("      ROBOT_ANG_VEL_RANGES:"):
-            ang_vel_ranges = [ast.literal_eval(n) for n in args.ang_vel_ranges]
-            eval_yaml_data[idx] = "      ROBOT_ANG_VEL_RANGES: {}".format(
-                ang_vel_ranges
-            )
         elif i.startswith("  SUCCESS_DISTANCE:"):
             eval_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(robot_goal)
         elif i.startswith("    SUCCESS_DISTANCE:"):

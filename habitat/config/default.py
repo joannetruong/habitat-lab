@@ -49,13 +49,6 @@ _C.ENVIRONMENT.ITERATOR_OPTIONS.STEP_REPETITION_RANGE = 0.2
 _C.TASK = CN()
 _C.TASK.TYPE = "Nav-v0"
 _C.TASK.SUCCESS_DISTANCE = 0.2
-_C.TASK.ROBOT_URDFS = [
-    "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-    "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-    "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
-]
-_C.TASK.USE_Z = False
-_C.TASK.ROBOTS = ["A1", "AlienGo", "Daisy"]
 _C.TASK.SENSORS = []
 _C.TASK.MEASUREMENTS = []
 _C.TASK.GOAL_SENSOR_UUID = "pointgoal"
@@ -97,6 +90,7 @@ ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
 ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
 ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
 ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 240.0
+ACTIONS.VELOCITY_CONTROL.ROBOT_URDF = "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
 
 # DYNAMIC VELOCITY ACTION
 ACTIONS.DYNAMIC_VELOCITY_CONTROL = CN()
@@ -242,10 +236,6 @@ _C.TASK.COLLISIONS.TYPE = "Collisions"
 # -----------------------------------------------------------------------------
 _C.TASK.EPISODE_DISTANCE = CN()
 _C.TASK.EPISODE_DISTANCE.TYPE = "EpisodeDistance"
-# VELOCITY TRACKING ERROR MEASUREMENT
-# -----------------------------------------------------------------------------
-_C.TASK.VEL_TRK_ERR = CN()
-_C.TASK.VEL_TRK_ERR.TYPE = "VelTrkErr"
 # -----------------------------------------------------------------------------
 # HUMAN_COLLISION MEASUREMENT
 # -----------------------------------------------------------------------------

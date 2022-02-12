@@ -8,7 +8,6 @@ import warnings
 from typing import List, Optional, Union
 
 import numpy as np
-
 from habitat import get_config as get_task_config
 from habitat.config import Config as CN
 
@@ -75,8 +74,6 @@ _C.RL.COLLISION_PENALTY = 0.0
 _C.RL.BACKWARDS_PENALTY = 0.0
 _C.RL.ANG_ACCEL_PENALTY_COEFF = 0.0
 _C.RL.MAX_ANG_ACCEL_PENALTY = 0.0
-_C.RL.VEL_ERR_PENALTY = 1.0
-_C.RL.FALL_PENALTY = 5.0
 # -----------------------------------------------------------------------------
 # preemption CONFIG
 # -----------------------------------------------------------------------------
