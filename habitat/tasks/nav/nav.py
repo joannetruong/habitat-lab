@@ -23,20 +23,33 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (EmbodiedTask, Measure,
-                                        SimulatorTaskAction)
+from habitat.core.embodied_task import (
+    EmbodiedTask,
+    Measure,
+    SimulatorTaskAction,
+)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
-                                    ShortestPathPoint, Simulator)
+from habitat.core.simulator import (
+    AgentState,
+    RGBSensor,
+    Sensor,
+    SensorTypes,
+    ShortestPathPoint,
+    Simulator,
+)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor, HabitatSimRGBSensor)
+    HabitatSimDepthSensor,
+    HabitatSimRGBSensor,
+)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (quaternion_from_coeff,
-                                          quaternion_rotate_vector)
+from habitat.utils.geometry_utils import (
+    quaternion_from_coeff,
+    quaternion_rotate_vector,
+)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -47,8 +60,11 @@ try:
 except ImportError:
     pass
 
-from .spot_utils.raibert_controller import (Raibert_controller_turn,
-                                            Raibert_controller_turn_stable)
+from .spot_utils.raibert_controller import (
+    Raibert_controller_turn,
+    Raibert_controller_turn_stable,
+)
+from .spot_utils.robot_env import *
 
 cv2 = try_cv2_import()
 
@@ -1235,11 +1251,11 @@ class VelocityAction(SimulatorTaskAction):
         # If robot was never spawned or was removed with previous scene
         if self.robot_id is None or self.robot_id.object_id == -1:
             ao_mgr = self._sim.get_articulated_object_manager()
-            self.robot_id = ao_mgr.add_articulated_object_from_urdf(
+            robot_id = ao_mgr.add_articulated_object_from_urdf(
                 self.robot_file, fixed_base=False
             )
-
-        self.robot_id.joint_positions = np.deg2rad([0, 60, -120] * 4)
+        self.robot_wrapper = eval(task._config.ROBOT)(robot_id=robot_id)
+        self.robot_wrapper.reset()
 
     def step(
         self,
@@ -1295,6 +1311,8 @@ class VelocityAction(SimulatorTaskAction):
             )
         self.vel_control.linear_velocity = np.array([hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
+
+        """Get the current agent state"""
         agent_state = self._sim.get_agent_state()
         normalized_quaternion = np.normalized(agent_state.rotation)
         agent_mn_quat = mn.Quaternion(
@@ -1304,7 +1322,7 @@ class VelocityAction(SimulatorTaskAction):
             agent_mn_quat,
             agent_state.position,
         )
-        # manually integrate the rigid state
+        """Integrate the rigid state to get the state after taking a step"""
         goal_rigid_state = self.vel_control.integrate_transform(
             time_step, current_rigid_state
         )
@@ -1313,7 +1331,7 @@ class VelocityAction(SimulatorTaskAction):
         final_position = self._sim.pathfinder.try_step_no_sliding(  # type: ignore
             agent_state.position, goal_rigid_state.translation
         )
-        # Check if a collision occured
+        """Check if a collision occured"""
         dist_moved_before_filter = (
             goal_rigid_state.translation - agent_state.position
         ).dot()
@@ -1340,32 +1358,26 @@ class VelocityAction(SimulatorTaskAction):
             self.prev_ang_vel = 0.0
             return agent_observations
 
-        """See if goal state causes interpenetration with surroundings"""
         goal_mn_quat = mn.Quaternion(
             goal_rigid_state.rotation.vector, goal_rigid_state.rotation.scalar
         )
         agent_T_global = mn.Matrix4.from_(
             goal_mn_quat.to_matrix(), goal_rigid_state.translation
         )
-        robot_rotation_offset = mn.Matrix4.rotation(
+        robot_T_agent_rot_offset = mn.Matrix4.rotation(
             mn.Rad(0.0), mn.Vector3((1.0, 0.0, 0.0))
         ).rotation()
-        robot_translation_offset = mn.Vector3(np.array([0.0, 0.625, 0.0]))
         robot_T_agent = mn.Matrix4.from_(
-            robot_rotation_offset, robot_translation_offset
+            robot_T_agent_rot_offset,
+            self.robot_wrapper.base_transform.translation,
         )
 
         robot_T_global = robot_T_agent @ agent_T_global
-        robot_rotation_offset = mn.Matrix4.rotation(
-            mn.Rad(-np.pi / 2.0),
-            mn.Vector3((1.0, 0.0, 0.0)),
-        ) @ mn.Matrix4.rotation(
-            mn.Rad(np.pi / 2.0),
-            mn.Vector3((0.0, 0.0, 1.0)),
-        )
-        robot_T_global = robot_T_global @ robot_rotation_offset
+        robot_global_rotation_offset = self.robot_wrapper.self.base_transform
+        robot_T_global = robot_T_global @ robot_global_rotation_offset
         self.robot_id.transformation = robot_T_global
 
+        """See if goal state causes interpenetration with surroundings"""
         collided = self._sim.contact_test(self.robot_id.object_id)
         if collided:
             agent_observations = self._sim.get_observations_at()
@@ -1391,7 +1403,6 @@ class VelocityAction(SimulatorTaskAction):
             rotation=final_rotation,
             keep_agent_at_new_pose=True,
         )
-        # TODO: Make a better way to flag collisions
         self._sim._prev_sim_obs["collided"] = collided  # type: ignore
         agent_observations["hit_navmesh"] = collided
         agent_observations["moving_backwards"] = lin_vel < 0
@@ -1446,10 +1457,19 @@ class DynamicVelocityAction(VelocityAction):
         return ActionSpace(action_dict)
 
     def _reset_robot(self, task, agent_pos, agent_rot):
-        task.robot_id.transformation = mn.Matrix4.from_(
-            agent_rot.__matmul__(
-                task.robot_wrapper.rotation_offset
-            ).rotation(),  # 3x3 rotation
+        self.robot_id.clear_joint_states()
+        self.robot_id.root_angular_velocity = mn.Vector3(0.0, 0.0, 0.0)
+        self.robot_id.root_linear_velocity = mn.Vector3(0.0, 0.0, 0.0)
+
+        # Roll robot 90 deg
+        base_transform = mn.Matrix4.rotation(
+            mn.Rad(np.deg2rad(-90)), mn.Vector3(1.0, 0.0, 0.0)
+        ) @ mn.Matrix4.rotation(
+            mn.Rad(np.deg2rad(yaw)), mn.Vector3(0.0, 0.0, 1.0)
+        )
+
+        self.robot_id.transformation = mn.Matrix4.from_(
+            agent_rot.__matmul__(base_transform).rotation(),  # 3x3 rotation
             agent_pos
             + task.robot_wrapper.robot_spawn_offset,  # translation vector
         )  # 4x4 homogenous transform
@@ -1770,11 +1790,19 @@ class SpotGraySensor(HabitatSimRGBSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_gray"
 
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
+        return spaces.Box(
+            low=0,
+            high=255,
+            shape=(256, 128, 1),
+            dtype=np.float32,
+        )
+
     def get_observation(self, sim_obs):
         obs = sim_obs.get(self.uuid, None)
         assert isinstance(obs, np.ndarray)
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        obs = cv2.resize(obs, (256, 126))
+        obs = cv2.resize(obs, (128, 256))
         obs = obs.reshape([*obs.shape[:2], 1])
         return obs
 
