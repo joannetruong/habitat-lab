@@ -42,6 +42,12 @@ SIMULATOR:
     MAX_DEPTH: 3.5
     MIN_DEPTH: 0.0
     NORMALIZE_DEPTH: True
+  RGB_SENSOR:
+    WIDTH: 256
+    HEIGHT: 256
+    HFOV: 70
+    ORIENTATION: [ -0.7, 0.0, 0.0 ]
+    POSITION: [ 0.0, 1.1, 1.0 ]
 TASK:
   TYPE: Nav-v0
   ROBOT: "Spot"
@@ -73,5 +79,5 @@ TASK:
 
 DATASET:
   TYPE: PointNav-v1
-  SPLIT: train
+  SPLIT: val
   DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz

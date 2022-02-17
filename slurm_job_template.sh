@@ -23,7 +23,7 @@
 source ~/.bashrc
 unset PYTHONPATH
 
-conda activate habitat-quad
+conda activate habitat-outdoor
 cd HABITAT_REPO_PATH
 export CUDA_LAUNCH_BLOCKING=1
 srun python -u -m habitat_baselines.run \

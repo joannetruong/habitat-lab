@@ -1,9 +1,9 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_quadruped_train.yaml"
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot_eval.yaml"
 TOTAL_NUM_STEPS: 5e8
 
 VERBOSE: False
 TRAINER_NAME: "ddppo"
-ENV_NAME: "MultiNavRLEnv"
+ENV_NAME: "NavRLEnv"
 SIMULATOR_GPU_ID: 0
 TORCH_GPU_ID: 0
 VIDEO_OPTION: []
@@ -13,8 +13,8 @@ EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_res
 CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 16
-SENSORS: ["DEPTH_SENSOR"]
+NUM_ENVIRONMENTS: 8
+SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']
 NUM_UPDATES: -1
 LOG_INTERVAL: 10
 NUM_CHECKPOINTS: 100
@@ -78,3 +78,5 @@ RL:
     backbone: resnet18
     rnn_type: LSTM
     num_recurrent_layers: 2
+EVAL:
+    SPLIT: "val"

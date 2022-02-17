@@ -23,17 +23,21 @@ parser = argparse.ArgumentParser()
 parser.add_argument("experiment_name")
 
 # Training
-parser.add_argument("-u", "--user", default="joanne")
 parser.add_argument("-sd", "--seed", type=int, default=100)
-parser.add_argument("-r", "--robots", nargs="+", required=True)
+parser.add_argument("-r", "--robot", default="Spot")
 parser.add_argument("-c", "--control-type", required=True)
 parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
-parser.add_argument("-ds", "--dataset", default="gibson")
+parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
 parser.add_argument("-ts", "--time-step", type=float, default=1.0)
 parser.add_argument("-vx", "--lin_vel_ranges", nargs="+", required=True)
 parser.add_argument("-vy", "--hor_vel_ranges", nargs="+", required=True)
 parser.add_argument("-vt", "--ang_vel_ranges", nargs="+", required=True)
+parser.add_argument(
+    "-sc", "--spot_cameras", default=False, action="store_true"
+)
+parser.add_argument("-g", "--gray", default=False, action="store_true")
+parser.add_argument("-o", "--outdoor", default=False, action="store_true")
 
 parser.add_argument("-nd", "--noisy_depth", default=False, action="store_true")
 parser.add_argument("-curr", "--curricium", default=False, action="store_true")
@@ -47,17 +51,23 @@ parser.add_argument("-d", "--debug", default=False, action="store_true")
 args = parser.parse_args()
 
 
-EXP_YAML = "habitat_baselines/config/pointnav/ddppo_pointnav_spot_train.yaml"
-EVAL_EXP_YAML = (
-    "habitat_baselines/config/pointnav/ddppo_pointnav_spot_eval.yaml"
+yaml_type = "spot" if args.spot_cameras else "quadruped"
+EXP_YAML = (
+    "habitat_baselines/config/pointnav/ddppo_pointnav_"
+    + yaml_type
+    + "_train.yaml"
 )
-TASK_YAML = "configs/tasks/pointnav_spot_train.yaml"
-EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
+EVAL_EXP_YAML = (
+    "habitat_baselines/config/pointnav/ddppo_pointnav_"
+    + yaml_type
+    + "_eval.yaml"
+)
+TASK_YAML = "configs/tasks/pointnav_" + yaml_type + "_train.yaml"
+EVAL_YAML = "configs/tasks/pointnav_" + yaml_type + "_eval.yaml"
 EXP_YAML_SUBDIR = "ddppo_yamls"
 TASK_YAML_SUBDIR = "pointnav_yamls"
 
 experiment_name = args.experiment_name
-
 
 dst_dir = os.path.join(RESULTS, experiment_name)
 exp_yaml_path = os.path.join(HABITAT_LAB, EXP_YAML)
@@ -74,7 +84,6 @@ new_eval_exp_yaml_path = os.path.join(
 )
 
 robot_urdfs_dict = {
-    "A1": "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
     "AlienGo": "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
     "Daisy": "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
     "Spot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf",
@@ -100,36 +109,18 @@ robot_data_dict = {
 
 robot_radius_dict = {"A1": 0.2, "AlienGo": 0.22, "Locobot": 0.23, "Spot": 0.3}
 
-robots = args.robots
-num_robots = len(robots)
-robots_urdfs = [robot_urdfs_dict[robot] for robot in robots]
+robot = args.robot
+robot_goal = robot_goal_dict[robot]
+robot_urdf = robot_urdfs_dict[robot]
 
-if num_robots > 1:
-    robot_goal = min([robot_goal_dict[robot] for robot in robots])
-else:
-    robot_goal = robot_goal_dict[robots[0]]
-
-if num_robots > 1:
-    largest_robot_value = max([robot_goal_dict[robot] for robot in robots])
-    largest_robot = [
-        k for k, v in robot_goal_dict.items() if v == largest_robot_value
-    ][0]
-else:
-    largest_robot = robots[0]
-
-largest_robot_radius = robot_radius_dict[largest_robot]
-robot_data_path = "pointnav_{}_{}".format(
-    largest_robot.lower(), largest_robot_radius
-)
-
-
-robots_underscore = "_".join(robots)
+largest_robot_radius = robot_radius_dict[robot]
+robot_data_path = "pointnav_{}_{}".format(robot.lower(), largest_robot_radius)
+robots_underscore = robot
 if args.control_type == "dynamic":
     robots_underscore += "_dynamic"
 
 # Training
 if not args.eval:
-
     # Create directory
     if os.path.isdir(dst_dir):
         response = input(
@@ -157,10 +148,10 @@ if not args.eval:
             task_yaml_data[idx] = "  CURRICULUM: {}".format(args.curricium)
         elif i.startswith("    RADIUS:"):
             task_yaml_data[idx] = "    RADIUS: {}".format(largest_robot_radius)
-        elif i.startswith("  ROBOTS:"):
-            task_yaml_data[idx] = "  ROBOTS: {}".format(robots)
-        elif i.startswith("  ROBOT_URDFS:"):
-            task_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith("  ROBOT:"):
+            task_yaml_data[idx] = "  ROBOT: {}".format(robot)
+        elif i.startswith("      ROBOT_URDF:"):
+            task_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -188,9 +179,12 @@ if not args.eval:
         elif i.startswith("SEED:"):
             task_yaml_data[idx] = "SEED: {}".format(args.seed)
         elif i.startswith("  DATA_PATH:"):
-            data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_{}/{}/{{split}}/{{split}}.json.gz".format(
-                args.dataset, robot_data_path
-            )
+            if args.outdoor:
+                data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/{split}/{split}.json.gz"
+            else:
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_{}/{}/{{split}}/{{split}}.json.gz".format(
+                    args.dataset, robot_data_path
+                )
             task_yaml_data[idx] = "  DATA_PATH: {}".format(data_path)
 
     with open(new_task_yaml_path, "w") as f:
@@ -207,7 +201,7 @@ if not args.eval:
                 new_task_yaml_path
             )
         elif i.startswith("TOTAL_NUM_STEPS:"):
-            max_num_steps = 5e8 if args.control_type == "kinematic" else 3e7
+            max_num_steps = 2e9 if args.control_type == "kinematic" else 2e8
             exp_yaml_data[idx] = "TOTAL_NUM_STEPS: {}".format(max_num_steps)
         elif i.startswith("TENSORBOARD_DIR:"):
             exp_yaml_data[idx] = "TENSORBOARD_DIR:    '{}'".format(
@@ -256,18 +250,16 @@ if not args.eval:
 
     print(
         "\nSee output with:\ntail -F {}".format(
-            os.path.join(dst_dir, "output_err", experiment_name + ".err")
+            os.path.join(dst_dir, experiment_name + ".err")
         )
     )
 
 # Evaluation
 else:
-
     # Make sure folder exists
     assert os.path.isdir(dst_dir), "{} directory does not exist".format(
         dst_dir
     )
-
     os.makedirs(os.path.join(dst_dir, "output_err"), exist_ok=True)
     os.makedirs(os.path.join(dst_dir, TASK_YAML_SUBDIR), exist_ok=True)
     os.makedirs(os.path.join(dst_dir, EXP_YAML_SUBDIR), exist_ok=True)
@@ -285,10 +277,10 @@ else:
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curricium)
         elif i.startswith("    RADIUS:"):
             eval_yaml_data[idx] = "    RADIUS: {}".format(largest_robot_radius)
-        elif i.startswith("  ROBOTS:"):
-            eval_yaml_data[idx] = "  ROBOTS: {}".format(robots)
-        elif i.startswith("  ROBOT_URDFS:"):
-            eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith("  ROBOT:"):
+            eval_yaml_data[idx] = "  ROBOT: {}".format(robot)
+        elif i.startswith("      ROBOT_URDF:"):
+            eval_yaml_data[idx] = "      ROBOT_URDF {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -385,8 +377,28 @@ else:
             else:
                 exp_yaml_data[idx] = "VIDEO_OPTION: []"
         elif i.startswith("SENSORS:"):
-            if args.video:
-                exp_yaml_data[idx] = "SENSORS: ['RGB_SENSOR','DEPTH_SENSOR']"
+            if args.spot_cameras and args.use_gray:
+                exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+                if args.video:
+                    exp_yaml_data[
+                        idx
+                    ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+            elif args.spot_cameras:
+                exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
+                if args.video:
+                    exp_yaml_data[
+                        idx
+                    ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
+            else:
+                exp_yaml_data[idx] = "SENSORS: ['DEPTH_SENSOR']"
+                if args.video:
+                    exp_yaml_data[
+                        idx
+                    ] = "SENSORS: ['RGB_SENSOR','DEPTH_SENSOR']"
         elif i.startswith("VIDEO_DIR:"):
             if args.video:
                 if args.ckpt:
