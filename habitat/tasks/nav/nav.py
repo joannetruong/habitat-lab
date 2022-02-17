@@ -18,39 +18,25 @@ import math
 import os
 
 import numpy as np
-import squaternion
 from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (
-    EmbodiedTask,
-    Measure,
-    SimulatorTaskAction,
-)
+from habitat.core.embodied_task import (EmbodiedTask, Measure,
+                                        SimulatorTaskAction)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (
-    AgentState,
-    RGBSensor,
-    Sensor,
-    SensorTypes,
-    ShortestPathPoint,
-    Simulator,
-)
+from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
+                                    ShortestPathPoint, Simulator)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor,
-    HabitatSimRGBSensor,
-)
+    HabitatSimDepthSensor, HabitatSimRGBSensor)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (
-    euler_from_quaternion,
-    quaternion_from_coeff,
-    quaternion_rotate_vector,
-)
+from habitat.utils.geometry_utils import (euler_from_quaternion,
+                                          quaternion_from_coeff,
+                                          quaternion_rotate_vector)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -61,11 +47,9 @@ try:
 except ImportError:
     pass
 
-from .spot_utils.raibert_controller import (
-    Raibert_controller_turn,
-    Raibert_controller_turn_stable,
-)
-from .spot_utils.robot_env import *
+from .robot_utils.raibert_controller import (Raibert_controller_turn,
+                                             Raibert_controller_turn_stable)
+from .robot_utils.robot_env import *
 
 cv2 = try_cv2_import()
 
