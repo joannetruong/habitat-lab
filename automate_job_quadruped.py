@@ -36,7 +36,10 @@ parser.add_argument("-vt", "--ang_vel_ranges", nargs="+", required=True)
 parser.add_argument(
     "-sc", "--spot_cameras", default=False, action="store_true"
 )
-parser.add_argument("-g", "--gray", default=False, action="store_true")
+parser.add_argument("-g", "--use_gray", default=False, action="store_true")
+parser.add_argument(
+    "-gd", "--use_gray_depth", default=False, action="store_true"
+)
 parser.add_argument("-o", "--outdoor", default=False, action="store_true")
 
 parser.add_argument("-nd", "--noisy_depth", default=False, action="store_true")
@@ -142,14 +145,12 @@ if not args.eval:
     # robots_heights = [robot_heights_dict[robot] for robot in robots]
 
     for idx, i in enumerate(task_yaml_data):
-        if i.startswith("  TYPE: Nav-v0"):
-            task_yaml_data[idx] = "  TYPE: MultiNav-v0"
-        elif i.startswith("  CURRICULUM:"):
+        if i.startswith("  CURRICULUM:"):
             task_yaml_data[idx] = "  CURRICULUM: {}".format(args.curricium)
         elif i.startswith("    RADIUS:"):
             task_yaml_data[idx] = "    RADIUS: {}".format(largest_robot_radius)
         elif i.startswith("  ROBOT:"):
-            task_yaml_data[idx] = "  ROBOT: {}".format(robot)
+            task_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
             task_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
@@ -207,6 +208,24 @@ if not args.eval:
             exp_yaml_data[idx] = "TENSORBOARD_DIR:    '{}'".format(
                 os.path.join(dst_dir, "tb")
             )
+        elif i.startswith("NUM_ENVIRONMENTS:"):
+            if args.use_gray or args.use_gray_depth:
+                exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
+        elif i.startswith("SENSORS:"):
+            if args.spot_cameras and args.use_gray:
+                exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+            elif args.spot_cameras and args.use_gray_depth:
+                exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+            elif args.spot_cameras:
+                exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
+            else:
+                exp_yaml_data[idx] = "SENSORS: ['DEPTH_SENSOR']"
         elif i.startswith("VIDEO_DIR:"):
             exp_yaml_data[idx] = "VIDEO_DIR:          '{}'".format(
                 os.path.join(dst_dir, "video_dir")
@@ -268,17 +287,13 @@ else:
     with open(eval_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
 
-    if args.use_z:
-        robots_underscore += "_" + str(args.adapt_z)
     for idx, i in enumerate(eval_yaml_data):
-        if i.startswith("  TYPE: Nav-v0"):
-            eval_yaml_data[idx] = "  TYPE: MultiNav-v0"
-        elif i.startswith("  CURRICULUM:"):
+        if i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curricium)
         elif i.startswith("    RADIUS:"):
             eval_yaml_data[idx] = "    RADIUS: {}".format(largest_robot_radius)
         elif i.startswith("  ROBOT:"):
-            eval_yaml_data[idx] = "  ROBOT: {}".format(robot)
+            eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
             eval_yaml_data[idx] = "      ROBOT_URDF {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
@@ -376,6 +391,9 @@ else:
                 exp_yaml_data[idx] = "VIDEO_OPTION: ['disk']"
             else:
                 exp_yaml_data[idx] = "VIDEO_OPTION: []"
+        elif i.startswith("NUM_ENVIRONMENTS:"):
+            if args.use_gray or args.use_gray_depth:
+                exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
         elif i.startswith("SENSORS:"):
             if args.spot_cameras and args.use_gray:
                 exp_yaml_data[
@@ -484,6 +502,10 @@ else:
         if args.partition == "overcap":
             slurm_data = slurm_data.replace(
                 "# ACCOUNT", "#SBATCH --account overcap"
+            )
+        elif args.partition == "user-overcap":
+            slurm_data = slurm_data.replace(
+                "# ACCOUNT", "#SBATCH --account user-overcap"
             )
 
     os.makedirs(os.path.join(dst_dir, "eval_bash_files"), exist_ok=True)

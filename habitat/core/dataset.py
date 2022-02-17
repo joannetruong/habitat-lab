@@ -13,25 +13,14 @@ import json
 import os
 import random
 from itertools import groupby
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Generic,
-    Iterator,
-    List,
-    Optional,
-    Sequence,
-    TypeVar,
-    Union,
-)
+from typing import (Any, Callable, Dict, Generic, Iterator, List, Optional,
+                    Sequence, TypeVar, Union)
 
 import attr
 import numpy as np
-from numpy import ndarray
-
 from habitat.config import Config
 from habitat.core.utils import not_none_validator
+from numpy import ndarray
 
 ALL_SCENES_MASK = "*"
 
@@ -388,7 +377,9 @@ class EpisodeIterator(Iterator):
 
         if curriculum:
             shuffle = False
-            self.episodes = sorted(self.episodes, key=lambda x: x.info['geodesic_distance'])
+            self.episodes = sorted(
+                self.episodes, key=lambda x: x.info["geodesic_distance"]
+            )
 
         self.shuffle = shuffle
 

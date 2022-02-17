@@ -12,11 +12,8 @@ from typing import List, Optional
 from habitat.config import Config
 from habitat.core.dataset import ALL_SCENES_MASK, Dataset
 from habitat.core.registry import registry
-from habitat.tasks.nav.nav import (
-    NavigationEpisode,
-    NavigationGoal,
-    ShortestPathPoint,
-)
+from habitat.tasks.nav.nav import (NavigationEpisode, NavigationGoal,
+                                   ShortestPathPoint)
 
 CONTENT_SCENES_PATH_FIELD = "content_scenes_path"
 DEFAULT_SCENE_PATH_PREFIX = "data/scene_datasets/"
@@ -31,7 +28,16 @@ class PointNavDatasetV1(Dataset):
 
     @staticmethod
     def check_config_paths_exist(config: Config) -> bool:
-        print('DATA PATH: ', config.DATA_PATH.format(split=config.SPLIT))
+        print(
+            "DATA PATH: ",
+            config.DATA_PATH.format(split=config.SPLIT),
+            os.path.exists(config.DATA_PATH.format(split=config.SPLIT)),
+        )
+        print(
+            "SCENES DIR: ",
+            config.SCENES_DIR,
+            os.path.exists(config.SCENES_DIR),
+        )
         return os.path.exists(
             config.DATA_PATH.format(split=config.SPLIT)
         ) and os.path.exists(config.SCENES_DIR)

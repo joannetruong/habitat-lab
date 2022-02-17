@@ -24,7 +24,7 @@ SIMULATOR:
     ORIENTATION: [0.0, 0.0, 0.0]
     POSITION: [0.0, 0.0, 0.0]
 TASK:
-  TYPE: MultiNav-v0
+  TYPE: Nav-v0
   ROBOTS: ['Spot']
   # ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
   ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
