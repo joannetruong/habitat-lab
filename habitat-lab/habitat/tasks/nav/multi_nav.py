@@ -93,10 +93,14 @@ class MultiNavigationTask(NavigationTask):
                 self.robot_wrapper._initial_joint_positions
             )
 
-        # depth_sensor = self._sim._sensors["depth"]
-        # depth_pos_offset = np.array([0.0, 0.0, 0.0]) + self.robot_wrapper.camera_spawn_offset
-        # depth_sensor._spec.position = depth_pos_offset
-        # depth_sensor._sensor_object.set_transformation_from_spec()
+        if self._sim._sensors.get("depth", False):
+            depth_sensor = self._sim._sensors["depth"]
+            depth_pos_offset = (
+                np.array([0.0, 0.0, 0.0])
+                + self.robot_wrapper.camera_spawn_offset
+            )
+            depth_sensor._spec.position = depth_pos_offset
+            depth_sensor._sensor_object.set_transformation_from_spec()
 
     def step(self, action: Dict[str, Any], episode: Episode):
         if "action_args" not in action or action["action_args"] is None:

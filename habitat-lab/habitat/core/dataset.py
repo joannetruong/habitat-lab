@@ -388,7 +388,9 @@ class EpisodeIterator(Iterator):
 
         if curriculum:
             shuffle = False
-            self.episodes = sorted(self.episodes, key=lambda x: x.info['geodesic_distance'])
+            self.episodes = sorted(
+                self.episodes, key=lambda x: x.info["geodesic_distance"]
+            )
 
         self.shuffle = shuffle
 

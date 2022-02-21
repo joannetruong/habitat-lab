@@ -2134,11 +2134,20 @@ class SpotGraySensor(HabitatSimRGBSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_gray"
 
+    ## Hack to get Spot cameras resized to 256,256 after concatenation
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
+        return spaces.Box(
+            low=0,
+            high=255,
+            shape=(256, 128, 1),
+            dtype=np.float32,
+        )
+
     def get_observation(self, sim_obs):
         obs = sim_obs.get(self.uuid, None)
         assert isinstance(obs, np.ndarray)
         obs = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        obs = cv2.resize(obs, (256, 126))
+        obs = cv2.resize(obs, (128, 256))
         obs = obs.reshape([*obs.shape[:2], 1])
         return obs
 

@@ -174,19 +174,28 @@ class ResNetEncoder(nn.Module):
         super().__init__()
 
         self.rgb_keys = [k for k in observation_space.spaces if "rgb" in k]
+        self.gray_keys = [k for k in observation_space.spaces if "gray" in k]
         self.depth_keys = [k for k in observation_space.spaces if "depth" in k]
-        self.using_one_camera = "depth" in observation_space.spaces
-        self.using_two_cameras = any(
+
+        self.using_one_gray_camera = "gray" in observation_space.spaces
+        self.using_two_gray_cameras = any(
+            [k.endswith("_gray") for k in observation_space.spaces.keys()]
+        )
+
+        self.using_one_depth_camera = "depth" in observation_space.spaces
+        self.using_two_depth_cameras = any(
             [k.endswith("_depth") for k in observation_space.spaces.keys()]
         )
 
-        self._n_input_rgb, self._n_input_depth = [
+        self._n_input_rgb, self._n_input_depth, self._n_input_gray = [
             # sum() returns 0 for an empty list
             sum([observation_space.spaces[k].shape[2] for k in keys])
-            for keys in [self.rgb_keys, self.depth_keys]
+            for keys in [self.rgb_keys, self.depth_keys, self.gray_keys]
         ]
-        if self.using_one_camera or self.using_two_cameras:
+        if self.using_one_depth_camera or self.using_two_depth_cameras:
             self._n_input_depth = 1
+        if self.using_one_gray_camera or self.using_two_gray_cameras:
+            self._n_input_gray = 1
 
         if normalize_visual_inputs:
             self.running_mean_and_var: nn.Module = RunningMeanAndVar(
@@ -196,14 +205,18 @@ class ResNetEncoder(nn.Module):
             self.running_mean_and_var = nn.Sequential()
 
         if not self.is_blind:
-            all_keys = self.rgb_keys + self.depth_keys
+            all_keys = self.rgb_keys + self.depth_keys + self.gray_keys
             spatial_size_h = (
                 observation_space.spaces[all_keys[0]].shape[0] // 2
             )
             spatial_size_w = (
                 observation_space.spaces[all_keys[0]].shape[1] // 2
             )
-            input_channels = self._n_input_depth + self._n_input_rgb
+            if self.using_two_depth_cameras or self.using_two_gray_cameras:
+                spatial_size_w = observation_space.spaces[all_keys[0]].shape[1]
+            input_channels = (
+                self._n_input_depth + self._n_input_rgb + self._n_input_gray
+            )
             self.backbone = make_backbone(input_channels, baseplanes, ngroups)
 
             final_spatial_h = int(
@@ -257,17 +270,37 @@ class ResNetEncoder(nn.Module):
         cnn_input = []
         if self._n_input_rgb > 0:
             rgb_observations = observations["rgb"]
-            # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
             rgb_observations = rgb_observations.permute(0, 3, 1, 2)
             rgb_observations = (
                 rgb_observations.float() / 255.0
             )  # normalize RGB
             cnn_input.append(rgb_observations)
 
+        if self._n_input_gray > 0:
+            if self.using_one_gray_camera:
+                gray_observations = observations["gray"]
+            elif self.using_two_gray_cameras:
+                gray_observations = torch.cat(
+                    [
+                        # Spot is cross-eyed; right is on the left on the FOV
+                        observations["spot_right_gray"],
+                        observations["spot_left_gray"],
+                    ],
+                    dim=2,
+                )
+            else:
+                raise Exception("Not implemented")
+            # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
+            gray_observations = gray_observations.permute(0, 3, 1, 2)
+            gray_observations = (
+                gray_observations.float() / 255.0
+            )  # normalize RGB
+            cnn_input.append(gray_observations)
+
         if self._n_input_depth > 0:
-            if self.using_one_camera:
+            if self.using_one_depth_camera:
                 depth_observations = observations["depth"]
-            elif self.using_two_cameras:
+            elif self.using_two_depth_cameras:
                 depth_observations = torch.cat(
                     [
                         # Spot is cross-eyed; right is on the left on the FOV
@@ -436,13 +469,17 @@ class PointNavResNetNet(Net):
             normalize_visual_inputs=normalize_visual_inputs,
         )
 
+        using_spot = any(
+            [k.startswith("spot") for k in observation_space.spaces.keys()]
+        )
         if not self.visual_encoder.is_blind:
-            ## 4069 = 256 * 4 * 4 [for 256 x 256 imgs]
-            ## 4560 = 228 * 4 * 5 [for 320 x 240 imgs]
+            ## 2048 = 128 * 4 * 4 [for 256 x 256 imgs]
+            ## 2040 = 228 * 4 * 5 [for 320 x 240 imgs]
+            dim = 2048 if using_spot else 2040
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
-                # nn.Linear(4096, hidden_size),
-                nn.Linear(4560, hidden_size),
+                nn.Linear(dim, hidden_size),
+                # nn.Linear(4560, hidden_size),
                 # np.prod(self.visual_encoder.output_shape), hidden_size
                 nn.ReLU(True),
             )

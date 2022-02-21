@@ -49,11 +49,13 @@ _C.ENVIRONMENT.ITERATOR_OPTIONS.STEP_REPETITION_RANGE = 0.2
 _C.TASK = CN()
 _C.TASK.TYPE = "Nav-v0"
 _C.TASK.SUCCESS_DISTANCE = 0.2
-_C.TASK.ROBOT_URDFS = ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-                       "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-                       "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf"]
+_C.TASK.ROBOT_URDFS = [
+    "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
+    "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
+    "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
+]
 _C.TASK.USE_Z = False
-_C.TASK.ROBOTS = ['A1', 'AlienGo', 'Daisy']
+_C.TASK.ROBOTS = ["A1", "AlienGo", "Daisy"]
 _C.TASK.SENSORS = []
 _C.TASK.MEASUREMENTS = []
 _C.TASK.GOAL_SENSOR_UUID = "pointgoal"
@@ -87,9 +89,21 @@ ACTIONS.VELOCITY_CONTROL.POLICY_LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
 ACTIONS.VELOCITY_CONTROL.POLICY_HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
 ACTIONS.VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [-17.19, 17.19]  # deg per sec
 
-ACTIONS.VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [[-7.81, 7.81], [-9.77, 9.77], [-30, -30]]  # deg per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [
+    [-0.23, 0.23],
+    [-0.28, 0.28],
+    [-0.25, 0.25],
+]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [
+    [-0.23, 0.23],
+    [-0.28, 0.28],
+    [-0.25, 0.25],
+]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [
+    [-7.81, 7.81],
+    [-9.77, 9.77],
+    [-30, -30],
+]  # deg per sec
 
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
@@ -100,16 +114,37 @@ ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
 ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
 ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 240.0
 
-# DYNAMIC VELOCITY ACTION 
+# DYNAMIC VELOCITY ACTION
 ACTIONS.DYNAMIC_VELOCITY_CONTROL = CN()
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.TYPE = "DynamicVelocityAction"
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_LIN_VEL_RANGES = [-0.50, 0.50]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_HOR_VEL_RANGES = [-0.50, 0.50]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [-17.19, 17.19]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_LIN_VEL_RANGES = [
+    -0.50,
+    0.50,
+]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_HOR_VEL_RANGES = [
+    -0.50,
+    0.50,
+]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [
+    -17.19,
+    17.19,
+]  # meters per sec
 
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [[-0.23, 0.23], [-0.28, 0.28], [-0.25, 0.25]]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [[-7.81, 7.81], [-9.77, 9.77], [-30, -30]]  # deg per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [
+    [-0.23, 0.23],
+    [-0.28, 0.28],
+    [-0.25, 0.25],
+]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [
+    [-0.23, 0.23],
+    [-0.28, 0.28],
+    [-0.25, 0.25],
+]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [
+    [-7.81, 7.81],
+    [-9.77, 9.77],
+    [-30, -30],
+]  # deg per sec
 
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
@@ -118,7 +153,7 @@ ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.DISCRETE_ACTIONS = []
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.MUST_CALL_STOP = True
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.TIME_PER_STEP = 100
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.TIME_PER_STEP = 80
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.CTRL_FREQ = 240.0
 
 _C.TASK.ACTIONS = ACTIONS
@@ -214,7 +249,9 @@ _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 # -----------------------------------------------------------------------------
 _C.TASK.SOCIAL_TOP_DOWN_MAP = CN()
 _C.TASK.SOCIAL_TOP_DOWN_MAP.TYPE = "SocialTopDownMap"
-_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = (
+    _C.ENVIRONMENT.MAX_EPISODE_STEPS
+)
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_PADDING = 3
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_RESOLUTION = 1024
 _C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_SOURCE = True
@@ -409,7 +446,7 @@ _C.PYROBOT.LOCOBOT.CAMERA_ACTIONS = ["set_pan", "set_tilt", "set_pan_tilt"]
 # -----------------------------------------------------------------------------
 _C.DATASET = CN()
 _C.DATASET.TYPE = "PointNav-v1"
-_C.DATASET.SPLIT = "train"  
+_C.DATASET.SPLIT = "train"
 _C.DATASET.SCENES_DIR = "data/scene_datasets"
 _C.DATASET.CONTENT_SCENES = ["*"]
 _C.DATASET.DATA_PATH = (
