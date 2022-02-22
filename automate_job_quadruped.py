@@ -122,6 +122,11 @@ robots_underscore = robot
 if args.control_type == "dynamic":
     robots_underscore += "_dynamic"
 
+if args.outdoor:
+    robots_underscore += "_ferst"
+
+print("robots underscore: ", robots_underscore)
+
 # Training
 if not args.eval:
     # Create directory
@@ -202,7 +207,7 @@ if not args.eval:
                 new_task_yaml_path
             )
         elif i.startswith("TOTAL_NUM_STEPS:"):
-            max_num_steps = 2e9 if args.control_type == "kinematic" else 2e8
+            max_num_steps = 5e8 if args.control_type == "kinematic" else 5e7
             exp_yaml_data[idx] = "TOTAL_NUM_STEPS: {}".format(max_num_steps)
         elif i.startswith("TENSORBOARD_DIR:"):
             exp_yaml_data[idx] = "TENSORBOARD_DIR:    '{}'".format(
@@ -358,7 +363,7 @@ else:
                         args.dataset, robots_underscore, args.ckpt
                     )
                 )
-            tb_dir = os.path.join(dst_dir, "tb_evals", tb_dir + "_ferst")
+            tb_dir = os.path.join(dst_dir, "tb_evals", tb_dir)
             exp_yaml_data[idx] = "TENSORBOARD_DIR:    '{}'".format(tb_dir)
         elif i.startswith("NUM_PROCESSES:"):
             exp_yaml_data[idx] = "NUM_PROCESSES: 13"
@@ -384,7 +389,7 @@ else:
                 )
             )
             exp_yaml_data[idx] = "TXT_DIR:            '{}'".format(
-                os.path.join(dst_dir, "txts", txt_dir + "_ferst")
+                os.path.join(dst_dir, "txts", txt_dir)
             )
         elif i.startswith("VIDEO_OPTION:"):
             if args.video:

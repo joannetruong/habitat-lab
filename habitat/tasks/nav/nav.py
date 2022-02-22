@@ -22,21 +22,34 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (EmbodiedTask, Measure,
-                                        SimulatorTaskAction)
+from habitat.core.embodied_task import (
+    EmbodiedTask,
+    Measure,
+    SimulatorTaskAction,
+)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
-                                    ShortestPathPoint, Simulator)
+from habitat.core.simulator import (
+    AgentState,
+    RGBSensor,
+    Sensor,
+    SensorTypes,
+    ShortestPathPoint,
+    Simulator,
+)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor, HabitatSimRGBSensor)
+    HabitatSimDepthSensor,
+    HabitatSimRGBSensor,
+)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (euler_from_quaternion,
-                                          quaternion_from_coeff,
-                                          quaternion_rotate_vector)
+from habitat.utils.geometry_utils import (
+    euler_from_quaternion,
+    quaternion_from_coeff,
+    quaternion_rotate_vector,
+)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -47,8 +60,10 @@ try:
 except ImportError:
     pass
 
-from .robot_utils.raibert_controller import (Raibert_controller_turn,
-                                             Raibert_controller_turn_stable)
+from .robot_utils.raibert_controller import (
+    Raibert_controller_turn,
+    Raibert_controller_turn_stable,
+)
 from .robot_utils.robot_env import *
 
 cv2 = try_cv2_import()
@@ -536,7 +551,6 @@ class Success(Measure):
         distance_to_target = task.measurements.measures[
             DistanceToGoal.cls_uuid
         ].get_metric()
-
         if distance_to_target == 999.99:
             task.is_stop_called = True
             self._metric = 0.0
@@ -1021,6 +1035,7 @@ class DistanceToGoal(Measure):
                     episode,
                 )
                 if distance_to_target == np.inf:
+                    logger.error("WARNING!! Distance_to_target was inf")
                     distance_to_target = 999.99
             elif self._config.DISTANCE_TO == "VIEW_POINTS":
                 distance_to_target = self._sim.geodesic_distance(
@@ -1204,6 +1219,8 @@ class VelocityAction(SimulatorTaskAction):
         self.robot = eval(task._config.ROBOT)()
         self.ctrl_freq = config.CTRL_FREQ
 
+        self.must_call_stop = config.MUST_CALL_STOP
+
     @property
     def action_space(self):
         action_dict = {
@@ -1290,7 +1307,7 @@ class VelocityAction(SimulatorTaskAction):
             and abs(ang_vel) < self.min_abs_ang_speed
             and abs(hor_vel) < self.min_abs_hor_speed
         )
-        if called_stop and task.must_call_stop:
+        if called_stop and self.must_call_stop:
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
                 position=None,
@@ -1498,12 +1515,13 @@ class DynamicVelocityAction(VelocityAction):
         hor_vel = self.min_hor_vel + hor_vel * (
             self.max_hor_vel - self.min_hor_vel
         )
+
         called_stop = (
             abs(lin_vel) < self.min_abs_lin_speed
             and abs(ang_vel) < self.min_abs_ang_speed
             and abs(hor_vel) < self.min_abs_hor_speed
         )
-        if called_stop and task.must_call_stop:
+        if called_stop and self.must_call_stop:
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
                 position=None,
@@ -1539,7 +1557,6 @@ class DynamicVelocityAction(VelocityAction):
                 )
                 self._sim.step_physics(self.dt)
                 state = self.robot.calc_state()
-
         """Get agent final position"""
         agent_final_position = self.robot.robot_id.transformation.translation
         agent_final_rotation = self.robot.get_base_ori()
@@ -1552,6 +1569,19 @@ class DynamicVelocityAction(VelocityAction):
             rotation=agent_final_rotation,
             keep_agent_at_new_pose=True,
         )
+
+        z_fall = agent_final_position[1] < self.robot.start_height - 0.3
+
+        if z_fall:
+            print("fell over")
+            task.is_stop_called = True
+            agent_observations = self._sim.get_observations_at(
+                position=None,
+                rotation=None,
+            )
+
+            agent_observations["fell_over"] = True
+            return agent_observations
 
         # TODO: Make a better way to flag collisions
         agent_observations["moving_backwards"] = lin_vel < 0

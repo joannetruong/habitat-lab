@@ -372,6 +372,7 @@ class EpisodeIterator(Iterator):
             episodes = list(episodes)
 
         self.episodes = episodes
+
         self.cycle = cycle
         self.group_by_scene = group_by_scene
 

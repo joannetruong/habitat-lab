@@ -45,13 +45,11 @@ class A1:
         ) @ mn.Matrix4.rotation(mn.Rad(yaw), mn.Vector3(0.0, 0.0, 1.0))
 
         self.base_transform.translation = mn.Vector3(*self.robot_spawn_offset)
-
         if pos:
             self.base_transform.translation += mn.Vector3(*pos)
+        self.start_height = self.base_transform.translation[1]
 
         self.robot_id.transformation = self.base_transform
-
-        # self.robot_id.joint_positions = self._initial_joint_positions
 
     def position(self):
         return self.robot_id.transformation.translation

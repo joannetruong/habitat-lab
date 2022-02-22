@@ -7,11 +7,8 @@
 from habitat.core.logging import logger
 from habitat.core.registry import registry
 from habitat.tasks.eqa import _try_register_eqa_task
-from habitat.tasks.nav import (
-    _try_register_nav_task,
-    _try_register_social_nav_task,
-    _try_register_multi_nav_task
-)
+from habitat.tasks.nav import (_try_register_nav_task,
+                               _try_register_social_nav_task)
 from habitat.tasks.vln import _try_register_vln_task
 
 
@@ -28,5 +25,4 @@ def make_task(id_task, **kwargs):
 _try_register_eqa_task()
 _try_register_nav_task()
 _try_register_social_nav_task()
-_try_register_multi_nav_task()
 _try_register_vln_task()

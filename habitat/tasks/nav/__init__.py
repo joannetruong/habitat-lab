@@ -19,6 +19,7 @@ def _try_register_nav_task():
             def __init__(self, *args, **kwargs):
                 raise navtask_import_error
 
+
 def _try_register_social_nav_task():
     try:
         from habitat.tasks.nav.social_nav import SocialNavigationTask  # noqa
@@ -29,14 +30,3 @@ def _try_register_social_nav_task():
         class NavigationTaskImportError(EmbodiedTask):
             def __init__(self, *args, **kwargs):
                 raise socialnavtask_import_error
-
-def _try_register_multi_nav_task():
-    try:
-        from habitat.tasks.nav.multi_nav import MultiNavigationTask  # noqa
-    except ImportError as e:
-        multinavtask_import_error = e
-
-        @registry.register_task(name="MultiNav-v0")
-        class NavigationTaskImportError(EmbodiedTask):
-            def __init__(self, *args, **kwargs):
-                raise multinavtask_import_error

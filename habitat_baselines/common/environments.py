@@ -114,6 +114,8 @@ class NavRLEnv(habitat.RLEnv):
             reward -= self._rl_config.BACKWARDS_PENALTY
         if observations.get("moving_sideways", False):
             reward -= self._rl_config.BACKWARDS_PENALTY
+        if observations.get("fell_over", False):
+            reward -= self._rl_config.FALL_PENALTY
 
         if "ang_accel" in observations:
             reward -= min(
