@@ -216,6 +216,8 @@ if not args.eval:
         elif i.startswith("NUM_ENVIRONMENTS:"):
             if args.use_gray or args.use_gray_depth:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
+            if args.outdoor:
+                exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.spot_cameras and args.use_gray:
                 exp_yaml_data[
@@ -399,6 +401,8 @@ else:
         elif i.startswith("NUM_ENVIRONMENTS:"):
             if args.use_gray or args.use_gray_depth:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
+            if args.outdoor:
+                exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.spot_cameras and args.use_gray:
                 exp_yaml_data[
