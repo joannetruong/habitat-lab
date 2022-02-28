@@ -12,24 +12,17 @@ import numpy as np
 import torch
 from gym import spaces
 from habitat.config import Config
-from habitat.tasks.nav.nav import (
-    EpisodicCompassSensor,
-    EpisodicGPSSensor,
-    HeadingSensor,
-    ImageGoalSensor,
-    IntegratedPointGoalGPSAndCompassSensor,
-    PointGoalSensor,
-    ProximitySensor,
-)
+from habitat.tasks.nav.nav import (EpisodicCompassSensor, EpisodicGPSSensor,
+                                   HeadingSensor, ImageGoalSensor,
+                                   IntegratedPointGoalGPSAndCompassSensor,
+                                   PointGoalSensor, ProximitySensor)
 from habitat.tasks.nav.object_nav_task import ObjectGoalSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.ddppo.policy import resnet
-from habitat_baselines.rl.ddppo.policy.running_mean_and_var import (
-    RunningMeanAndVar,
-)
-from habitat_baselines.rl.models.rnn_state_encoder import (
-    build_rnn_state_encoder,
-)
+from habitat_baselines.rl.ddppo.policy.running_mean_and_var import \
+    RunningMeanAndVar
+from habitat_baselines.rl.models.rnn_state_encoder import \
+    build_rnn_state_encoder
 from habitat_baselines.rl.ppo import Net, Policy
 from torch import nn as nn
 from torch.nn import functional as F
@@ -466,59 +459,7 @@ class PointNavResNetNet(Net):
                 )
             x.append(self.tgt_embeding(goal_observations))
 
-        if PointGoalSensor.cls_uuid in observations:
-            goal_observations = observations[PointGoalSensor.cls_uuid]
-            x.append(self.pointgoal_embedding(goal_observations))
-
-        if ProximitySensor.cls_uuid in observations:
-            sensor_observations = observations[ProximitySensor.cls_uuid]
-            x.append(self.proximity_embedding(sensor_observations))
-
-        if HeadingSensor.cls_uuid in observations:
-            sensor_observations = observations[HeadingSensor.cls_uuid]
-            sensor_observations = torch.stack(
-                [
-                    torch.cos(sensor_observations[0]),
-                    torch.sin(sensor_observations[0]),
-                ],
-                -1,
-            )
-            x.append(self.heading_embedding(sensor_observations))
-
-        if ObjectGoalSensor.cls_uuid in observations:
-            object_goal = observations[ObjectGoalSensor.cls_uuid].long()
-            x.append(self.obj_categories_embedding(object_goal).squeeze(dim=1))
-
-        if EpisodicCompassSensor.cls_uuid in observations:
-            compass_observations = torch.stack(
-                [
-                    torch.cos(observations[EpisodicCompassSensor.cls_uuid]),
-                    torch.sin(observations[EpisodicCompassSensor.cls_uuid]),
-                ],
-                -1,
-            )
-            x.append(
-                self.compass_embedding(compass_observations.squeeze(dim=1))
-            )
-
-        if EpisodicGPSSensor.cls_uuid in observations:
-            x.append(
-                self.gps_embedding(observations[EpisodicGPSSensor.cls_uuid])
-            )
-
-        if ImageGoalSensor.cls_uuid in observations:
-            goal_image = observations[ImageGoalSensor.cls_uuid]
-            goal_output = self.goal_visual_encoder({"rgb": goal_image})
-            x.append(self.goal_visual_fc(goal_output))
-
-        if self.discrete_actions:
-            prev_actions = prev_actions.squeeze(-1)
-            start_token = torch.zeros_like(prev_actions)
-            prev_actions = self.prev_action_embedding(
-                torch.where(masks.view(-1), prev_actions + 1, start_token)
-            )
-        else:
-            prev_actions = self.prev_action_embedding(prev_actions.float())
+        prev_actions = self.prev_action_embedding(prev_actions.float())
 
         x.append(prev_actions)
 

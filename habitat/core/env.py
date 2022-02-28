@@ -12,7 +12,6 @@ import gym
 import numba
 import numpy as np
 from gym import spaces
-
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode, EpisodeIterator
 from habitat.core.embodied_task import EmbodiedTask, Metrics

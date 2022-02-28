@@ -163,12 +163,16 @@ class PPOTrainer(BaseRLTrainer):
             observation_space, self.obs_transforms
         )
         # hack to prevent training with RGB; but still be able to evaluate / generate videos with RGB
-        if "rgb" in observation_space.spaces:
-            del observation_space.spaces["rgb"]
+        # if "rgb" in observation_space.spaces:
+        #     del observation_space.spaces["rgb"]
 
         self.actor_critic = policy.from_config(
-            self.config, observation_space, self.policy_action_space
+            self.config,
+            observation_space,
+            self.policy_action_space,
         )
+
+        print("SELF.ACTOR_CRITIC: ", self.actor_critic)
         self.obs_space = observation_space
         self.actor_critic.to(self.device)
 
@@ -205,6 +209,46 @@ class PPOTrainer(BaseRLTrainer):
         if self.config.RL.DDPPO.reset_critic:
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
             nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
+
+        visual_layers = self.actor_critic.net.visual_encoder
+        if self.config.RL.SPLITNET.freeze_encoder_features:
+            for param in visual_layers.encoder.parameters():
+                param.requires_grad = False
+        if self.config.RL.SPLITNET.freeze_visual_decoder_features:
+            if hasattr(visual_layers, "bridge"):
+                for param in visual_layers.bridge.parameters():
+                    param.requires_grad = False
+            if hasattr(visual_layers, "decoder"):
+                for param in visual_layers.decoder.parameters():
+                    param.requires_grad = False
+            if hasattr(visual_layers, "out"):
+                for param in visual_layers.out.parameters():
+                    param.requires_grad = False
+            if hasattr(visual_layers, "class_pred_layer"):
+                if visual_layers.class_pred_layer is not None:
+                    for param in visual_layers.class_pred_layer.parameters():
+                        param.requires_grad = False
+
+        if (
+            self.config.RL.SPLITNET.freeze_motion_decoder_features
+            and self.config.RL.SPLITNET.freeze_policy_decoder_features
+        ):
+            for param in self.actor_critic.net.visual_fc.parameters():
+                param.requires_grad = False
+
+        if self.config.RL.SPLITNET.freeze_motion_decoder_features:
+            for param in self.actor_critic.net.egomotion_layer.parameters():
+                param.requires_grad = False
+            for param in self.actor_critic.net.motion_model_layer.parameters():
+                param.requires_grad = False
+
+        if self.config.RL.SPLITNET.freeze_policy_decoder_features:
+            for param in self.actor_critic.net.state_encoder.parameters():
+                param.requires_grad = False
+            for param in self.actor_critic.critic.parameters():
+                param.requires_grad = False
+            for param in self.actor_critic.action_distribution.parameters():
+                param.requires_grad = False
 
         self.agent = (DDPPO if self._is_distributed else PPO)(
             actor_critic=self.actor_critic,
@@ -329,7 +373,6 @@ class PPOTrainer(BaseRLTrainer):
             )
 
         self._nbuffers = 2 if ppo_cfg.use_double_buffered_sampler else 1
-
         self.rollouts = RolloutStorage(
             ppo_cfg.num_steps,
             self.envs.num_envs,
@@ -615,9 +658,16 @@ class PPOTrainer(BaseRLTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy = self.agent.update(
-            self.rollouts
-        )
+        (
+            value_loss,
+            action_loss,
+            dist_entropy,
+            loss_total_epoch,
+            visual_loss_total,
+            visual_loss_dict,
+            egomotion_loss,
+            forward_model_loss,
+        ) = self.agent.update(self.rollouts)
 
         self.rollouts.after_update()
         self.pth_time += time.time() - t_update_model
@@ -626,6 +676,11 @@ class PPOTrainer(BaseRLTrainer):
             value_loss,
             action_loss,
             dist_entropy,
+            loss_total_epoch,
+            visual_loss_total,
+            visual_loss_dict,
+            egomotion_loss,
+            forward_model_loss,
         )
 
     def _coalesce_post_step(
@@ -881,17 +936,25 @@ class PPOTrainer(BaseRLTrainer):
                     value_loss,
                     action_loss,
                     dist_entropy,
+                    loss_total_epoch,
+                    visual_loss_total,
+                    visual_loss_dict,
+                    egomotion_loss,
+                    forward_model_loss,
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
                     lr_scheduler.step()  # type: ignore
 
                 self.num_updates_done += 1
+                loss_dict = dict(
+                    value_loss=value_loss, action_loss=action_loss
+                )
+                loss_dict.update(visual_loss_dict)
                 losses = self._coalesce_post_step(
-                    dict(value_loss=value_loss, action_loss=action_loss),
+                    loss_dict,
                     count_steps_delta,
                 )
-
                 self._training_log(writer, losses, prev_time)
 
                 # checkpoint model

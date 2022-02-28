@@ -94,6 +94,22 @@ _C.RL.POLICY = CN()
 _C.RL.POLICY.name = "PointNavResNetPolicy"
 _C.RL.POLICY.action_distribution_type = "categorical"
 # -----------------------------------------------------------------------------
+# SPLITNET CONFIG
+# -----------------------------------------------------------------------------
+_C.RL.SPLITNET = CN()
+_C.RL.SPLITNET = CN()
+_C.RL.SPLITNET.create_decoder = True
+_C.RL.SPLITNET.separate_optimizers = True
+_C.RL.SPLITNET.use_visual_loss = True
+_C.RL.SPLITNET.use_motion_loss = False
+_C.RL.SPLITNET.update_encoder_features = True
+_C.RL.SPLITNET.freeze_encoder_features = False
+_C.RL.SPLITNET.update_visual_decoder_features = True
+_C.RL.SPLITNET.freeze_visual_decoder_features = False
+_C.RL.SPLITNET.update_motion_decoder_features = False
+_C.RL.SPLITNET.freeze_motion_decoder_features = False
+_C.RL.SPLITNET.freeze_policy_decoder_features = False
+# -----------------------------------------------------------------------------
 # OBS_TRANSFORMS CONFIG
 # -----------------------------------------------------------------------------
 _C.RL.POLICY.OBS_TRANSFORMS = CN()

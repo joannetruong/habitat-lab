@@ -22,34 +22,21 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (
-    EmbodiedTask,
-    Measure,
-    SimulatorTaskAction,
-)
+from habitat.core.embodied_task import (EmbodiedTask, Measure,
+                                        SimulatorTaskAction)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (
-    AgentState,
-    RGBSensor,
-    Sensor,
-    SensorTypes,
-    ShortestPathPoint,
-    Simulator,
-)
+from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
+                                    ShortestPathPoint, Simulator)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor,
-    HabitatSimRGBSensor,
-)
+    HabitatSimDepthSensor, HabitatSimRGBSensor)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (
-    euler_from_quaternion,
-    quaternion_from_coeff,
-    quaternion_rotate_vector,
-)
+from habitat.utils.geometry_utils import (euler_from_quaternion,
+                                          quaternion_from_coeff,
+                                          quaternion_rotate_vector)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -60,10 +47,11 @@ try:
 except ImportError:
     pass
 
-from .robot_utils.raibert_controller import (
-    Raibert_controller_turn,
-    Raibert_controller_turn_stable,
-)
+import torch
+from dg_util.python_utils import pytorch_util as pt_util
+
+from .robot_utils.raibert_controller import (Raibert_controller_turn,
+                                             Raibert_controller_turn_stable)
 from .robot_utils.robot_env import *
 
 cv2 = try_cv2_import()
@@ -1724,3 +1712,38 @@ class SpotLeftDepthSensor(SpotDepthSensor):
 class SpotRightDepthSensor(SpotDepthSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_right_depth"
+
+
+@registry.register_sensor
+class SpotSurfaceNormalSensor(HabitatSimRGBSensor):
+    def _get_uuid(self, *args, **kwargs):
+        return "surface_normals"
+
+    ## Hack to get Spot cameras resized to 256,256 after concatenation
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
+        return spaces.Box(
+            low=0,
+            high=2,
+            shape=(256, 256, 3),
+            dtype=np.float32,
+        )
+
+    def get_observation(self, sim_obs):
+        left_depth_obs = sim_obs.get("spot_left_depth", None)
+        right_depth_obs = sim_obs.get("spot_right_depth", None)
+
+        depth_obs = np.concatenate(
+            [
+                # Spot is cross-eyed; right is on the left on the FOV
+                right_depth_obs,
+                left_depth_obs,
+            ],
+            axis=1,
+        )
+
+        depth_obs = depth_obs.reshape(1, 1, *depth_obs.shape[:2])
+        sn = pt_util.depth_to_surface_normals(torch.from_numpy(depth_obs))
+        sn = sn.squeeze(0)
+        sn = sn.permute(1, 2, 0)  # CHW => HWC
+        # sn = sn.permute((0, 3, 1, 2))  # NHWC => NCHW
+        return sn
