@@ -22,21 +22,34 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (EmbodiedTask, Measure,
-                                        SimulatorTaskAction)
+from habitat.core.embodied_task import (
+    EmbodiedTask,
+    Measure,
+    SimulatorTaskAction,
+)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
-                                    ShortestPathPoint, Simulator)
+from habitat.core.simulator import (
+    AgentState,
+    RGBSensor,
+    Sensor,
+    SensorTypes,
+    ShortestPathPoint,
+    Simulator,
+)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor, HabitatSimRGBSensor)
+    HabitatSimDepthSensor,
+    HabitatSimRGBSensor,
+)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (euler_from_quaternion,
-                                          quaternion_from_coeff,
-                                          quaternion_rotate_vector)
+from habitat.utils.geometry_utils import (
+    euler_from_quaternion,
+    quaternion_from_coeff,
+    quaternion_rotate_vector,
+)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -50,8 +63,10 @@ except ImportError:
 import torch
 from dg_util.python_utils import pytorch_util as pt_util
 
-from .robot_utils.raibert_controller import (Raibert_controller_turn,
-                                             Raibert_controller_turn_stable)
+from .robot_utils.raibert_controller import (
+    Raibert_controller_turn,
+    Raibert_controller_turn_stable,
+)
 from .robot_utils.robot_env import *
 
 cv2 = try_cv2_import()
@@ -1295,7 +1310,13 @@ class VelocityAction(SimulatorTaskAction):
             and abs(ang_vel) < self.min_abs_ang_speed
             and abs(hor_vel) < self.min_abs_hor_speed
         )
-        if called_stop and self.must_call_stop:
+        if (
+            self.must_call_stop
+            and called_stop
+            or not self.must_call_stop
+            and task.measurements.measures["distance_to_goal"].get_metric()
+            < task._config.SUCCESS_DISTANCE
+        ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
                 position=None,
