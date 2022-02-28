@@ -210,6 +210,20 @@ class PPOTrainer(BaseRLTrainer):
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
             nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
 
+        if self.config.RL.SPLITNET.pretrained_encoder:
+            pretrained_state = torch.load(
+                self.config.RL.SPLITNET.pretrained_weights, map_location="cpu"
+            )
+            prefix = "base.visual_encoder.module."
+            self.actor_critic.net.visual_encoder.load_state_dict(
+                {
+                    k[len(prefix) :]: v
+                    for k, v in pretrained_state.items()
+                    if k.startswith(prefix)
+                }
+            )
+            print("LOADED SPLITNET PRETRAINED ENCODER ")
+
         visual_layers = self.actor_critic.net.visual_encoder
         if self.config.RL.SPLITNET.freeze_encoder_features:
             for param in visual_layers.encoder.parameters():

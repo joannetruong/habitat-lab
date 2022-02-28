@@ -1,5 +1,5 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot_train.yaml"
-TOTAL_NUM_STEPS: 5e8
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot_splitnet_train.yaml"
+TOTAL_NUM_STEPS: 5e7
 
 VERBOSE: False
 TRAINER_NAME: "ddppo"
@@ -44,6 +44,8 @@ RL:
     update_motion_decoder_features: False
     freeze_motion_decoder_features: False
     freeze_policy_decoder_features: False
+    pretrained_encoder: True
+    pretrained_weights: /coc/testnvme/jtruong33/google_nav/splitnet/output_files/hm3d/splitnet_pretrain/checkpoints/2022_02_11_22_34_05/001001000.pt
   PPO:
     # ppo params
     clip_param: 0.2
