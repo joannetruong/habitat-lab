@@ -17,11 +17,10 @@ except ModuleNotFoundError:
     pass
 
 import numpy as np
-from numpy import float64
-
 from habitat.core.simulator import ShortestPathPoint
 from habitat.datasets.utils import get_action_shortest_path
 from habitat.tasks.nav.nav import NavigationEpisode, NavigationGoal
+from numpy import float64
 
 try:
     from habitat_sim.errors import GreedyFollowerError
@@ -111,7 +110,7 @@ def generate_pointnav_episode(
     furthest_dist_limit: float = 30,
     geodesic_to_euclid_min_ratio: float = 1.1,
     number_retries_per_target: int = 10,
-    robot: str = 'Spot'
+    robot: str = "Spot",
 ) -> Generator[NavigationEpisode, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
 
@@ -146,46 +145,90 @@ def generate_pointnav_episode(
     """
 
     # Load Spot model
-    if robot == 'A1':
+    if robot == "A1":
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"
-        init_joint_positions = [0.05, 0.60, -1.5,
-                                -0.05, 0.60, -1.5,
-                                0.05, 0.65, -1.5,
-                                -0.05, 0.65, -1.5]
+        init_joint_positions = [
+            0.05,
+            0.60,
+            -1.5,
+            -0.05,
+            0.60,
+            -1.5,
+            0.05,
+            0.65,
+            -1.5,
+            -0.05,
+            0.65,
+            -1.5,
+        ]
         z_offset = 0.28
-    elif robot == 'AlienGo':
-        robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf"
-        init_joint_positions = [0.1, 0.60, -1.5,
-                                -0.1, 0.60, -1.5,
-                                0.1, 0.6, -1.5,
-                                -0.1, 0.6, -1.5]
+    elif robot == "AlienGo":
+        robot_file = (
+            "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf"
+        )
+        init_joint_positions = [
+            0.1,
+            0.60,
+            -1.5,
+            -0.1,
+            0.60,
+            -1.5,
+            0.1,
+            0.6,
+            -1.5,
+            -0.1,
+            0.6,
+            -1.5,
+        ]
         z_offset = 0.35
-    elif robot == 'Daisy':
+    elif robot == "Daisy":
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf"
-        init_joint_positions = [0.0, 1.2, -0.5,
-                                0.0, -1.2, 0.5,
-                                0.0, 1.2, -0.5,
-                                0.0, -1.2, 0.5,
-                                0.0, 1.2, -0.5,
-                                0.0, -1.2, 0.5]
+        init_joint_positions = [
+            0.0,
+            1.2,
+            -0.5,
+            0.0,
+            -1.2,
+            0.5,
+            0.0,
+            1.2,
+            -0.5,
+            0.0,
+            -1.2,
+            0.5,
+            0.0,
+            1.2,
+            -0.5,
+            0.0,
+            -1.2,
+            0.5,
+        ]
         z_offset = 0.14
-    elif robot == 'Locobot':
+    elif robot == "Locobot":
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/locobot/urdf/locobot_description2.urdf"
         z_offset = -0.02
-    elif robot == 'Spot':
+    elif robot == "Spot":
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
-        init_joint_positions = [0.05, 0.7, -1.3,
-                                -0.05, 0.7, -1.3,
-                                0.05, 0.7, -1.3,
-                                -0.05, 0.7, -1.3]
+        init_joint_positions = [
+            0.05,
+            0.7,
+            -1.3,
+            -0.05,
+            0.7,
+            -1.3,
+            0.05,
+            0.7,
+            -1.3,
+            -0.05,
+            0.7,
+            -1.3,
+        ]
         z_offset = 0.525
 
     ao_mgr = sim.get_articulated_object_manager()
-    robot_id = ao_mgr.add_articulated_object_from_urdf(
-        robot_file, fixed_base=False
-    )
+    robot_id = ao_mgr.add_articulated_object_from_urdf(robot_file, fixed_base=False)
 
-    if robot != 'Locobot':
+    if robot != "Locobot":
         # Set Spot's joints to default walking position
         robot_id.joint_positions = init_joint_positions
 
@@ -203,14 +246,15 @@ def generate_pointnav_episode(
     num_trials = num_episodes * 100
     ctr = -1
     while episode_count < num_episodes or num_episodes < 0:
+        print(episode_count)
         if ctr > num_trials:
-            print('EPISODE COUNT: ', episode_count)
+            print("EPISODE COUNT: ", episode_count)
             break
         ctr += 1
         try:
             target_position = sim.sample_navigable_point()
         except:
-            print('unable to find navigable point')
+            print("unable to find navigable point")
             ctr = num_trials + 1
             continue
 
@@ -233,7 +277,7 @@ def generate_pointnav_episode(
         if is_compatible:
 
             def cartesian_to_polar(x, y):
-                rho = np.sqrt(x ** 2 + y ** 2)
+                rho = np.sqrt(x**2 + y**2)
                 phi = np.arctan2(y, x)
                 return rho, phi
 
@@ -263,12 +307,20 @@ def generate_pointnav_episode(
             heading = np.quaternion(source_rotation[-1], *source_rotation[:-1])
             heading = -quat_to_rad(heading) + np.pi / 2
 
-            robot_rigid_state = mn.Matrix4.rotation_y(
-                mn.Rad(-heading),
-            ).__matmul__(yaw_offset).__matmul__(roll_offset)
-            robot_rigid_state.translation = np.array(source_position) + np.array([
-                0.0, z_offset, 0.0,
-            ])
+            robot_rigid_state = (
+                mn.Matrix4.rotation_y(
+                    mn.Rad(-heading),
+                )
+                .__matmul__(yaw_offset)
+                .__matmul__(roll_offset)
+            )
+            robot_rigid_state.translation = np.array(source_position) + np.array(
+                [
+                    0.0,
+                    z_offset,
+                    0.0,
+                ]
+            )
 
             robot_id.transformation = robot_rigid_state
             collided = sim.contact_test(robot_id.object_id)
