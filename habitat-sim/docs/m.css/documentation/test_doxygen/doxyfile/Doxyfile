@@ -1,5 +1,0 @@
-# Includes
-@INCLUDE = Doxyfile-another
-
-# Quotes
-PROJECT_BRIEF = "is cool"
