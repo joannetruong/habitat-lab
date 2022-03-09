@@ -29,14 +29,12 @@ parser.add_argument("-r", "--robots", nargs="+", required=True)
 parser.add_argument("-c", "--control-type", required=True)
 parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
-parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
+parser.add_argument("-ds", "--dataset", default="gibson")
 parser.add_argument("-ts", "--time-step", type=float, default=1.0)
 
 parser.add_argument("-mvx", "--max_lin_vel", type=float, default=0.5, required=False)
 parser.add_argument("-mvy", "--max_hor_vel", type=float, default=0.5, required=False)
 parser.add_argument("-mvt", "--max_ang_vel", type=float, default=17.19, required=False)
-
-parser.add_argument("-det", "--deterministic", default=False, action="store_true")
 
 parser.add_argument("-vx", "--lin_vel_ranges", nargs="+", required=True)
 parser.add_argument("-vy", "--hor_vel_ranges", nargs="+", required=True)
@@ -46,11 +44,18 @@ parser.add_argument("-o", "--outdoor", default=False, action="store_true")
 parser.add_argument("-nd", "--noisy_depth", default=False, action="store_true")
 parser.add_argument("-curr", "--curriculum", default=False, action="store_true")
 
-# Spot cameras
+# z params
+parser.add_argument("-z", "--use_z", default=False, action="store_true")
+parser.add_argument("-zmlp", "--use_z_mlp", default=False, action="store_true")
+parser.add_argument("-az", "--adapt_z", default="null", required=False)
+parser.add_argument("-zod", "--z_out_dim", type=int, default=1, required=False)
+parser.add_argument("-pw", "--prev_window", type=int, default=50, required=False)
+parser.add_argument("-zei", "--z_enc_inputs", nargs="+", default=[], required=False)
+
+# spot cameras
 parser.add_argument("-sc", "--spot_cameras", default=False, action="store_true")
 parser.add_argument("-g", "--use_gray", default=False, action="store_true")
 parser.add_argument("-gd", "--use_gray_depth", default=False, action="store_true")
-parser.add_argument("-s", "--sliding", default=False, action="store_true")
 
 # Evaluation
 parser.add_argument("-e", "--eval", default=False, action="store_true")
@@ -58,7 +63,7 @@ parser.add_argument("-cpt", "--ckpt", type=int, default=-1)
 parser.add_argument("-v", "--video", default=False, action="store_true")
 
 parser.add_argument("-d", "--debug", default=False, action="store_true")
-parser.add_argument("--ext", default="")
+parser.add_argument("-ext", default="")
 
 args = parser.parse_args()
 
@@ -187,6 +192,18 @@ if not args.eval:
             task_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith("  ROBOT_URDFS:"):
             task_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith("    USE_Z:"):
+            task_yaml_data[idx] = "    USE_Z: {}".format(args.use_z)
+        elif i.startswith("    USE_MLP:"):
+            task_yaml_data[idx] = "    USE_MLP: {}".format(args.use_z_mlp)
+        elif i.startswith("    ADAPT_Z:"):
+            task_yaml_data[idx] = "    ADAPT_Z: {}".format(args.adapt_z)
+        elif i.startswith("    Z_OUT_DIM:"):
+            task_yaml_data[idx] = "    Z_OUT_DIM: {}".format(args.z_out_dim)
+        elif i.startswith("    PREV_WINDOW:"):
+            task_yaml_data[idx] = "    PREV_WINDOW: {}".format(args.prev_window)
+        elif i.startswith("    Z_ENC_INPUTS:"):
+            task_yaml_data[idx] = "    Z_ENC_INPUTS: {}".format(args.z_enc_inputs)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -341,12 +358,7 @@ if not args.eval:
 
 # Evaluation
 else:
-    if args.ext != "":
-        robots_underscore += "_" + args.ext
-    if args.deterministic:
-        robots_underscore += "_det"
-    if args.sliding:
-        robots_underscore += "_sliding"
+
     # Make sure folder exists
     assert os.path.isdir(dst_dir), "{} directory does not exist".format(dst_dir)
 
@@ -358,14 +370,11 @@ else:
     with open(eval_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
 
+    if args.use_z:
+        robots_underscore += "_" + str(args.adapt_z)
     for idx, i in enumerate(eval_yaml_data):
         if i.startswith("  TYPE: Nav-v0"):
             eval_yaml_data[idx] = "  TYPE: MultiNav-v0"
-        if i.startswith("    ALLOW_SLIDING:"):
-            if args.sliding:
-                eval_yaml_data[idx] = "    ALLOW_SLIDING: True"
-            else:
-                eval_yaml_data[idx] = "    ALLOW_SLIDING: False"
         elif i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
@@ -374,6 +383,18 @@ else:
             eval_yaml_data[idx] = "  ROBOTS: {}".format(robots)
         elif i.startswith("  ROBOT_URDFS:"):
             eval_yaml_data[idx] = "  ROBOT_URDFS: {}".format(robots_urdfs)
+        elif i.startswith("    USE_Z:"):
+            eval_yaml_data[idx] = "    USE_Z: {}".format(args.use_z)
+        elif i.startswith("    USE_MLP:"):
+            eval_yaml_data[idx] = "    USE_MLP: {}".format(args.use_z_mlp)
+        elif i.startswith("    ADAPT_Z:"):
+            eval_yaml_data[idx] = "    ADAPT_Z: {}".format(args.adapt_z)
+        elif i.startswith("    Z_OUT_DIM:"):
+            eval_yaml_data[idx] = "    Z_OUT_DIM: {}".format(args.z_out_dim)
+        elif i.startswith("    PREV_WINDOW:"):
+            eval_yaml_data[idx] = "    PREV_WINDOW: {}".format(args.prev_window)
+        elif i.startswith("    Z_ENC_INPUTS:"):
+            eval_yaml_data[idx] = "    Z_ENC_INPUTS: {}".format(args.z_enc_inputs)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -534,13 +555,6 @@ else:
                 exp_yaml_data[idx] = "    SPLIT: val"
             if args.dataset == "hm3d_gibson_7m":
                 exp_yaml_data[idx] = "    SPLIT: val_7m"
-            if args.dataset == "ferst_20m":
-                exp_yaml_data[idx] = "    SPLIT: val_20m"
-        elif i.startswith("    deterministic:"):
-            if args.deterministic:
-                exp_yaml_data[idx] = "    deterministic: True"
-            else:
-                exp_yaml_data[idx] = "    deterministic: False"
 
     if os.path.isdir(tb_dir):
         response = input(

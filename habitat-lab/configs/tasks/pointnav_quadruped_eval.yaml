@@ -60,12 +60,11 @@ TASK:
       ROBOT_HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
       ROBOT_ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]
 
-  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'EPISODE_DISTANCE', 'SUCCESS', 'SPL', 'COLLISIONS', 'VEL_TRK_ERR']
+  MEASUREMENTS: ['DISTANCE_TO_GOAL', 'EPISODE_DISTANCE', 'SUCCESS', 'SPL', 'COLLISIONS']
   SUCCESS:
     SUCCESS_DISTANCE: 0.425
 
 DATASET:
   TYPE: PointNav-v1
   SPLIT: train
-  # DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz
-  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/ferst/{split}/{split}.json.gz
+  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz

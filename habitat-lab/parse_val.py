@@ -24,12 +24,9 @@ def main():
     parser.add_argument("agent_dir", help="dir of .csvs of a particular agent")
     parser.add_argument("-n", "--num-episodes", type=int, default=1070)
     parser.add_argument("-c", "--checkpoint", type=int, default=-1)
-    parser.add_argument(
-        "-ty", "--type", default="succ", help="metric to optimize for"
-    )
-    parser.add_argument(
-        "-l", "--limit", type=int, default=1e9, help="step limit"
-    )
+    parser.add_argument("-ty", "--type", default="succ", help="metric to optimize for")
+    parser.add_argument("-l", "--limit", type=int, default=1e9, help="step limit")
+    parser.add_argument("-p", "--plot", default=False, action="store_true")
     args = parser.parse_args()
     global NUM_EPISODES
     NUM_EPISODES = args.num_episodes
@@ -43,7 +40,7 @@ def main():
         step_limit=args.limit,
     )
     pprint(f"Best checkpoint:\n {best_csv}")
-    all_stats = S.calculate_stats(best_csv, split="all")
+    all_stats = S.calculate_stats(best_csv, split="all", plot=args.plot)
     pprint("Best checkpoint stats: ")
     print("Success, SPL, # Steps, # Collisions, Dist2Goal, Episode Distance")
     print(
@@ -98,10 +95,8 @@ class Stats(object):
         df.episode_distance_success.hist(legend=True)
         plt.xlabel("episode distance (m)")
         plt.ylabel("frequency")
-        plt.title("Outdoor Env Episode Distance Frequency")
-        fig.savefig(
-            "/coc/testnvme/jtruong33/habitat_spot/habitat-lab/hist.png"
-        )
+        plt.title("Ferst Dr. Outdoor Env Episode Distance Frequency")
+        fig.savefig("/coc/testnvme/jtruong33/habitat_spot/habitat-lab/outdoor_hist.png")
         print("min episode dist: ", df["episode_distance"].min())
         print("max episode dist: ", df["episode_distance"].max())
         print(" ")
@@ -120,10 +115,10 @@ class Stats(object):
     calculate stats.
     """
 
-    def calculate_stats(self, csv, split, eps=None, eps_ignore=None):
+    def calculate_stats(self, csv, split, eps=None, eps_ignore=None, plot=False):
         num_lines = sum(1 for line in open(csv))
-        # print(f'{csv} has {num_lines} unique episode ids.')
-        # print('NUM_LINES: ', num_lines, 'CKPT: ', csv)
+        print(f"{csv} has {num_lines} unique episode ids.")
+        # print("NUM_LINES: ", num_lines, "CKPT: ", csv)
         assert num_lines == NUM_EPISODES + 1
         with open(csv) as f:
             df = pandas.read_csv(f)
@@ -133,29 +128,26 @@ class Stats(object):
         if eps_ignore is not None:
             SPLIT = [i for i in SPLIT if i not in eps_ignore]
         df_split = df[[ep_id in SPLIT for ep_id in df.id]]
-        self.plot_episode_distance(df_split)
+        if plot:
+            self.plot_episode_distance(df_split)
         stats = {}
         # id,reward,distance_to_goal,success,spl,steps,collisions,soft_spl,episode_distance,num_actions
-        stats["spl_stats"] = self.mean_confidence_interval(
-            np.array(df_split.spl)
-        )
-        stats["dist_stats"] = self.mean_confidence_interval(
-            df_split.distance_to_goal
-        )
+        stats["spl_stats"] = self.mean_confidence_interval(np.array(df_split.spl))
+        stats["dist_stats"] = self.mean_confidence_interval(df_split.distance_to_goal)
         stats["success_stats"] = self.mean_confidence_interval(
             np.array(df_split.success)
         )
         stats["episode_distance_stats"] = self.mean_confidence_interval(
             np.array(df_split.episode_distance)
         )
-        stats[
-            "success_episode_distance_stats"
-        ] = self.mean_confidence_interval(
+        stats["success_episode_distance_stats"] = self.mean_confidence_interval(
             np.array(df_split[df_split.success == 1.0].episode_distance)
         )
         stats["fail_episode_distance_stats"] = self.mean_confidence_interval(
             np.array(df_split[df_split.success == 0.0].episode_distance)
         )
+        print("Avg Succ: ", stats["success_stats"])
+        print("Avg SPL: ", stats["spl_stats"])
         try:
             stats["num_actions_stats"] = self.mean_confidence_interval(
                 np.array(df_split.steps)
@@ -190,9 +182,7 @@ class Stats(object):
     Only consider csvs corresponding to ckpts trained on <= 200M steps.
     """
 
-    def get_best_checkpoint(
-        self, agent_dir, ty, split="all", ckpt=-1, step_limit=2e8
-    ):
+    def get_best_checkpoint(self, agent_dir, ty, split="all", ckpt=-1, step_limit=2e8):
         agent_name = os.path.basename(agent_dir)
         csvs = self.get_valid_csvs(agent_dir, ckpt=ckpt, step_limit=step_limit)
         mean_successes, mean_colls = [], []
