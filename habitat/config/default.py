@@ -84,25 +84,9 @@ ACTIONS.VELOCITY_CONTROL = CN()
 
 # KINEMATIC VELOCITY ACTION
 ACTIONS.VELOCITY_CONTROL.TYPE = "VelocityAction"
-ACTIONS.VELOCITY_CONTROL.POLICY_LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.POLICY_HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [-17.19, 17.19]  # deg per sec
-
-ACTIONS.VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [
-    [-0.23, 0.23],
-    [-0.28, 0.28],
-    [-0.25, 0.25],
-]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [
-    [-0.23, 0.23],
-    [-0.28, 0.28],
-    [-0.25, 0.25],
-]  # meters per sec
-ACTIONS.VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [
-    [-7.81, 7.81],
-    [-9.77, 9.77],
-    [-30, -30],
-]  # deg per sec
+ACTIONS.VELOCITY_CONTROL.LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.VELOCITY_CONTROL.ANG_VEL_RANGE = [-17.19, 17.19]  # deg per sec
 
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
@@ -116,34 +100,9 @@ ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 240.0
 # DYNAMIC VELOCITY ACTION
 ACTIONS.DYNAMIC_VELOCITY_CONTROL = CN()
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.TYPE = "DynamicVelocityAction"
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_LIN_VEL_RANGES = [
-    -0.50,
-    0.50,
-]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_HOR_VEL_RANGES = [
-    -0.50,
-    0.50,
-]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.POLICY_ANG_VEL_RANGE = [
-    -17.19,
-    17.19,
-]  # meters per sec
-
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_LIN_VEL_RANGES = [
-    [-0.23, 0.23],
-    [-0.28, 0.28],
-    [-0.25, 0.25],
-]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_HOR_VEL_RANGES = [
-    [-0.23, 0.23],
-    [-0.28, 0.28],
-    [-0.25, 0.25],
-]  # meters per sec
-ACTIONS.DYNAMIC_VELOCITY_CONTROL.ROBOT_ANG_VEL_RANGES = [
-    [-7.81, 7.81],
-    [-9.77, 9.77],
-    [-30, -30],
-]  # deg per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.LIN_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.HOR_VEL_RANGE = [-0.50, 0.50]  # meters per sec
+ACTIONS.DYNAMIC_VELOCITY_CONTROL.ANG_VEL_RANGE = [-17.19, 17.19]  # meters per sec
 
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_LIN_SPEED = 0.025  # meters per sec
 ACTIONS.DYNAMIC_VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
@@ -170,9 +129,7 @@ _C.TASK.POINTGOAL_SENSOR.DIMENSIONALITY = 2
 # POINTGOAL WITH GPS+COMPASS SENSOR
 # -----------------------------------------------------------------------------
 _C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR = _C.TASK.POINTGOAL_SENSOR.clone()
-_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = (
-    "PointGoalWithGPSCompassSensor"
-)
+_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = "PointGoalWithGPSCompassSensor"
 # -----------------------------------------------------------------------------
 # OBJECTGOAL SENSOR
 # -----------------------------------------------------------------------------
@@ -248,9 +205,7 @@ _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 # -----------------------------------------------------------------------------
 _C.TASK.SOCIAL_TOP_DOWN_MAP = CN()
 _C.TASK.SOCIAL_TOP_DOWN_MAP.TYPE = "SocialTopDownMap"
-_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = (
-    _C.ENVIRONMENT.MAX_EPISODE_STEPS
-)
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_PADDING = 3
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_RESOLUTION = 1024
 _C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_SOURCE = True
@@ -327,9 +282,7 @@ _C.SIMULATOR = CN()
 _C.SIMULATOR.TYPE = "Sim-v0"
 _C.SIMULATOR.ACTION_SPACE_CONFIG = "v0"
 _C.SIMULATOR.FORWARD_STEP_SIZE = 0.25  # in metres
-_C.SIMULATOR.SCENE = (
-    "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
-)
+_C.SIMULATOR.SCENE = "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
 _C.SIMULATOR.SEED = _C.SEED
 _C.SIMULATOR.TURN_ANGLE = 10  # angle to rotate left or right in degrees
 _C.SIMULATOR.TILT_ANGLE = 15  # angle to tilt the camera up or down in degrees
@@ -393,9 +346,7 @@ _C.SIMULATOR.HABITAT_SIM_V0.GPU_GPU = False
 # Whether or not the agent slides on collisions
 _C.SIMULATOR.HABITAT_SIM_V0.ALLOW_SLIDING = True
 _C.SIMULATOR.HABITAT_SIM_V0.ENABLE_PHYSICS = False
-_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = (
-    "./data/default.physics_config.json"
-)
+_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = "./data/default.physics_config.json"
 _C.SIMULATOR.NUM_PEOPLE = 1
 # -----------------------------------------------------------------------------
 # PYROBOT

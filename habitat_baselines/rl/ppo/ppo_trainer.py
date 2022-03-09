@@ -27,35 +27,25 @@ from habitat_baselines.common.base_trainer import BaseRLTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.environments import get_env_class
 from habitat_baselines.common.obs_transformers import (
-    apply_obs_transforms_batch,
-    apply_obs_transforms_obs_space,
-    get_active_obs_transforms,
-)
+    apply_obs_transforms_batch, apply_obs_transforms_obs_space,
+    get_active_obs_transforms)
 from habitat_baselines.common.rollout_storage import RolloutStorage
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.rl.ddppo.algo import DDPPO
-from habitat_baselines.rl.ddppo.ddp_utils import (
-    EXIT,
-    add_signal_handlers,
-    get_distrib_size,
-    init_distrib_slurm,
-    is_slurm_batch_job,
-    load_resume_state,
-    rank0_only,
-    requeue_job,
-    save_resume_state,
-)
-from habitat_baselines.rl.ddppo.policy import (  # noqa: F401.
-    PointNavResNetPolicy,
-)
+from habitat_baselines.rl.ddppo.ddp_utils import (EXIT, add_signal_handlers,
+                                                  get_distrib_size,
+                                                  init_distrib_slurm,
+                                                  is_slurm_batch_job,
+                                                  load_resume_state,
+                                                  rank0_only, requeue_job,
+                                                  save_resume_state)
+from habitat_baselines.rl.ddppo.policy import \
+    PointNavResNetPolicy  # noqa: F401.
 from habitat_baselines.rl.ppo import PPO
 from habitat_baselines.rl.ppo.policy import Policy
-from habitat_baselines.utils.common import (
-    ObservationBatchingCache,
-    action_to_velocity_control,
-    batch_obs,
-    generate_video,
-)
+from habitat_baselines.utils.common import (ObservationBatchingCache,
+                                            action_to_velocity_control,
+                                            batch_obs, generate_video)
 from habitat_baselines.utils.env_utils import construct_envs
 
 
@@ -80,12 +70,8 @@ class PPOTrainer(BaseRLTrainer):
             self.OVERRIDE_TOTAL_NUM_STEPS = None
             if resume_state is not None:
                 if "OVERRIDE" in config:
-                    self.OVERRIDE_NUM_CHECKPOINTS = (
-                        config.OVERRIDE.NUM_CHECKPOINTS
-                    )
-                    self.OVERRIDE_TOTAL_NUM_STEPS = (
-                        config.OVERRIDE.TOTAL_NUM_STEPS
-                    )
+                    self.OVERRIDE_NUM_CHECKPOINTS = config.OVERRIDE.NUM_CHECKPOINTS
+                    self.OVERRIDE_TOTAL_NUM_STEPS = config.OVERRIDE.TOTAL_NUM_STEPS
                     config = resume_state["config"]
                     config.defrost()
                     config.NUM_CHECKPOINTS = self.OVERRIDE_NUM_CHECKPOINTS
@@ -173,10 +159,7 @@ class PPOTrainer(BaseRLTrainer):
         self.obs_space = observation_space
         self.actor_critic.to(self.device)
 
-        if (
-            self.config.RL.DDPPO.pretrained_encoder
-            or self.config.RL.DDPPO.pretrained
-        ):
+        if self.config.RL.DDPPO.pretrained_encoder or self.config.RL.DDPPO.pretrained:
             pretrained_state = torch.load(
                 self.config.RL.DDPPO.pretrained_weights, map_location="cpu"
             )
@@ -276,18 +259,13 @@ class PPOTrainer(BaseRLTrainer):
         self._init_envs()
 
         if self.config.RL.POLICY.action_distribution_type == "gaussian":
-            self.policy_action_space = self.envs.action_spaces[0][
-                self.action_type
-            ]
+            self.policy_action_space = self.envs.action_spaces[0][self.action_type]
             action_shape = self.policy_action_space.n
             discrete_actions = False
         else:
             if len(self.discrete_actions) > 0:
                 self.policy_action_space = ActionSpace(
-                    {
-                        str(i): EmptySpace()
-                        for i in range(len(self.discrete_actions))
-                    }
+                    {str(i): EmptySpace() for i in range(len(self.discrete_actions))}
                 )
             else:
                 self.policy_action_space = self.envs.action_spaces[0]
@@ -353,7 +331,6 @@ class PPOTrainer(BaseRLTrainer):
         if self._static_encoder:
             with torch.no_grad():
                 batch["visual_features"] = self._encoder(batch)
-        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         self.rollouts.buffers["observations"][0] = batch
 
         self.current_episode_reward = torch.zeros(self.envs.num_envs, 1)
@@ -389,9 +366,7 @@ class PPOTrainer(BaseRLTrainer):
         if extra_state is not None:
             checkpoint["extra_state"] = extra_state
 
-        torch.save(
-            checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
-        )
+        torch.save(checkpoint, os.path.join(self.config.CHECKPOINT_FOLDER, file_name))
 
     def load_checkpoint(self, checkpoint_path: str, *args, **kwargs) -> Dict:
         r"""Load checkpoint of specified path as a dict.
@@ -409,9 +384,7 @@ class PPOTrainer(BaseRLTrainer):
     METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision"}
 
     @classmethod
-    def _extract_scalars_from_info(
-        cls, info: Dict[str, Any]
-    ) -> Dict[str, float]:
+    def _extract_scalars_from_info(cls, info: Dict[str, Any]) -> Dict[str, float]:
         result = {}
         for k, v in info.items():
             if k in cls.METRICS_BLACKLIST:
@@ -421,9 +394,7 @@ class PPOTrainer(BaseRLTrainer):
                 result.update(
                     {
                         k + "." + subk: subv
-                        for subk, subv in cls._extract_scalars_from_info(
-                            v
-                        ).items()
+                        for subk, subv in cls._extract_scalars_from_info(v).items()
                         if (k + "." + subk) not in cls.METRICS_BLACKLIST
                     }
                 )
@@ -528,9 +499,7 @@ class PPOTrainer(BaseRLTrainer):
             for index_env in range(env_slice.start, env_slice.stop)
         ]
 
-        observations, rewards_l, dones, infos = [
-            list(x) for x in zip(*outputs)
-        ]
+        observations, rewards_l, dones, infos = [list(x) for x in zip(*outputs)]
 
         self.env_time += time.time() - t_step_env
 
@@ -540,7 +509,6 @@ class PPOTrainer(BaseRLTrainer):
         )
         batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
-        batch["robot_id"] = batch["robot_id"].reshape(-1, 1)
         rewards = torch.tensor(
             rewards_l,
             dtype=torch.float,
@@ -601,9 +569,7 @@ class PPOTrainer(BaseRLTrainer):
         ppo_cfg = self.config.RL.PPO
         t_update_model = time.time()
         with torch.no_grad():
-            step_batch = self.rollouts.buffers[
-                self.rollouts.current_rollout_step_idx
-            ]
+            step_batch = self.rollouts.buffers[self.rollouts.current_rollout_step_idx]
 
             next_value = self.actor_critic.get_value(
                 step_batch["observations"],
@@ -618,9 +584,7 @@ class PPOTrainer(BaseRLTrainer):
 
         self.agent.train()
 
-        value_loss, action_loss, dist_entropy = self.agent.update(
-            self.rollouts
-        )
+        value_loss, action_loss, dist_entropy = self.agent.update(self.rollouts)
 
         self.rollouts.after_update()
         self.pth_time += time.time() - t_update_model
@@ -635,9 +599,7 @@ class PPOTrainer(BaseRLTrainer):
         self, losses: Dict[str, float], count_steps_delta: int
     ) -> Dict[str, float]:
         stats_ordering = sorted(self.running_episode_stats.keys())
-        stats = torch.stack(
-            [self.running_episode_stats[k] for k in stats_ordering], 0
-        )
+        stats = torch.stack([self.running_episode_stats[k] for k in stats_ordering], 0)
 
         stats = self._all_reduce(stats)
 
@@ -655,9 +617,7 @@ class PPOTrainer(BaseRLTrainer):
             count_steps_delta = int(stats[-1].item())
             stats /= torch.distributed.get_world_size()
 
-            losses = {
-                k: stats[i].item() for i, k in enumerate(loss_name_ordering)
-            }
+            losses = {k: stats[i].item() for i, k in enumerate(loss_name_ordering)}
 
         if self._is_distributed and rank0_only():
             self.num_rollouts_done_store.set("num_done", "0")
@@ -667,15 +627,9 @@ class PPOTrainer(BaseRLTrainer):
         return losses
 
     @rank0_only
-    def _training_log(
-        self, writer, losses: Dict[str, float], prev_time: int = 0
-    ):
+    def _training_log(self, writer, losses: Dict[str, float], prev_time: int = 0):
         deltas = {
-            k: (
-                (v[-1] - v[0]).sum().item()
-                if len(v) > 1
-                else v[0].sum().item()
-            )
+            k: ((v[-1] - v[0]).sum().item() if len(v) > 1 else v[0].sum().item())
             for k, v in self.window_episode_stats.items()
         }
         deltas["count"] = max(deltas["count"], 1.0)
@@ -711,8 +665,7 @@ class PPOTrainer(BaseRLTrainer):
             logger.info(
                 "update: {}\tfps: {:.3f}\t".format(
                     self.num_updates_done,
-                    self.num_steps_done
-                    / ((time.time() - self.t_start) + prev_time),
+                    self.num_steps_done / ((time.time() - self.t_start) + prev_time),
                 )
             )
 
@@ -743,8 +696,7 @@ class PPOTrainer(BaseRLTrainer):
         # This is where the preemption of workers happens.  If a
         # worker detects it will be a straggler, it preempts itself!
         return (
-            rollout_step
-            >= self.config.RL.PPO.num_steps * self.SHORT_ROLLOUT_THRESHOLD
+            rollout_step >= self.config.RL.PPO.num_steps * self.SHORT_ROLLOUT_THRESHOLD
         ) and int(self.num_rollouts_done_store.get("num_done")) >= (
             self.config.RL.DDPPO.sync_frac * torch.distributed.get_world_size()
         )
@@ -787,16 +739,12 @@ class PPOTrainer(BaseRLTrainer):
             count_checkpoints = requeue_stats["count_checkpoints"]
             prev_time = requeue_stats["prev_time"]
             self.running_episode_stats = requeue_stats["running_episode_stats"]
-            self.window_episode_stats.update(
-                requeue_stats["window_episode_stats"]
-            )
+            self.window_episode_stats.update(requeue_stats["window_episode_stats"])
 
         ppo_cfg = self.config.RL.PPO
 
         with (
-            TensorboardWriter(
-                self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs
-            )
+            TensorboardWriter(self.config.TENSORBOARD_DIR, flush_secs=self.flush_secs)
             if rank0_only()
             else contextlib.suppress()
         ) as writer:
@@ -866,9 +814,7 @@ class PPOTrainer(BaseRLTrainer):
 
                         if not is_last_step:
                             if (buffer_index + 1) == self._nbuffers:
-                                profiling_wrapper.range_push(
-                                    "_collect_rollout_step"
-                                )
+                                profiling_wrapper.range_push("_collect_rollout_step")
 
                             self._compute_actions_and_step_envs(buffer_index)
 
@@ -948,9 +894,7 @@ class PPOTrainer(BaseRLTrainer):
         if len(self.config.VIDEO_OPTION) > 0:
             config.defrost()
             if config.TASK_CONFIG.TASK.TYPE == "SocialNav-v0":
-                config.TASK_CONFIG.TASK.MEASUREMENTS.append(
-                    "SOCIAL_TOP_DOWN_MAP"
-                )
+                config.TASK_CONFIG.TASK.MEASUREMENTS.append("SOCIAL_TOP_DOWN_MAP")
             else:
                 config.TASK_CONFIG.TASK.MEASUREMENTS.append("TOP_DOWN_MAP")
             config.TASK_CONFIG.TASK.MEASUREMENTS.append("COLLISIONS")
@@ -962,18 +906,13 @@ class PPOTrainer(BaseRLTrainer):
         self._init_envs(config)
 
         if self.config.RL.POLICY.action_distribution_type == "gaussian":
-            self.policy_action_space = self.envs.action_spaces[0][
-                self.action_type
-            ]
+            self.policy_action_space = self.envs.action_spaces[0][self.action_type]
             action_shape = self.policy_action_space.n
             action_type = torch.float
         else:
             if len(self.discrete_actions) > 0:
                 self.policy_action_space = ActionSpace(
-                    {
-                        str(i): EmptySpace()
-                        for i in range(len(self.discrete_actions))
-                    }
+                    {str(i): EmptySpace() for i in range(len(self.discrete_actions))}
                 )
             else:
                 self.policy_action_space = self.envs.action_spaces[0]
@@ -991,9 +930,7 @@ class PPOTrainer(BaseRLTrainer):
         )
         batch = apply_obs_transforms_batch(batch, self.obs_transforms)
 
-        current_episode_reward = torch.zeros(
-            self.envs.num_envs, 1, device="cpu"
-        )
+        current_episode_reward = torch.zeros(self.envs.num_envs, 1, device="cpu")
 
         test_recurrent_hidden_states = torch.zeros(
             self.config.NUM_ENVIRONMENTS,
@@ -1039,19 +976,11 @@ class PPOTrainer(BaseRLTrainer):
         pbar = tqdm.tqdm(total=number_of_eval_episodes)
         self.actor_critic.eval()
         all_episode_stats = {}
-        while (
-            len(stats_episodes) < number_of_eval_episodes
-            and self.envs.num_envs > 0
-        ):
+        while len(stats_episodes) < number_of_eval_episodes and self.envs.num_envs > 0:
             current_episodes = self.envs.current_episodes()
 
             with torch.no_grad():
-                (
-                    _,
-                    actions,
-                    _,
-                    test_recurrent_hidden_states,
-                ) = self.actor_critic.act(
+                (_, actions, _, test_recurrent_hidden_states,) = self.actor_critic.act(
                     batch,
                     test_recurrent_hidden_states,
                     prev_actions,
@@ -1087,9 +1016,7 @@ class PPOTrainer(BaseRLTrainer):
 
             outputs = self.envs.step(step_data)
 
-            observations, rewards_l, dones, infos = [
-                list(x) for x in zip(*outputs)
-            ]
+            observations, rewards_l, dones, infos = [list(x) for x in zip(*outputs)]
             batch = batch_obs(
                 observations,
                 device=self.device,
@@ -1122,9 +1049,7 @@ class PPOTrainer(BaseRLTrainer):
                     pbar.update()
                     episode_stats = {}
                     episode_stats["reward"] = current_episode_reward[i].item()
-                    episode_stats.update(
-                        self._extract_scalars_from_info(infos[i])
-                    )
+                    episode_stats.update(self._extract_scalars_from_info(infos[i]))
                     current_episode_reward[i] = 0
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[
@@ -1136,18 +1061,14 @@ class PPOTrainer(BaseRLTrainer):
 
                     episode_stats["num_steps"] = len(rgb_frames[i])
 
-                    all_episode_stats[
-                        current_episodes[i].episode_id
-                    ] = episode_stats
+                    all_episode_stats[current_episodes[i].episode_id] = episode_stats
 
                     txt_dir = getattr(self.config, "TXT_DIR", "")
                     if txt_dir != "":
                         if not os.path.isdir(txt_dir):
                             os.makedirs(txt_dir)
                         episode_steps_filename = "{}.csv".format(
-                            os.path.basename(checkpoint_path[:-4]).replace(
-                                ".", "_"
-                            )
+                            os.path.basename(checkpoint_path[:-4]).replace(".", "_")
                         )
                         episode_steps_filename = os.path.join(
                             txt_dir, episode_steps_filename
@@ -1229,8 +1150,7 @@ class PPOTrainer(BaseRLTrainer):
         aggregated_stats = {}
         for stat_key in next(iter(stats_episodes.values())).keys():
             aggregated_stats[stat_key] = (
-                sum(v[stat_key] for v in stats_episodes.values())
-                / num_episodes
+                sum(v[stat_key] for v in stats_episodes.values()) / num_episodes
             )
 
         step_id = checkpoint_index

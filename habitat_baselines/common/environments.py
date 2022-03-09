@@ -11,13 +11,14 @@ in habitat. Customized environments should be registered using
 """
 
 from typing import Optional, Type
+
+import numpy as np
 from gym.spaces import Box
 
 import habitat
 from habitat import Config, Dataset
 from habitat_baselines.common.baseline_registry import baseline_registry
 
-import numpy as np
 
 def get_env_class(env_name: str) -> Type[habitat.RLEnv]:
     r"""Return environment class based on name.
@@ -46,9 +47,7 @@ class NavRLEnv(habitat.RLEnv):
     def reset(self):
         self._previous_action = None
         observations = super().reset()
-        self._previous_measure = self._env.get_metrics()[
-            self._reward_measure_name
-        ]
+        self._previous_measure = self._env.get_metrics()[self._reward_measure_name]
         return observations
 
     def step(self, *args, **kwargs):
@@ -72,35 +71,28 @@ class NavRLEnv(habitat.RLEnv):
         ):
             reward += self._previous_measure - current_measure
         else:
-            reward += (
-                self._previous_measure - current_measure
-            ) * max(
-                0,
-                (
-                    1 - observations["num_steps"]
-                    / self._rl_config.FULL_GEODESIC_DECAY
-                )
+            reward += (self._previous_measure - current_measure) * max(
+                0, (1 - observations["num_steps"] / self._rl_config.FULL_GEODESIC_DECAY)
             )
 
         sim = self._env._sim
-        if 'PROXIMITY_PENALTY' in self._rl_config:
+        if "PROXIMITY_PENALTY" in self._rl_config:
             agent_pos = sim.get_agent_state().position
             if sim.social_nav:
                 for p in sim.people:
                     distance = np.sqrt(
-                        (p.current_position[0]-agent_pos[0])**2
-                        +(p.current_position[2]-agent_pos[2])**2
+                        (p.current_position[0] - agent_pos[0]) ** 2
+                        + (p.current_position[2] - agent_pos[2]) ** 2
                     )
-                    if distance < self._rl_config.get('PENALTY_RADIUS', 1.5):
+                    if distance < self._rl_config.get("PENALTY_RADIUS", 1.5):
                         reward -= self._rl_config.PROXIMITY_PENALTY
                         break
             elif sim.interactive_nav:
                 for p in sim.object_positions:
                     distance = np.sqrt(
-                        (p[0]-agent_pos[0])**2
-                        +(p[2]-agent_pos[2])**2
+                        (p[0] - agent_pos[0]) ** 2 + (p[2] - agent_pos[2]) ** 2
                     )
-                    if distance < self._rl_config.get('PENALTY_RADIUS', 1.5):
+                    if distance < self._rl_config.get("PENALTY_RADIUS", 1.5):
                         reward -= self._rl_config.PROXIMITY_PENALTY
                         break
 
@@ -109,9 +101,6 @@ class NavRLEnv(habitat.RLEnv):
         if self._episode_success():
             reward += self._rl_config.SUCCESS_REWARD
 
-        if observations.get('fell_over', False):
-            reward -= self._rl_config.FALL_PENALTY
-
         if observations.get("hit_navmesh", False):
             reward -= self._rl_config.COLLISION_PENALTY
 
@@ -119,15 +108,10 @@ class NavRLEnv(habitat.RLEnv):
             reward -= self._rl_config.BACKWARDS_PENALTY
         if observations.get("moving_sideways", False):
             reward -= self._rl_config.BACKWARDS_PENALTY
-        if "velocity_error" in observations:
-            velocity_error =  observations["velocity_error"]
-            vel_err_penalty = velocity_error * self._rl_config.VEL_ERR_PENALTY
-            # print('reward: ', reward, ' penalty: ', vel_err_penalty)
-            reward -= vel_err_penalty
 
-        if 'ang_accel' in observations:
+        if "ang_accel" in observations:
             reward -= min(
-                abs(observations['ang_accel'])
+                abs(observations["ang_accel"])
                 * self._rl_config.ANG_ACCEL_PENALTY_COEFF,
                 self._rl_config.MAX_ANG_ACCEL_PENALTY,
             )
@@ -145,32 +129,9 @@ class NavRLEnv(habitat.RLEnv):
 
     def get_info(self, observations):
         return self.habitat_env.get_metrics()
-        
+
+
 @baseline_registry.register_env(name="MultiNavRLEnv")
 class MultiNavRLEnv(NavRLEnv):
     def __init__(self, config: Config, dataset: Optional[Dataset] = None):
         super().__init__(config, dataset)
-        self.observation_space["robot_id"] = Box(
-            low=np.finfo(np.float32).min,
-            high=np.finfo(np.float32).max,
-            shape=(1,),
-            dtype=np.float32,
-        )
-        self.observation_space["urdf_params"] = Box(
-            low=np.finfo(np.float32).min,
-            high=np.finfo(np.float32).max,
-            shape=(4,),
-            dtype=np.float32,
-        )
-        self.observation_space["prev_states"] = Box(
-            low=np.finfo(np.float32).min,
-            high=np.finfo(np.float32).max,
-            shape=(config.TASK_CONFIG.TASK.Z.PREV_WINDOW, 2),
-            dtype=np.float32,
-        )
-        self.observation_space["prev_actions"] = Box(
-            low=np.finfo(np.float32).min,
-            high=np.finfo(np.float32).max,
-            shape=(config.TASK_CONFIG.TASK.Z.PREV_WINDOW, 3),
-            dtype=np.float32,
-        )

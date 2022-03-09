@@ -9,8 +9,8 @@ import os
 import shutil
 import subprocess
 
-HABITAT_LAB = "/coc/testnvme/jtruong33/habitat_spot/habitat-lab"
-CONDA_ENV = "/nethome/jtruong33/miniconda3/envs/habitat-quad/bin/python"
+HABITAT_LAB = "/coc/testnvme/jtruong33/kin2dyn/habitat-lab"
+CONDA_ENV = "/nethome/jtruong33/miniconda3/envs/kin2dyn/bin/python"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/kin2dyn_results"
 SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "slurm_job_template.sh")
 EVAL_SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "eval_slurm_template.sh")
@@ -251,7 +251,7 @@ if not args.eval:
         slurm_data = slurm_data.replace("$CONFIG_YAML", new_exp_yaml_path)
         slurm_data = slurm_data.replace("$PARTITION", args.partition)
     if args.debug:
-        slurm_data = slurm_data.replace("$GPUS", "2")
+        slurm_data = slurm_data.replace("$GPUS", "1")
     else:
         slurm_data = slurm_data.replace("$GPUS", "8")
 
