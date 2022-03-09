@@ -54,7 +54,6 @@ _C.TASK.ROBOT_URDFS = [
     "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
     "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_side.urdf",
 ]
-_C.TASK.USE_Z = False
 _C.TASK.ROBOTS = ["A1", "AlienGo", "Daisy"]
 _C.TASK.SENSORS = []
 _C.TASK.MEASUREMENTS = []

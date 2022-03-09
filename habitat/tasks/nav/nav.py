@@ -1097,62 +1097,6 @@ class EpisodeDistance(Measure):
     ):
         pass
 
-
-@registry.register_measure
-class VelTrkErr(Measure):
-    def __init__(self, sim, config, *args: Any, **kwargs: Any):
-        self._sim = sim
-        self._config = config
-        self._metric = 0.0
-        super().__init__()
-
-    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
-        return "vel_trk_err"
-
-    def reset_metric(self, episode, task, *args: Any, **kwargs: Any):
-        self._num_steps_taken = 0
-        self._total_err = 0
-        self._metric = 0.0
-
-    def update_metric(self, episode, task, action, *args: Any, **kwargs: Any):
-        vel_ctrl_cfg = task._config.ACTIONS.VELOCITY_CONTROL
-        vel_actions = action["action_args"]
-        robot_id = task.robot_wrapper.id
-
-        cmd_lin_vel = scale_policy_action(
-            vel_actions["lin_vel"], *vel_ctrl_cfg.POLICY_LIN_VEL_RANGE
-        )
-        cmd_hor_vel = scale_policy_action(
-            vel_actions["hor_vel"], *vel_ctrl_cfg.POLICY_HOR_VEL_RANGE
-        )
-        cmd_ang_vel = scale_policy_action(
-            vel_actions["ang_vel"], *vel_ctrl_cfg.POLICY_ANG_VEL_RANGE
-        )
-
-        actual_lin_vel = scale_robot_action(
-            cmd_lin_vel, *vel_ctrl_cfg.ROBOT_LIN_VEL_RANGES[robot_id]
-        )
-        actual_hor_vel = scale_robot_action(
-            cmd_hor_vel, *vel_ctrl_cfg.ROBOT_HOR_VEL_RANGES[robot_id]
-        )
-        actual_ang_vel = scale_robot_action(
-            cmd_ang_vel, *vel_ctrl_cfg.ROBOT_ANG_VEL_RANGES[robot_id]
-        )
-
-        lin_vel_diff = calc_vel_error(cmd_lin_vel, actual_lin_vel)
-        hor_vel_diff = calc_vel_error(cmd_hor_vel, actual_hor_vel)
-        ang_vel_diff = calc_vel_error(cmd_ang_vel, actual_ang_vel)
-
-        # print('VEL TRK cmd vx: ', cmd_lin_vel, 'actual vx: ', actual_lin_vel, 'err: ', lin_vel_diff)
-        # print('VEL TRK cmd vy: ', cmd_hor_vel, 'actual vy: ', actual_hor_vel, 'err: ', hor_vel_diff)
-        # print('VEL TRK cmd vt: ', np.deg2rad(cmd_ang_vel), 'actual vt: ', np.deg2rad(actual_ang_vel), 'err: ', np.deg2rad(ang_vel_diff))
-
-        abs_vel_err = lin_vel_diff + hor_vel_diff + np.deg2rad(ang_vel_diff)
-        self._total_err += abs_vel_err
-        self._num_steps_taken += 1
-        self._metric = self._total_err / self._num_steps_taken
-
-
 @registry.register_task_action
 class MoveForwardAction(SimulatorTaskAction):
     name: str = "MOVE_FORWARD"
@@ -1277,32 +1221,17 @@ class VelocityAction(SimulatorTaskAction):
         self.vel_control.ang_vel_is_local = True
 
         config = kwargs["config"]
-        # self.robot_min_lin_vel, self.robot_max_lin_vel = config.LIN_VEL_RANGE
-        # self.robot_min_ang_vel, self.robot_max_ang_vel = config.ANG_VEL_RANGE
-        self.robot_min_abs_lin_speed = config.MIN_ABS_LIN_SPEED
-        self.robot_min_abs_hor_speed = config.MIN_ABS_HOR_SPEED
-        self.robot_min_abs_ang_speed = config.MIN_ABS_ANG_SPEED
+        self.min_lin_vel, self.max_lin_vel = config.LIN_VEL_RANGE
+        self.min_ang_vel, self.max_ang_vel = config.ANG_VEL_RANGE
+        self.min_hor_vel, self.max_hor_vel = config.HOR_VEL_RANGE
+
+        self.min_abs_lin_speed = config.MIN_ABS_LIN_SPEED
+        self.min_abs_ang_speed = config.MIN_ABS_ANG_SPEED
+        self.has_hor_vel = self.min_hor_vel != 0.0 and self.max_hor_vel != 0.0
+        self.min_abs_hor_speed = config.MIN_ABS_HOR_SPEED
+
         self.must_call_stop = config.MUST_CALL_STOP
         self.time_step = config.TIME_STEP
-
-        # velocity limits to scale policy action to
-        (
-            self.policy_min_lin_vel,
-            self.policy_max_lin_vel,
-        ) = config.POLICY_LIN_VEL_RANGE
-        (
-            self.policy_min_hor_vel,
-            self.policy_max_hor_vel,
-        ) = config.POLICY_HOR_VEL_RANGE
-        (
-            self.policy_min_ang_vel,
-            self.policy_max_ang_vel,
-        ) = config.POLICY_ANG_VEL_RANGE
-
-        # robot specific velocity limits to clamp scaled policy action to
-        self.robot_lin_vels = config.ROBOT_LIN_VEL_RANGES
-        self.robot_hor_vels = config.ROBOT_HOR_VEL_RANGES
-        self.robot_ang_vels = config.ROBOT_ANG_VEL_RANGES
 
         # For acceleration penalty
         self.prev_ang_vel = 0.0
@@ -1374,53 +1303,6 @@ class VelocityAction(SimulatorTaskAction):
                 task.robot_wrapper.calc_state()
             )
 
-    def rescale_actions(
-        self,
-        task: EmbodiedTask,
-        lin_vel: float,
-        ang_vel: float,
-        hor_vel: float,
-    ):
-        # Convert from [-1, 1] to [0, 1] range
-        # print('policy vx: ', lin_vel, 'policy vy: ', hor_vel, 'policy vt: ', ang_vel)
-        cmd_lin_vel = scale_policy_action(
-            lin_vel, self.policy_min_lin_vel, self.policy_max_lin_vel
-        )
-        cmd_hor_vel = scale_policy_action(
-            hor_vel, self.policy_min_hor_vel, self.policy_max_hor_vel
-        )
-        cmd_ang_vel = scale_policy_action(
-            ang_vel, self.policy_min_ang_vel, self.policy_max_ang_vel
-        )
-
-        robot_id = task.robot_wrapper.id
-
-        actual_lin_vel = scale_robot_action(
-            cmd_lin_vel, *self.robot_lin_vels[robot_id]
-        )
-        actual_hor_vel = scale_robot_action(
-            cmd_hor_vel, *self.robot_hor_vels[robot_id]
-        )
-        actual_ang_vel = scale_robot_action(
-            cmd_ang_vel, *self.robot_ang_vels[robot_id]
-        )
-
-        lin_vel_diff = calc_vel_error(cmd_lin_vel, actual_lin_vel)
-        hor_vel_diff = calc_vel_error(cmd_hor_vel, actual_hor_vel)
-        ang_vel_diff = calc_vel_error(cmd_ang_vel, actual_ang_vel)
-
-        # print('cmd vx: ', cmd_lin_vel, 'actual vx: ', actual_lin_vel, 'err: ', lin_vel_diff)
-        # print('cmd vy: ', cmd_hor_vel, 'actual vy: ', actual_hor_vel, 'err: ', hor_vel_diff)
-        # print('cmd vt: ', np.deg2rad(cmd_ang_vel), 'actual vt: ', np.deg2rad(actual_ang_vel), 'err: ', np.deg2rad(ang_vel_diff))
-
-        abs_vel_err = lin_vel_diff + hor_vel_diff + np.deg2rad(ang_vel_diff)
-        return (
-            actual_lin_vel,
-            np.deg2rad(actual_ang_vel),
-            actual_hor_vel,
-            abs_vel_err,
-        )
-
     def get_curr_rigid_state(self):
         agent_state = self._sim.get_agent_state()
         normalized_quaternion = np.normalized(agent_state.rotation)
@@ -1432,6 +1314,39 @@ class VelocityAction(SimulatorTaskAction):
             agent_state.position,
         )
         return current_rigid_state
+
+    def put_text(self, task, agent_observations, lin_vel, hor_vel, ang_vel):
+        try:
+            robot_rigid_state = task.robot_id.rigid_state
+            img = np.copy(agent_observations["rgb"])
+            font = cv2.FONT_HERSHEY_PLAIN
+            vel_text = (
+                "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
+                    lin_vel, hor_vel, ang_vel
+                )
+            )
+            robot_state_text = (
+                "Robot state: {:.2f}, {:.2f}, {:.2f}".format(
+                    robot_rigid_state.translation.x,
+                    robot_rigid_state.translation.y,
+                    robot_rigid_state.translation.z,
+                )
+            )
+            dist_to_goal_text = "Dist2Goal: {:.2f}".format(
+                task.measurements.measures["distance_to_goal"].get_metric()
+            )
+            cv2.putText(
+                img, vel_text, (10, 20), font, 1, (0, 0, 0), 1
+            )
+            cv2.putText(
+                img, robot_state_text, (10, 60), font, 1, (0, 0, 0), 1
+            )
+            cv2.putText(
+                img, dist_to_goal_text, (10, 80), font, 1, (0, 0, 0), 1
+            )
+            agent_observations["rgb"] = img
+        except:
+            pass
 
     def step(
         self,
@@ -1459,27 +1374,28 @@ class VelocityAction(SimulatorTaskAction):
         if time_step is None:
             time_step = self.time_step
 
-        # print('kinematic policy action: ', lin_vel, ang_vel, hor_vel)
-        policy_action_vx = lin_vel
-        policy_action_vt = ang_vel
-        policy_action_vy = hor_vel
-        lin_vel, ang_vel, hor_vel, abs_vel_err = self.rescale_actions(
-            task, lin_vel, ang_vel, hor_vel
+        # Convert from [-1, 1] to [0, 1] range
+        lin_vel = (lin_vel + 1.0) / 2.0
+        ang_vel = (ang_vel + 1.0) / 2.0
+        hor_vel = (hor_vel + 1.0) / 2.0
+
+        # Scale actions
+        lin_vel = self.min_lin_vel + lin_vel * (self.max_lin_vel - self.min_lin_vel)
+        ang_vel = self.min_ang_vel + ang_vel * (self.max_ang_vel - self.min_ang_vel)
+        ang_vel = np.deg2rad(ang_vel)
+        hor_vel = self.min_hor_vel + hor_vel * (self.max_hor_vel - self.min_hor_vel)
+
+        called_stop = (
+                abs(lin_vel) < self.min_abs_lin_speed
+                and abs(ang_vel) < self.min_abs_ang_speed
+                and abs(hor_vel) < self.min_abs_hor_speed
         )
-        scaled_action_vx = lin_vel
-        scaled_action_vt = ang_vel
-        scaled_action_vy = hor_vel
-        # print('kinematic scaled action: ', lin_vel, ang_vel, hor_vel)
         if (
-            self.must_call_stop
-            and (
-                abs(lin_vel) < self.robot_min_abs_lin_speed
-                and abs(ang_vel) < self.robot_min_abs_ang_speed
-                and abs(hor_vel) < self.robot_min_abs_hor_speed
-            )
-            or not self.must_call_stop
-            and task.measurements.measures["distance_to_goal"].get_metric()
-            < task.robot_wrapper.robot_dist_to_goal
+                self.must_call_stop
+                and called_stop
+                or not self.must_call_stop
+                and task.measurements.measures["distance_to_goal"].get_metric()
+                < task._config.SUCCESS_DISTANCE
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1502,19 +1418,6 @@ class VelocityAction(SimulatorTaskAction):
         agent_mn_quat = mn.Quaternion(
             normalized_quaternion.imag, normalized_quaternion.real
         )
-
-        # agent_T_global = mn.Matrix4.from_(
-        #     agent_mn_quat.to_matrix(), agent_state.position
-        # )
-        # robot_rotation_offset = mn.Matrix4.rotation(
-        #     mn.Rad(-np.pi / 2.0), mn.Vector3((1.0, 0.0, 0.0))
-        # )
-        # robot_translation_offset = mn.Vector3(
-        #     task.robot_wrapper.robot_spawn_offset
-        # )
-        # robot_T_agent = mn.Matrix4.from_(
-        #     robot_rotation_offset, robot_translation_offset
-        # )
 
         current_rigid_state = RigidState(
             agent_mn_quat,
@@ -1553,82 +1456,16 @@ class VelocityAction(SimulatorTaskAction):
             agent_observations["moving_backwards"] = False
             agent_observations["moving_sideways"] = False
             agent_observations["ang_accel"] = 0.0
-            agent_observations["velocity_error"] = abs_vel_err
             if kwargs.get("num_steps", -1) != -1:
                 agent_observations["num_steps"] = kwargs["num_steps"]
 
             self.prev_ang_vel = 0.0
-            try:
-                robot_rigid_state = task.robot_id.rigid_state
-                img = np.copy(agent_observations["rgb"])
-                font = cv2.FONT_HERSHEY_PLAIN
-                policy_vel_text = (
-                    "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                        policy_action_vx, policy_action_vy, policy_action_vt
-                    )
-                )
-                scaled_vel_text = (
-                    "SA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                        scaled_action_vx, scaled_action_vy, scaled_action_vt
-                    )
-                )
-                robot_state_text = (
-                    "Robot state: {:.2f}, {:.2f}, {:.2f}".format(
-                        robot_rigid_state.translation.x,
-                        robot_rigid_state.translation.y,
-                        robot_rigid_state.translation.z,
-                    )
-                )
-                dist_to_goal_text = "Dist2Goal: {:.2f}".format(
-                    task.measurements.measures["distance_to_goal"].get_metric()
-                )
-                cv2.putText(
-                    img, policy_vel_text, (10, 20), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, scaled_vel_text, (10, 40), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, robot_state_text, (10, 60), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, dist_to_goal_text, (10, 80), font, 1, (0, 0, 0), 1
-                )
-                agent_observations["rgb"] = img
-            except:
-                # print('PASS')
-                pass
+            self.put_text(task, agent_observations, lin_vel, hor_vel, ang_vel)
             return agent_observations
 
         """See if goal state causes interpenetration with surroundings"""
 
         # Calculate next rigid state off agent rigid state
-
-        def cartesian_to_polar(x, y):
-            rho = np.sqrt(x**2 + y**2)
-            phi = np.arctan2(y, x)
-            return rho, phi
-
-        def quaternion_rotate_vector(
-            quat: np.quaternion, v: np.array
-        ) -> np.array:
-            r"""Rotates a vector by a quaternion
-            Args:
-                quaternion: The quaternion to rotate by
-                v: The vector to rotate
-            Returns:
-                np.array: The rotated vector
-            """
-            vq = np.quaternion(0, 0, 0, 0)
-            vq.imag = v
-            return (quat * vq * quat.inverse()).imag
-
-        def quat_to_rad(rotation):
-            heading_vector = quaternion_rotate_vector(
-                rotation.inverse(), np.array([0, 0, -1])
-            )
-            phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-            return phi
 
         goal_mn_quat = mn.Quaternion(
             goal_rigid_state.rotation.vector, goal_rigid_state.rotation.scalar
@@ -1641,9 +1478,6 @@ class VelocityAction(SimulatorTaskAction):
             mn.Vector3((1.0, 0.0, 0.0))
             # mn.Rad(-np.pi / 2.0), mn.Vector3((1.0, 0.0, 0.0))
         ).rotation()
-        # robot_rotation_offset = mn.Matrix4.rotation(
-        #     mn.Rad(0.0), mn.Vector3((1.0, 0.0, 0.0))
-        # )
         robot_translation_offset = mn.Vector3(
             task.robot_wrapper.robot_spawn_offset
         )
@@ -1661,32 +1495,6 @@ class VelocityAction(SimulatorTaskAction):
         )
         robot_T_global = robot_T_global @ robot_rotation_offset
         task.robot_id.transformation = robot_T_global
-        # heading = np.quaternion(
-        #     goal_rigid_state.rotation.scalar, *goal_rigid_state.rotation.vector
-        # )
-        # heading = -quat_to_rad(heading) + np.pi / 2
-        # next_rs = (
-        #     mn.Matrix4.rotation_y(
-        #         mn.Rad(-heading),
-        #     )
-        #     .__matmul__(  # Rotate 180 deg yaw
-        #         mn.Matrix4.rotation(
-        #             mn.Rad(np.pi),
-        #             mn.Vector3((0.0, 1.0, 0.0)),
-        #         )
-        #     )
-        #     .__matmul__(  # Rotate 90 deg roll
-        #         mn.Matrix4.rotation(
-        #             mn.Rad(-np.pi / 2.0),
-        #             mn.Vector3((1.0, 0.0, 0.0)),
-        #         )
-        #     )
-        # )
-        #
-        # next_rs.translation = (
-        #     np.array(final_position) + task.robot_wrapper.robot_spawn_offset
-        # )
-        # task.robot_id.transformation = next_rs
 
         collided = self._sim.contact_test(task.robot_id.object_id)
         if collided:
@@ -1697,51 +1505,11 @@ class VelocityAction(SimulatorTaskAction):
             agent_observations["moving_backwards"] = False
             agent_observations["moving_sideways"] = False
             agent_observations["ang_accel"] = 0.0
-            agent_observations["velocity_error"] = abs_vel_err
             if kwargs.get("num_steps", -1) != -1:
                 agent_observations["num_steps"] = kwargs["num_steps"]
 
             self.prev_ang_vel = 0.0
-            try:
-                robot_rigid_state = task.robot_id.rigid_state
-                img = np.copy(agent_observations["rgb"])
-                font = cv2.FONT_HERSHEY_PLAIN
-                policy_vel_text = (
-                    "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                        policy_action_vx, policy_action_vy, policy_action_vt
-                    )
-                )
-                scaled_vel_text = (
-                    "SA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                        scaled_action_vx, scaled_action_vy, scaled_action_vt
-                    )
-                )
-                robot_state_text = (
-                    "Robot state: {:.2f}, {:.2f}, {:.2f}".format(
-                        robot_rigid_state.translation.x,
-                        robot_rigid_state.translation.y,
-                        robot_rigid_state.translation.z,
-                    )
-                )
-                dist_to_goal_text = "Dist2Goal: {:.2f}".format(
-                    task.measurements.measures["distance_to_goal"].get_metric()
-                )
-                cv2.putText(
-                    img, policy_vel_text, (10, 20), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, scaled_vel_text, (10, 40), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, robot_state_text, (10, 60), font, 1, (0, 0, 0), 1
-                )
-                cv2.putText(
-                    img, dist_to_goal_text, (10, 80), font, 1, (0, 0, 0), 1
-                )
-                agent_observations["rgb"] = img
-            except:
-                # print('PASS')
-                pass
+            self.put_text(task, agent_observations, lin_vel, hor_vel, ang_vel)
 
             return agent_observations
 
@@ -1769,37 +1537,9 @@ class VelocityAction(SimulatorTaskAction):
         ) / self.time_step
         if kwargs.get("num_steps", -1) != -1:
             agent_observations["num_steps"] = kwargs["num_steps"]
-        agent_observations["velocity_error"] = abs_vel_err
 
         self.prev_ang_vel = ang_vel
-        try:
-            robot_rigid_state = task.robot_id.rigid_state
-            img = np.copy(agent_observations["rgb"])
-            font = cv2.FONT_HERSHEY_PLAIN
-            policy_vel_text = "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                policy_action_vx, policy_action_vy, policy_action_vt
-            )
-            scaled_vel_text = "SA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                scaled_action_vx, scaled_action_vy, scaled_action_vt
-            )
-            robot_state_text = "Robot state: {:.2f}, {:.2f}, {:.2f}".format(
-                robot_rigid_state.translation.x,
-                robot_rigid_state.translation.y,
-                robot_rigid_state.translation.z,
-            )
-            dist_to_goal_text = "Dist2Goal: {:.2f}".format(
-                task.measurements.measures["distance_to_goal"].get_metric()
-            )
-            cv2.putText(img, policy_vel_text, (10, 20), font, 1, (0, 0, 0), 1)
-            cv2.putText(img, scaled_vel_text, (10, 40), font, 1, (0, 0, 0), 1)
-            cv2.putText(img, robot_state_text, (10, 60), font, 1, (0, 0, 0), 1)
-            cv2.putText(
-                img, dist_to_goal_text, (10, 80), font, 1, (0, 0, 0), 1
-            )
-            agent_observations["rgb"] = img
-        except:
-            # print('PASS')
-            pass
+        self.put_text(task, agent_observations, lin_vel, hor_vel, ang_vel)
 
         return agent_observations
 
@@ -1853,13 +1593,6 @@ class DynamicVelocityAction(VelocityAction):
             mn.Vector3(0.0, 0.0, 0.0),
         )  # 4x4 homogenous transform with no translation
 
-        # agent_rot = mn.Matrix4.from_(
-        #     mn.Quaternion.rotation(
-        #         mn.Rad(agent_rot[3]), mn.Vector3(*agent_rot[:3])
-        #     ).to_matrix(),
-        #     mn.Vector3(0.0, 0.0, 0.0)
-        # )  # 4x4 homogenous transform with no translation
-
         # Raibert controller
         if task.robot_wrapper.name != "Locobot":
             self.raibert_controller = Raibert_controller_turn(
@@ -1867,11 +1600,6 @@ class DynamicVelocityAction(VelocityAction):
                 num_timestep_per_HL_action=self.time_per_step,
                 robot=task.robot_wrapper.name,
             )
-        # self.raibert_controller = Raibert_controller_turn_stable(
-        #     control_frequency=self.ctrl_freq,
-        #     num_timestep_per_HL_action=self.time_per_step,
-        #     robot=task.robot_wrapper.name
-        # )
 
         self._reset_robot(task, agent_pos, agent_rot)
 
@@ -1900,30 +1628,28 @@ class DynamicVelocityAction(VelocityAction):
             allow_sliding: whether the agent will slide on collision
         """
 
-        # print('policy action: ', lin_vel, ang_vel, hor_vel)
-        policy_action_vx = lin_vel
-        policy_action_vt = ang_vel
-        policy_action_vy = hor_vel
-        lin_vel, ang_vel, hor_vel, abs_vel_err = self.rescale_actions(
-            task, lin_vel, ang_vel, hor_vel
+        # Convert from [-1, 1] to [0, 1] range
+        lin_vel = (lin_vel + 1.0) / 2.0
+        ang_vel = (ang_vel + 1.0) / 2.0
+        hor_vel = (hor_vel + 1.0) / 2.0
+
+        # Scale actions
+        lin_vel = self.min_lin_vel + lin_vel * (self.max_lin_vel - self.min_lin_vel)
+        ang_vel = self.min_ang_vel + ang_vel * (self.max_ang_vel - self.min_ang_vel)
+        ang_vel = np.deg2rad(ang_vel)
+        hor_vel = self.min_hor_vel + hor_vel * (self.max_hor_vel - self.min_hor_vel)
+
+        called_stop = (
+                abs(lin_vel) < self.min_abs_lin_speed
+                and abs(ang_vel) < self.min_abs_ang_speed
+                and abs(hor_vel) < self.min_abs_hor_speed
         )
-
-        scaled_action_vx = lin_vel
-        scaled_action_vt = ang_vel
-        scaled_action_vy = hor_vel
-        self.num_actions += 1
-        # print('scaled action: ', lin_vel, ang_vel, hor_vel)
-
         if (
-            self.must_call_stop
-            and (
-                abs(lin_vel) < self.robot_min_abs_lin_speed
-                and abs(ang_vel) < self.robot_min_abs_ang_speed
-                and abs(hor_vel) < self.robot_min_abs_hor_speed
-            )
-            or not self.must_call_stop
-            and task.measurements.measures["distance_to_goal"].get_metric()
-            < task.robot_wrapper.robot_dist_to_goal
+                self.must_call_stop
+                and called_stop
+                or not self.must_call_stop
+                and task.measurements.measures["distance_to_goal"].get_metric()
+                < task._config.SUCCESS_DISTANCE
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1979,12 +1705,6 @@ class DynamicVelocityAction(VelocityAction):
         )
         final_rotation = [*final_rotation.vector, final_rotation.scalar]
 
-        roll, yaw, pitch = squaternion.Quaternion(
-            final_rotation[3], *final_rotation[:3]
-        ).to_euler()
-
-        roll_fall = np.abs(roll) > 0.75 and np.abs(roll) < 2.39
-        pitch_fall = np.abs(pitch) > 0.75 and np.abs(pitch) < 2.39
         z_fall = final_position[1] < self.start_height + 0.1
 
         if z_fall and task.robot_wrapper.name != "Locobot":
@@ -1997,24 +1717,6 @@ class DynamicVelocityAction(VelocityAction):
 
             agent_observations["fell_over"] = True
             return agent_observations
-
-        # snapped_pt = self._sim.pathfinder.snap_point(final_position)
-        # # print('############: SNAPPED PT ############: ', snapped_pt)
-        # snapped_pts_nan = any([math.isnan(x) for x in snapped_pt])
-
-        # navigable = self._sim.pathfinder.is_navigable(
-        #     final_position, max_y_delta=0.6
-        # )
-
-        # if snapped_pts_nan or not navigable:
-        #     print('nans, setting to previous state', snapped_pts_nan, navigable, 'final pos: ', final_position, 'prev pos: ', agent_start_pos_copy)
-        #     final_position = agent_start_pos_copy
-        #     final_rotation = agent_start_rot_copy
-
-        #     task.robot_id.rigid_state = robot_start_rigid_state
-
-        # assert navigable, 'navigable failed'
-        # assert not snapped_pts_nan, 'snapped pts nan'
 
         agent_observations = self._sim.get_observations_at(
             position=final_position,
@@ -2030,7 +1732,6 @@ class DynamicVelocityAction(VelocityAction):
         agent_observations["ang_accel"] = (
             ang_vel - self.prev_ang_vel
         ) / self.dt
-        agent_observations["velocity_error"] = abs_vel_err
 
         if kwargs.get("num_steps", -1) != -1:
             agent_observations["num_steps"] = kwargs["num_steps"]
@@ -2043,54 +1744,11 @@ class DynamicVelocityAction(VelocityAction):
             for link in [c.link_id_a, c.link_id_b]:
                 contacting_feet.add(task.robot_id.get_link_name(link))
 
-        li_cont = list(contacting_feet)
-        b = " "
-        cont = b.join(li_cont)
-
-        # collided = self._sim.contact_test(task.robot_id.object_id)
         if num_contacts > 5:
-            # if collided:
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
             agent_observations["hit_navmesh"] = True
             self.num_collisions += 1
-        try:
-            img = np.copy(agent_observations["rgb"])
-            font = cv2.FONT_HERSHEY_PLAIN
-            policy_vel_text = "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                policy_action_vx, policy_action_vy, policy_action_vt
-            )
-            scaled_vel_text = "SA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
-                scaled_action_vx, scaled_action_vy, scaled_action_vt
-            )
-            robot_state_text = "Robot state: {:.2f}, {:.2f}, {:.2f}".format(
-                robot_rigid_state.translation.x,
-                robot_rigid_state.translation.y,
-                robot_rigid_state.translation.z,
-            )
-            dist_to_goal_text = "Dist2Goal: {:.2f}".format(
-                task.measurements.measures["distance_to_goal"].get_metric()
-            )
-            num_actions_text = "# Actions: {:.2f}".format(self.num_actions)
-            num_collisions_text = "# Collisions: {:.2f}".format(
-                self.num_collisions
-            )
-
-            cv2.putText(img, policy_vel_text, (10, 20), font, 1, (0, 0, 0), 1)
-            cv2.putText(img, scaled_vel_text, (10, 40), font, 1, (0, 0, 0), 1)
-            cv2.putText(img, robot_state_text, (10, 60), font, 1, (0, 0, 0), 1)
-            cv2.putText(
-                img, dist_to_goal_text, (10, 80), font, 1, (0, 0, 0), 1
-            )
-            cv2.putText(
-                img, num_actions_text, (10, 100), font, 1, (0, 0, 0), 1
-            )
-            cv2.putText(
-                img, num_collisions_text, (10, 120), font, 1, (0, 0, 0), 1
-            )
-
-            agent_observations["rgb"] = img
-        except:
-            pass
+        self.put_text(task, agent_observations, lin_vel, hor_vel, ang_vel)
 
         return agent_observations
 

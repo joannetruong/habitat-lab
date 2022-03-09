@@ -6,9 +6,9 @@ Replaces the yaml file content with the location of the new directory.
 
 HABITAT_LAB = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab"
 RESULTS = "/srv/share3/mrudolph8/develop/habitat_spot_results/dan_kinematic"
-EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_train.yaml"
+EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped.yaml"
 EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
-TASK_YAML = "configs/tasks/pointnav_quadruped_train.yaml"
+TASK_YAML = "configs/tasks/pointnav_quadruped.yaml"
 EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
 SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/slurm_job_template_max.sh"
 EVAL_SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/eval_slurm_template_max.sh"
