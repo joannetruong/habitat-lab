@@ -489,7 +489,7 @@ class PointNavResNetNet(Net):
                 torch.where(masks.view(-1), prev_actions + 1, start_token)
             )
         else:
-            prev_actions = self.prev_action_embedding(prev_actions.float())
+            prev_actions = self.prev_action_embedding(masks * prev_actions.float())
 
         x.append(prev_actions)
 

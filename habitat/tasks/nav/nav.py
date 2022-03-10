@@ -1310,7 +1310,6 @@ class VelocityAction(SimulatorTaskAction):
         self.vel_control.linear_velocity = np.array([hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
         agent_state = self._sim.get_agent_state()
-        # agent_state.depth.position[2] = agent_state.depth.position[2] - 0.3235
 
         normalized_quaternion = np.normalized(agent_state.rotation)
         agent_mn_quat = mn.Quaternion(

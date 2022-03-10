@@ -23,44 +23,39 @@ class MultiNavigationTask(NavigationTask):
     ) -> None:
         super().__init__(config=config, sim=sim, dataset=dataset)
         self.robot_id = None
-        self.robots = self._config.ROBOTS
-        self.robot_files = self._config.ROBOT_URDFS
+        self.robot = self._config.ROBOT
+        self.robot_file = self._config.ROBOT_URDF
         # if task reset happens everytime episode is reset, then create previous state deck here
 
     def reset(self, episode: Episode):
         # If robot was never spawned or was removed with previous scene
-        rand_robot = np.random.randint(0, len(self.robot_files))
         # if randomly selected robot is not the current robot already spawned
         # if there is a robot/ URDF created
-        if (
-            self.robot_id is not None
-            and self.robot_id.object_id != -1
-            and self.robot_wrapper.id != rand_robot
-        ):
+        if self.robot_id is not None and self.robot_id.object_id != -1:
             self.art_obj_mgr.remove_object_by_id(self.robot_id.object_id)
             self.robot_id = None
         if self.robot_id is None or self.robot_id.object_id == -1:
-            self._load_robot(rand_robot)
+            self._load_robot()
 
         observations = super().reset(episode)
         return observations
 
-    def _load_robot(self, rand_robot):
+    def _load_robot(self):
         # Add robot into the simulator
 
         self.art_obj_mgr = self._sim.get_articulated_object_manager()
         self.robot_id = self.art_obj_mgr.add_articulated_object_from_urdf(
-            self.robot_files[rand_robot], fixed_base=False
+            self.robot_file, fixed_base=False
         )
 
         if self.robot_id.object_id == -1:
-            raise ValueError("Could not load " + self.robot_files[rand_robot])
+            raise ValueError("Could not load " + self.robot_file)
 
         # Initialize robot wrapper
-        self.robot_wrapper = eval(self.robots[rand_robot])(
-            sim=self._sim, robot=self.robot_id, rand_id=rand_robot
+        self.robot_wrapper = eval(self.robot)(
+            sim=self._sim, robot=self.robot_id, rand_id=0
         )
-        self.robot_wrapper.id = rand_robot
+        self.robot_wrapper.id = 0
         if self.robot_wrapper.name != "Locobot":
             self.robot_id.joint_positions = self.robot_wrapper._initial_joint_positions
 
