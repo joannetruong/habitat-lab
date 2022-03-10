@@ -1131,6 +1131,13 @@ class VelocityAction(SimulatorTaskAction):
         self.ctrl_freq = config.CTRL_FREQ
         self.dt = 1.0 / self.ctrl_freq
 
+        # Noise
+        self.noise_mean_x = config.NOISE_MEAN_X
+        self.noise_mean_y = config.NOISE_MEAN_Y
+        self.noise_var_x = config.NOISE_VAR_X
+        self.noise_var_y = config.NOISE_VAR_Y
+        self.noise_var_t = config.NOISE_VAR_T
+        self.noise_mean_t = config.NOISE_MEAN_T
     @property
     def action_space(self):
         action_dict = {
@@ -1308,6 +1315,12 @@ class VelocityAction(SimulatorTaskAction):
         )
 
         """Check if point is on navmesh"""
+        goal_rigid_state.translation.x += np.random.normal(loc=self.noise_mean_x, scale=self.noise_var_x)
+        goal_rigid_state.translation.z += np.random.normal(loc=self.noise_mean_y, scale=self.noise_var_y)
+        ang = np.arctan2(goal_rigid_state.rotation.vector.y, goal_rigid_state.rotation.scalar) * 2 + \
+              np.random.normal(loc=self.noise_mean_t, scale=self.noise_var_t)
+        goal_rigid_state.rotation = mn.Quaternion.rotation(mn.Rad(ang), mn.Vector3(0, 1, 0))
+
         final_position = self._sim.pathfinder.try_step_no_sliding(  # type: ignore
             agent_state.position, goal_rigid_state.translation
         )
