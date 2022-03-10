@@ -24,11 +24,7 @@ from gym.spaces.box import Box
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (
-    EmbodiedTask,
-    Measure,
-    SimulatorTaskAction,
-)
+from habitat.core.embodied_task import EmbodiedTask, Measure, SimulatorTaskAction
 from habitat.core.logging import logger
 from habitat.core.registry import registry
 from habitat.core.simulator import (
@@ -47,17 +43,15 @@ from habitat.sims.habitat_simulator.habitat_simulator import (
     HabitatSimRGBSensor,
 )
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (
-    quaternion_from_coeff,
-    quaternion_rotate_vector,
-)
+from habitat.utils.geometry_utils import quaternion_from_coeff, quaternion_rotate_vector
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
     import habitat_sim
-    from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
     from habitat_sim.bindings import RigidState
     from habitat_sim.physics import VelocityControl
+
+    from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
 except ImportError:
     pass
 
@@ -1299,7 +1293,7 @@ class VelocityAction(SimulatorTaskAction):
             and called_stop
             or not self.must_call_stop
             and task.measurements.measures["distance_to_goal"].get_metric()
-            < task._config.SUCCESS_DISTANCE
+            < task.robot_wrapper.robot_dist_to_goal
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(
@@ -1547,7 +1541,7 @@ class DynamicVelocityAction(VelocityAction):
             and called_stop
             or not self.must_call_stop
             and task.measurements.measures["distance_to_goal"].get_metric()
-            < task._config.SUCCESS_DISTANCE
+            < task.robot_wrapper.robot_dist_to_goal
         ):
             task.is_stop_called = True  # type: ignore
             return self._sim.get_observations_at(

@@ -52,11 +52,9 @@ class MultiNavigationTask(NavigationTask):
         self.robot_id = self.art_obj_mgr.add_articulated_object_from_urdf(
             self.robot_files[rand_robot], fixed_base=False
         )
-        # obj_mgr = self._sim.get_object_template_manager()
-        # self.cube_id = self._sim.add_object_by_handle(obj_mgr.get_template_handles("cube")[0])
 
         if self.robot_id.object_id == -1:
-            raise ValueError("Could not load " + robot_file)
+            raise ValueError("Could not load " + self.robot_files[rand_robot])
 
         # Initialize robot wrapper
         self.robot_wrapper = eval(self.robots[rand_robot])(

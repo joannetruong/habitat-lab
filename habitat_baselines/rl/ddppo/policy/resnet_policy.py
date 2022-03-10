@@ -50,7 +50,6 @@ class PointNavResNetPolicy(Policy):
         normalize_visual_inputs: bool = False,
         force_blind_policy: bool = False,
         action_distribution_type: str = "categorical",
-        robots: list = ["A1"],
         **kwargs,
     ):
         discrete_actions = action_distribution_type == "categorical"
@@ -364,6 +363,8 @@ class PointNavResNetNet(Net):
             ## 2048 = 128 * 4 * 4 [for 256 x 256 imgs]
             ## 2040 = 228 * 4 * 5 [for 320 x 240 imgs]
             dim = 2048 if using_spot else 2040
+            # dim = 4096 if using_spot else 4560
+
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(dim, hidden_size),
