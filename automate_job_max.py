@@ -10,7 +10,7 @@ EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped.yaml"
 EVAL_EXP_YAML  = "habitat_baselines/config/pointnav/ddppo_pointnav_quadruped_eval.yaml"
 TASK_YAML = "configs/tasks/pointnav_quadruped.yaml"
 EVAL_YAML = "configs/tasks/pointnav_quadruped_eval.yaml"
-SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/slurm_job_template_max.sh"
+SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/slurm_template_max.sh"
 EVAL_SLURM_TEMPLATE = "/nethome/mrudolph8/Documents/habspot/habitat_spot/habitat-lab/eval_slurm_template_max.sh"
 
 import os

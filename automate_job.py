@@ -12,7 +12,7 @@ import subprocess
 HABITAT_LAB = "/coc/testnvme/jtruong33/kin2dyn/habitat-lab"
 CONDA_ENV = "/nethome/jtruong33/miniconda3/envs/kin2dyn/bin/python"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/kin2dyn_results"
-SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "slurm_job_template.sh")
+SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "slurm_template.sh")
 EVAL_SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "eval_slurm_template.sh")
 
 parser = argparse.ArgumentParser()
@@ -254,7 +254,7 @@ if not args.eval:
     if args.debug:
         slurm_data = slurm_data.replace("$GPUS", "1")
     else:
-        slurm_data = slurm_data.replace("$GPUS", "8")
+        slurm_data = slurm_data.replace("$GPUS", "4")
 
     slurm_path = os.path.join(dst_dir, experiment_name + ".sh")
     with open(slurm_path, "w") as f:
