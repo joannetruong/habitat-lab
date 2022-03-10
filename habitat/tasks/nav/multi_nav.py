@@ -31,7 +31,7 @@ class MultiNavigationTask(NavigationTask):
         # If robot was never spawned or was removed with previous scene
         # if randomly selected robot is not the current robot already spawned
         # if there is a robot/ URDF created
-        if self.robot_id is not None and self.robot_id.object_id != -1:
+        if self.robot_id is not None and self.robot_id.object_id != -1 and self.robot_wrapper.id != 0:
             self.art_obj_mgr.remove_object_by_id(self.robot_id.object_id)
             self.robot_id = None
         if self.robot_id is None or self.robot_id.object_id == -1:

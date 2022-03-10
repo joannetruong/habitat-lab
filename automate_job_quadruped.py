@@ -102,13 +102,14 @@ robot_vel_dict = {
     "AlienGo": [[-0.28, 0.28], [-9.74, 9.74]],
     "Spot": [[-0.5, 0.5], [-17.19, 17.19]],
 }
-
+robot_radius_dict = {"A1": 0.2, "AlienGo": 0.22, "Locobot": 0.23, "Spot": 0.3}
 
 robot = args.robot
 robot_urdf = robot_urdfs_dict[robot]
 
 robot_lin_vel, robot_ang_vel = robot_vel_dict[robot]
 succ_radius = robot_goal_dict[robot]
+robot_radius = robot_radius_dict[robot]
 
 # Training
 if not args.eval:
@@ -136,7 +137,7 @@ if not args.eval:
         if i.startswith("  CURRICULUM:"):
             task_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
-            task_yaml_data[idx] = "    RADIUS: {}".format(succ_radius - 0.05)
+            task_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             task_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):

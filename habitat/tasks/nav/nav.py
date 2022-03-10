@@ -80,25 +80,6 @@ def merge_sim_episode_config(sim_config: Config, episode: Episode) -> Any:
     return sim_config
 
 
-def scale_policy_action(policy_vel, policy_min_vel, policy_max_vel):
-    # Scale actions to max velocity range (largest robot)
-    policy_vel = (policy_vel + 1.0) / 2.0
-    scaled_policy_vel = policy_min_vel + policy_vel * 2 * policy_max_vel
-    return scaled_policy_vel
-
-
-def scale_robot_action(scaled_policy_vel, robot_min_vel, robot_max_vel):
-    # clamp scaled velocities to robot specific velocity range
-    scaled_robot_vel = np.clip(
-        scaled_policy_vel, a_min=robot_min_vel, a_max=robot_max_vel
-    )
-    return scaled_robot_vel
-
-
-def calc_vel_error(scaled_policy_vel, scaled_robot_vel):
-    return np.abs(scaled_policy_vel - scaled_robot_vel)
-
-
 @attr.s(auto_attribs=True, kw_only=True)
 class NavigationGoal:
     r"""Base class for a goal specification hierarchy."""
