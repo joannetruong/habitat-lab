@@ -139,20 +139,21 @@ class ResNetEncoder(nn.Module):
         if not self.is_blind:
             all_keys = self.rgb_keys + self.depth_keys + self.gray_keys
             spatial_size_h = observation_space.spaces[all_keys[0]].shape[0] // 2
-            spatial_size_w = observation_space.spaces[all_keys[0]].shape[1] // 2
+            spatial_size_w = spatial_size_h
             if self.using_two_depth_cameras or self.using_two_gray_cameras:
-                spatial_size_w = observation_space.spaces[all_keys[0]].shape[1]
+                spatial_size_w = observation_space.spaces[all_keys[0]].shape[1] // 2
             input_channels = (
-                self._n_input_depth + self._n_input_rgb + self._n_input_gray
+                    self._n_input_depth + self._n_input_rgb + self._n_input_gray
             )
             self.backbone = make_backbone(input_channels, baseplanes, ngroups)
 
             final_spatial_h = int(
-                np.ceil(spatial_size_h * self.backbone.final_spatial_compress)
+                spatial_size_h * self.backbone.final_spatial_compress
             )
             final_spatial_w = int(
-                np.ceil(spatial_size_w * self.backbone.final_spatial_compress)
+                spatial_size_w * self.backbone.final_spatial_compress
             )
+
             after_compression_flat_size = 2048
             num_compression_channels = int(
                 round(after_compression_flat_size / (final_spatial_h * final_spatial_w))
@@ -360,16 +361,10 @@ class PointNavResNetNet(Net):
             [k.startswith("spot") for k in observation_space.spaces.keys()]
         )
         if not self.visual_encoder.is_blind:
-            ## 2048 = 128 * 4 * 4 [for 256 x 256 imgs]
-            ## 2040 = 228 * 4 * 5 [for 320 x 240 imgs]
-            dim = 2048 if using_spot else 2040
-            # dim = 4096 if using_spot else 4560
-
+            dim = 4096 if using_spot else 4560
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(dim, hidden_size),
-                # nn.Linear(4560, hidden_size),
-                # np.prod(self.visual_encoder.output_shape), hidden_size
                 nn.ReLU(True),
             )
 
