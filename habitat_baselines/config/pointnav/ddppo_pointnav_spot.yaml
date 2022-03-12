@@ -32,6 +32,13 @@ RL:
   POLICY:
     name: "PointNavResNetPolicy"
     action_distribution_type: "gaussian"
+    OBS_TRANSFORMS:
+      ENABLED_TRANSFORMS: [ ]
+      PEPPER_NOISE:
+        NOISE_PERCENT: 0.1
+        WHITE: False
+      CUTOUT:
+        WHITE: False
   PPO:
     # ppo params
     clip_param: 0.2

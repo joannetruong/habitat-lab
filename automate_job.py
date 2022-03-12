@@ -25,15 +25,12 @@ parser.add_argument("-c", "--control-type", required=True)
 parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
-parser.add_argument("-vx", "--lin_vel_ranges", nargs="+", required=True)
-parser.add_argument("-vy", "--hor_vel_ranges", nargs="+", required=True)
-parser.add_argument("-vt", "--ang_vel_ranges", nargs="+", required=True)
-parser.add_argument("-sc", "--spot_cameras", default=False, action="store_true")
 parser.add_argument("-g", "--use_gray", default=False, action="store_true")
 parser.add_argument("-gd", "--use_gray_depth", default=False, action="store_true")
 parser.add_argument("-o", "--outdoor", default=False, action="store_true")
 
-parser.add_argument("-nd", "--noisy_depth", default=False, action="store_true")
+parser.add_argument("-pn", "--pepper_noise", default=False, action="store_true")
+parser.add_argument("-cn", "--cutout_noise", default=False, action="store_true")
 parser.add_argument("-curr", "--curriculum", default=False, action="store_true")
 
 # Evaluation
@@ -189,20 +186,14 @@ if not args.eval:
             if args.outdoor:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
-            if args.spot_cameras and args.use_gray:
+            if args.use_gray:
                 exp_yaml_data[
                     idx
                 ] = "SENSORS: ['SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
-            elif args.spot_cameras and args.use_gray_depth:
+            elif args.use_gray_depth:
                 exp_yaml_data[
                     idx
                 ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
-            elif args.spot_cameras:
-                exp_yaml_data[
-                    idx
-                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
-            else:
-                exp_yaml_data[idx] = "SENSORS: ['DEPTH_SENSOR']"
         elif i.startswith("VIDEO_DIR:"):
             exp_yaml_data[idx] = "VIDEO_DIR:          '{}'".format(
                 os.path.join(dst_dir, "video_dir")
@@ -219,12 +210,15 @@ if not args.eval:
             exp_yaml_data[idx] = "TXT_DIR:            '{}'".format(
                 os.path.join(dst_dir, "txts")
             )
+        elif i.startswith("      ENABLED_TRANSFORMS: [ ]"):
+            if args.pepper_noise:
+                exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"
+            elif args.cutout_noise:
+                exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['CUTOUT']"
 
     with open(new_exp_yaml_path, "w") as f:
         f.write("\n".join(exp_yaml_data))
     print("Created " + new_exp_yaml_path)
-
-    experiment_name += exp_name
 
     # Create slurm job
     with open(SLURM_TEMPLATE) as f:
@@ -350,7 +344,11 @@ else:
             if args.outdoor:
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
-            if args.spot_cameras and args.use_gray:
+            if args.video:
+                eval_exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
+            if args.use_gray:
                 eval_exp_yaml_data[
                     idx
                 ] = "SENSORS: ['SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
@@ -358,18 +356,6 @@ else:
                     eval_exp_yaml_data[
                         idx
                     ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
-            elif args.spot_cameras:
-                eval_exp_yaml_data[
-                    idx
-                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
-                if args.video:
-                    eval_exp_yaml_data[
-                        idx
-                    ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']"
-            else:
-                eval_exp_yaml_data[idx] = "SENSORS: ['DEPTH_SENSOR']"
-                if args.video:
-                    eval_exp_yaml_data[idx] = "SENSORS: ['RGB_SENSOR','DEPTH_SENSOR']"
         elif i.startswith("VIDEO_DIR:"):
             video_dir = (
                 "video_dir"
@@ -384,6 +370,11 @@ else:
                 eval_exp_yaml_data[idx] = "    SPLIT: val"
             elif args.dataset == "ferst_20m":
                 eval_exp_yaml_data[idx] = "    SPLIT: val_20m"
+        elif i.startswith("      ENABLED_TRANSFORMS: [ ]"):
+            if args.pepper_noise:
+                eval_exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"
+            elif args.cutout_noise:
+                eval_exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['CUTOUT']"
 
     if os.path.isdir(tb_dir):
         response = input(

@@ -70,9 +70,7 @@ class A1:
         """returns local velocity and corrects for initial rotation of quadruped robots
         [forward, right, up]
         """
-        local_vel = self.robot_id.transformation.inverted().transform_vector(
-            velocity
-        )
+        local_vel = self.robot_id.transformation.inverted().transform_vector(velocity)
         return np.array([local_vel[0], local_vel[2], -local_vel[1]])
 
     def get_base_ori(self):
@@ -134,12 +132,8 @@ class A1:
         """
         # joint_positions = self.robot.joint_positions
         # joint_velocities = self.robot.joint_velocities
-        joint_positions = np.array(self.robot_id.joint_positions)[
-            self.gibson_mapping
-        ]
-        joint_velocities = np.array(self.robot_id.joint_velocities)[
-            self.gibson_mapping
-        ]
+        joint_positions = np.array(self.robot_id.joint_positions)[self.gibson_mapping]
+        joint_velocities = np.array(self.robot_id.joint_velocities)[self.gibson_mapping]
         base_pos = self.position_xyz()
         base_ori_euler = self.get_ori_rpy()
         base_ori_quat = self.get_ori_quat()
