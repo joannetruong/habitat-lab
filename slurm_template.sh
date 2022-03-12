@@ -11,6 +11,6 @@
 #SBATCH --chdir $HABITAT_REPO_PATH
 
 export CUDA_LAUNCH_BLOCKING=1
-srun $CONDA_ENV habitat_baselines/run.py \
+srun $CONDA_ENV -u -m habitat_baselines.run \
      --exp-config $CONFIG_YAML \
      --run-type train

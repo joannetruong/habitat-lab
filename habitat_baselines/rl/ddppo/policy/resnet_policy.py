@@ -12,17 +12,20 @@ import numpy as np
 import torch
 from gym import spaces
 from habitat.config import Config
-from habitat.tasks.nav.nav import (EpisodicCompassSensor, EpisodicGPSSensor,
-                                   HeadingSensor, ImageGoalSensor,
-                                   IntegratedPointGoalGPSAndCompassSensor,
-                                   PointGoalSensor, ProximitySensor)
+from habitat.tasks.nav.nav import (
+    EpisodicCompassSensor,
+    EpisodicGPSSensor,
+    HeadingSensor,
+    ImageGoalSensor,
+    IntegratedPointGoalGPSAndCompassSensor,
+    PointGoalSensor,
+    ProximitySensor,
+)
 from habitat.tasks.nav.object_nav_task import ObjectGoalSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.ddppo.policy import resnet
-from habitat_baselines.rl.ddppo.policy.running_mean_and_var import \
-    RunningMeanAndVar
-from habitat_baselines.rl.models.rnn_state_encoder import \
-    build_rnn_state_encoder
+from habitat_baselines.rl.ddppo.policy.running_mean_and_var import RunningMeanAndVar
+from habitat_baselines.rl.models.rnn_state_encoder import build_rnn_state_encoder
 from habitat_baselines.rl.ppo import Net, Policy
 from torch import nn as nn
 from torch.nn import functional as F
@@ -127,6 +130,8 @@ class ResNetEncoder(nn.Module):
             all_keys = self.rgb_keys + self.depth_keys + self.gray_keys
             spatial_size_h = observation_space.spaces[all_keys[0]].shape[0] // 2
             spatial_size_w = observation_space.spaces[all_keys[0]].shape[1] // 2
+            if self.using_two_depth_cameras or self.using_two_gray_cameras:
+                spatial_size_w = observation_space.spaces[all_keys[0]].shape[1]
             input_channels = (
                 self._n_input_depth + self._n_input_rgb + self._n_input_gray
             )
@@ -338,11 +343,11 @@ class PointNavResNetNet(Net):
             make_backbone=getattr(resnet, backbone),
             normalize_visual_inputs=normalize_visual_inputs,
         )
-
+        dim = np.prod(self.visual_encoder.output_shape)
         if not self.visual_encoder.is_blind:
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(np.prod(self.visual_encoder.output_shape), hidden_size),
+                nn.Linear(dim, hidden_size),
                 nn.ReLU(True),
             )
 

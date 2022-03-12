@@ -4,7 +4,6 @@ Makes a new directory, and stores the two yaml files that generate the config.
 Replaces the yaml file content with the location of the new directory.
 """
 import argparse
-import ast
 import os
 import shutil
 import subprocess
