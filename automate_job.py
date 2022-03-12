@@ -4,7 +4,6 @@ Makes a new directory, and stores the two yaml files that generate the config.
 Replaces the yaml file content with the location of the new directory.
 """
 import argparse
-import ast
 import os
 import shutil
 import subprocess
@@ -12,6 +11,7 @@ import subprocess
 HABITAT_LAB = "/coc/testnvme/jtruong33/kin2dyn/habitat-lab"
 CONDA_ENV = "/nethome/jtruong33/miniconda3/envs/kin2dyn/bin/python"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/kin2dyn_results"
+URDFS = "/coc/testnvme/jtruong33/data/URDF_demo_assets"
 SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "slurm_template.sh")
 EVAL_SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "eval_slurm_template.sh")
 
@@ -83,11 +83,11 @@ new_eval_exp_yaml_path = (
 )
 
 robot_urdfs_dict = {
-    "A1": "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
-    "AlienGo": "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
-    "Daisy": "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
-    "Spot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf",
-    "Locobot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/locobot/urdf/locobot_description2.urdf",
+    "A1": os.path.join(URDFS, "a1/a1.urdf"),
+    "AlienGo":  os.path.join(URDFS, "aliengo/urdf/aliengo.urdf"),
+    "Daisy":  os.path.join(URDFS, "daisy/daisy_advanced_akshara.urdf"),
+    "Spot":  os.path.join(URDFS, "spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"),
+    "Locobot":  os.path.join(URDFS, "locobot/urdf/locobot_description2.urdf"),
 }
 
 robot_goal_dict = {
@@ -240,8 +240,6 @@ if not args.eval:
         f.write("\n".join(exp_yaml_data))
     print("Created " + new_exp_yaml_path)
 
-    experiment_name += exp_name
-
     # Create slurm job
     with open(SLURM_TEMPLATE) as f:
         slurm_data = f.read()
@@ -254,7 +252,7 @@ if not args.eval:
     if args.debug:
         slurm_data = slurm_data.replace("$GPUS", "1")
     else:
-        slurm_data = slurm_data.replace("$GPUS", "4")
+        slurm_data = slurm_data.replace("$GPUS", "8")
 
     slurm_path = os.path.join(dst_dir, experiment_name + ".sh")
     with open(slurm_path, "w") as f:
