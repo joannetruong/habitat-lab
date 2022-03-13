@@ -78,3 +78,5 @@ RL:
     backbone: resnet18
     rnn_type: LSTM
     num_recurrent_layers: 2
+EVAL:
+    SPLIT: "val"

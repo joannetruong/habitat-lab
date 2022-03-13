@@ -273,7 +273,7 @@ if not args.eval:
 else:
     # Make sure folder exists
     assert os.path.isdir(dst_dir), "{} directory does not exist".format(dst_dir)
-
+    os.makedirs(eval_dst_dir, exist_ok=True)
     # Create task yaml file, using file within Habitat Lab repo as a template
     with open(task_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
@@ -286,7 +286,7 @@ else:
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
-            eval_yaml_data[idx] = "      ROBOT_URDF {}".format(robot_urdf)
+            eval_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -321,9 +321,9 @@ else:
         elif i.startswith("SEED:"):
             eval_yaml_data[idx] = "SEED: {}".format(args.seed)
 
-    with open(new_task_yaml_path, "w") as f:
+    with open(new_eval_task_yaml_path, "w") as f:
         f.write("\n".join(eval_yaml_data))
-    print("Created " + new_task_yaml_path)
+    print("Created " + new_eval_task_yaml_path)
 
     # Edit the stored experiment yaml file
     with open(exp_yaml_path) as f:
