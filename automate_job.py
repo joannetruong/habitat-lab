@@ -459,6 +459,6 @@ else:
     subprocess.check_call(cmd.split(), cwd=dst_dir)
     print(
         "\nSee output with:\ntail -F {}".format(
-            os.path.join(eval_dst_dir, eval_experiment_name)
+            os.path.join(eval_dst_dir, eval_experiment_name + ".err")
         )
     )
