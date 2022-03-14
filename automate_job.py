@@ -61,13 +61,16 @@ if args.eval:
     exp_name += "_eval"
 if args.ckpt != -1:
     exp_name += "_ckpt_{}".format(args.ckpt)
+    eval_dst_dir += "_ckpt_{}".format(args.ckpt)
 if args.video:
     exp_name += "_video"
+    eval_dst_dir += "_video"
 if args.ext != "":
     exp_name += "_" + args.ext
     eval_dst_dir += "_" + args.ext
 if args.outdoor:
     exp_name += "_ferst"
+    eval_dst_dir += "_ferst"
 
 new_eval_task_yaml_path = (
     os.path.join(eval_dst_dir, os.path.basename(task_yaml_path)).split(".yaml")[0]
@@ -252,7 +255,7 @@ if not args.eval:
 else:
     # Make sure folder exists
     assert os.path.isdir(dst_dir), "{} directory does not exist".format(dst_dir)
-
+    os.makedirs(eval_dst_dir, exist_ok=True)
     # Create task yaml file, using file within Habitat Lab repo as a template
     with open(task_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
@@ -265,7 +268,7 @@ else:
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
-            eval_yaml_data[idx] = "      ROBOT_URDF {}".format(robot_urdf)
+            eval_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -288,9 +291,9 @@ else:
         elif i.startswith("SEED:"):
             eval_yaml_data[idx] = "SEED: {}".format(args.seed)
 
-    with open(new_task_yaml_path, "w") as f:
+    with open(new_eval_task_yaml_path, "w") as f:
         f.write("\n".join(eval_yaml_data))
-    print("Created " + new_task_yaml_path)
+    print("Created " + new_eval_task_yaml_path)
 
     # Edit the stored experiment yaml file
     with open(exp_yaml_path) as f:
@@ -423,6 +426,6 @@ else:
     subprocess.check_call(cmd.split(), cwd=dst_dir)
     print(
         "\nSee output with:\ntail -F {}".format(
-            os.path.join(eval_dst_dir, eval_experiment_name)
+            os.path.join(eval_dst_dir, eval_experiment_name + ".err")
         )
     )

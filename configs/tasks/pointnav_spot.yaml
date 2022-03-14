@@ -8,6 +8,12 @@ SIMULATOR:
     RADIUS: 0.3
   HABITAT_SIM_V0:
     ALLOW_SLIDING: False
+  RGB_SENSOR:
+    WIDTH: 256
+    HEIGHT: 256
+    HFOV: 70
+    ORIENTATION: [ -0.7, 0.0, 0.0 ]
+    POSITION: [ 0.0, 1.1, 1.0 ]
   SPOT_LEFT_GRAY_SENSOR:
     TYPE: "SpotLeftGraySensor"
     WIDTH: 120

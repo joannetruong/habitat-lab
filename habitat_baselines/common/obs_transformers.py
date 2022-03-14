@@ -29,8 +29,6 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 import numpy as np
 import torch
 from gym import spaces
-from torch import nn
-
 from habitat.config import Config
 from habitat.core.logging import logger
 from habitat_baselines.common.baseline_registry import baseline_registry
@@ -40,6 +38,7 @@ from habitat_baselines.utils.common import (
     image_resize_shortest_edge,
     overwrite_gym_box_shape,
 )
+from torch import nn
 
 
 class ObservationTransformer(nn.Module, metaclass=abc.ABCMeta):
@@ -1313,13 +1312,9 @@ class PepperNoise(ObservationTransformer):
         use_white,
         noise_percent: float,
         trans_keys: Tuple[str] = (
-            "rgb",
             "depth",
-            "semantic",
             "spot_left_depth",
-            "spot_left_rgb",
             "spot_right_depth",
-            "spot_right_rgb",
         ),
     ):
         """Args:
@@ -1339,11 +1334,6 @@ class PepperNoise(ObservationTransformer):
             obs,
             torch.ones_like(obs) if self.use_white else torch.zeros_like(obs),
         )
-        # obs = torch.where(
-        #     torch.rand_like(obs) > self.noise_percent,
-        #     obs,
-        #     torch.ones_like(obs) if self.use_white else torch.zeros_like(obs),
-        # )
 
         # NCHW -> NHWC
         obs = obs.permute(0, 2, 3, 1)

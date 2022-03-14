@@ -1164,6 +1164,10 @@ class VelocityAction(SimulatorTaskAction):
         task.is_stop_called = False  # type: ignore
         self.prev_ang_vel = 0.0
 
+        if self.robot.robot_id is not None and self.robot.robot_id.object_id != -1:
+            ao_mgr = self._sim.get_articulated_object_manager()
+            ao_mgr.remove_object_by_id(self.robot.robot_id.object_id)
+            self.robot.robot_id = None
         # If robot was never spawned or was removed with previous scene
         if self.robot.robot_id is None or self.robot.robot_id.object_id == -1:
             ao_mgr = self._sim.get_articulated_object_manager()
@@ -1173,8 +1177,7 @@ class VelocityAction(SimulatorTaskAction):
             self.robot.robot_id = robot_id
         agent_pos = kwargs["episode"].start_position
         agent_rot = kwargs["episode"].start_rotation
-        agent_yaw = euler_from_quaternion(*agent_rot)[-1]
-        self.robot.reset(agent_pos, agent_yaw)
+        self.robot.reset(agent_pos, agent_rot)
 
     def step(
         self,
@@ -1198,6 +1201,7 @@ class VelocityAction(SimulatorTaskAction):
             time_step: amount of time to move the agent for
             allow_sliding: whether the agent will slide on collision
         """
+        curr_rs = self.robot.robot_id.transformation
         if time_step is None:
             time_step = self.time_step
 
@@ -1287,19 +1291,25 @@ class VelocityAction(SimulatorTaskAction):
         robot_T_agent_rot_offset = mn.Matrix4.rotation(
             mn.Rad(0.0), mn.Vector3((1.0, 0.0, 0.0))
         ).rotation()
+        robot_translation_offset = mn.Vector3(self.robot.robot_spawn_offset)
         robot_T_agent = mn.Matrix4.from_(
-            robot_T_agent_rot_offset,
-            self.robot.base_transform.translation,
+            robot_T_agent_rot_offset, robot_translation_offset
         )
-
         robot_T_global = robot_T_agent @ agent_T_global
-        robot_global_rotation_offset = self.robot.base_transform
+        robot_global_rotation_offset = mn.Matrix4.rotation(
+            mn.Rad(-np.pi / 2.0),
+            mn.Vector3((1.0, 0.0, 0.0)),
+        ) @ mn.Matrix4.rotation(
+            mn.Rad(np.pi / 2.0),
+            mn.Vector3((0.0, 0.0, 1.0)),
+        )
         robot_T_global = robot_T_global @ robot_global_rotation_offset
         self.robot.robot_id.transformation = robot_T_global
 
         """See if goal state causes interpenetration with surroundings"""
         collided = self._sim.contact_test(self.robot.robot_id.object_id)
         if collided:
+            self.robot.robot_id.transformation = curr_rs
             agent_observations = self._sim.get_observations_at()
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
             agent_observations["hit_navmesh"] = True
@@ -1373,13 +1383,6 @@ class DynamicVelocityAction(VelocityAction):
 
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
         super().reset(task=task, *args, **kwargs)
-        self.robot.robot_id.clear_joint_states()
-
-        self.robot.robot_id.root_angular_velocity = mn.Vector3(0.0, 0.0, 0.0)
-        self.robot.robot_id.root_linear_velocity = mn.Vector3(0.0, 0.0, 0.0)
-
-        self.robot.set_pose_jms(self.robot._initial_joint_positions, True)
-
         self.raibert_controller = Raibert_controller_turn(
             control_frequency=self.ctrl_freq,
             num_timestep_per_HL_action=self.time_per_step,
