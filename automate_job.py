@@ -282,7 +282,7 @@ else:
         if i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
-            eval_yaml_data[idx] = "    RADIUS: {}".format(succ_radius)
+            eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
