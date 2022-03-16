@@ -4,10 +4,12 @@ conda activate kin2dyn && \
 cd kin2dyn && \
 git clone https://github.com/facebookresearch/habitat-sim.git && \
 git clone --branch kin2dyn git@github.com:joannetruong/habitat-lab.git && \
+export KIN2DYN_CONDA_PTH=$(which python) && \
+export KIN2DYN_HLAB_PTH=$(realpath habitat-lab) && \
 cd habitat-sim && \
 git checkout 1fb3f693e40279db09d0e0c9e5fa1357c30ab03c && \
 pip install -r requirements.txt && \
-python setup.py install --bullet --headless
+python setup.py install --bullet --headless && \
 echo "Finished habitat-sim installation." && \
 cd ../habitat-lab && \
 pip uninstall numpy -y; \
@@ -27,4 +29,5 @@ cd ../../scene_datasets && \
 ln -s /datasets01/hm3d/090121/ hm3d && \
 gdown "https://drive.google.com/uc?id=1EH-429McoUV81lIlAJlPCVPR8WTQWaWE" -O data/URDF_demo_assets.zip && \
 cd .. && unzip URDF_demo_assets.zip && rm URDF_demo_assets.zip && \
-echo "Finished habitat-lab installation."
+echo "Finished habitat-lab installation." && \
+export KIN2DYN_URDF_PTH=$(realpath URDF_demo_assets)
