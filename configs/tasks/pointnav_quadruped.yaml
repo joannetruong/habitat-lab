@@ -63,4 +63,4 @@ TASK:
 DATASET:
   TYPE: PointNav-v1
   SPLIT: train
-  DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz
+  DATA_PATH: data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz
