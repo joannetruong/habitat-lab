@@ -12,6 +12,7 @@ in habitat. Customized environments should be registered using
 
 from typing import Optional, Type
 
+import cv2
 import habitat
 import numpy as np
 from gym.spaces import Box
@@ -46,14 +47,20 @@ class NavRLEnv(habitat.RLEnv):
     def reset(self):
         self._previous_action = None
         observations = super().reset()
-        self._previous_measure = self._env.get_metrics()[
-            self._reward_measure_name
-        ]
+        self._previous_measure = self._env.get_metrics()[self._reward_measure_name]
         return observations
 
     def step(self, *args, **kwargs):
         self._previous_action = kwargs["action"]
-        return super().step(*args, **kwargs)
+        obs, reward, done, info = super().step(*args, **kwargs)
+
+        # img = np.copy(obs["rgb"])
+        # font = cv2.FONT_HERSHEY_PLAIN
+        # r, theta = obs["pointgoal_with_gps_compass"]
+        # goal_vector = "r: {:.2f}, theta: {:.2f}".format(r, np.rad2deg(theta))
+        # cv2.putText(img, goal_vector, (10, 20), font, 1, (0, 0, 0), 1)
+        # obs["rgb"] = img
+        return obs, reward, done, info
 
     def get_reward_range(self):
         return (
@@ -74,11 +81,7 @@ class NavRLEnv(habitat.RLEnv):
         else:
             reward += (self._previous_measure - current_measure) * max(
                 0,
-                (
-                    1
-                    - observations["num_steps"]
-                    / self._rl_config.FULL_GEODESIC_DECAY
-                ),
+                (1 - observations["num_steps"] / self._rl_config.FULL_GEODESIC_DECAY),
             )
 
         sim = self._env._sim

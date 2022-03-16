@@ -55,7 +55,6 @@ class A1:
     def reset(self, pos=None, rot=0):
         """Resets robot's movement, moves it back to center of platform"""
         # Zero out the link and root velocities
-        print("RESET ROBOT")
         self.robot_id.clear_joint_states()
 
         self.robot_id.root_angular_velocity = mn.Vector3(0.0, 0.0, 0.0)

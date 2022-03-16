@@ -7,7 +7,9 @@ import argparse
 import os
 import shutil
 import subprocess
+import sys
 
+automate_command = "python " + " ".join(sys.argv)
 HABITAT_LAB = "/coc/testnvme/jtruong33/google_nav/habitat-lab"
 CONDA_ENV = "/nethome/jtruong33/miniconda3/envs/habitat-outdoor/bin/python"
 RESULTS = "/coc/pskynet3/jtruong33/develop/flash_results/outdoor_nav_results"
@@ -27,8 +29,13 @@ parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
 parser.add_argument("-g", "--use_gray", default=False, action="store_true")
 parser.add_argument("-gd", "--use_gray_depth", default=False, action="store_true")
 parser.add_argument("-o", "--outdoor", default=False, action="store_true")
+parser.add_argument("--coda", default=False, action="store_true")
+
+parser.add_argument("-nre", "--no_roll_eyes", default=False, action="store_true")
+parser.add_argument("-2cnn", "--two_cnns", default=False, action="store_true")
 
 parser.add_argument("-pn", "--pepper_noise", default=False, action="store_true")
+parser.add_argument("-np", "--noise_percent", type=float, default=0.4)
 parser.add_argument("-cn", "--cutout_noise", default=False, action="store_true")
 parser.add_argument("-curr", "--curriculum", default=False, action="store_true")
 
@@ -38,6 +45,7 @@ parser.add_argument("-cpt", "--ckpt", type=int, default=-1)
 parser.add_argument("-v", "--video", default=False, action="store_true")
 
 parser.add_argument("-d", "--debug", default=False, action="store_true")
+parser.add_argument("-x", default=False, action="store_true")
 parser.add_argument("--ext", default="")
 args = parser.parse_args()
 
@@ -71,6 +79,12 @@ if args.ext != "":
 if args.outdoor:
     exp_name += "_ferst"
     eval_dst_dir += "_ferst"
+if args.dataset == "coda":
+    exp_name += "_coda"
+    eval_dst_dir += "_coda"
+if args.pepper_noise:
+    exp_name += "_pepper_noise_{}".format(args.noise_percent)
+    eval_dst_dir += "_pepper_noise_{}".format(args.noise_percent)
 
 new_eval_task_yaml_path = (
     os.path.join(eval_dst_dir, os.path.basename(task_yaml_path)).split(".yaml")[0]
@@ -122,6 +136,10 @@ if not args.eval:
     os.mkdir(dst_dir)
     print("Created " + dst_dir)
 
+    with open(os.path.join(dst_dir, "automate_job_cmd.txt"), "w") as f:
+        f.write(automate_command)
+    print("Saved automate command: " + os.path.join(dst_dir, "automate_job_cmd.txt"))
+
     # Create task yaml file, using file within Habitat Lab repo as a template
     with open(task_yaml_path) as f:
         task_yaml_data = f.read().splitlines()
@@ -131,6 +149,14 @@ if not args.eval:
     for idx, i in enumerate(task_yaml_data):
         if i.startswith("  CURRICULUM:"):
             task_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
+        elif i.startswith("    ORIENTATION: [ -0.4415683, -0.57648225, 0.270526 ]"):
+            if args.no_roll_eyes:
+                task_yaml_data[
+                    idx
+                ] = "    ORIENTATION: [ -0.4415683, -0.57648225, 0.0 ]"
+        elif i.startswith("    ORIENTATION: [ -0.4415683, 0.57648225, -0.270526 ]"):
+            if args.no_roll_eyes:
+                task_yaml_data[idx] = "    ORIENTATION: [ -0.4415683, 0.57648225, 0.0 ]"
         elif i.startswith("    RADIUS:"):
             task_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
@@ -161,6 +187,10 @@ if not args.eval:
         elif i.startswith("  DATA_PATH:"):
             if args.outdoor:
                 data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/{split}/{split}.json.gz"
+                task_yaml_data[idx] = "  DATA_PATH: {}".format(data_path)
+            if args.dataset == "coda":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
+                task_yaml_data[idx] = "  DATA_PATH: {}".format(data_path)
 
     with open(new_task_yaml_path, "w") as f:
         f.write("\n".join(task_yaml_data))
@@ -185,7 +215,7 @@ if not args.eval:
         elif i.startswith("NUM_ENVIRONMENTS:"):
             if args.use_gray or args.use_gray_depth:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
-            if args.outdoor:
+            if args.outdoor or args.dataset == "coda":
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.use_gray:
@@ -212,11 +242,16 @@ if not args.eval:
             exp_yaml_data[idx] = "TXT_DIR:            '{}'".format(
                 os.path.join(dst_dir, "txts")
             )
+        elif i.startswith("    num_cnns:"):
+            if args.two_cnns:
+                exp_yaml_data[idx] = "    num_cnns: 2"
         elif i.startswith("      ENABLED_TRANSFORMS: [ ]"):
             if args.pepper_noise:
                 exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"
             elif args.cutout_noise:
                 exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['CUTOUT']"
+        elif i.startswith("        NOISE_PERCENT:"):
+            exp_yaml_data[idx] = "        NOISE_PERCENT: {}".format(args.noise_percent)
 
     with open(new_exp_yaml_path, "w") as f:
         f.write("\n".join(exp_yaml_data))
@@ -241,9 +276,12 @@ if not args.eval:
         f.write(slurm_data)
     print("Generated slurm job: " + slurm_path)
 
-    # Submit slurm job
-    cmd = "sbatch " + slurm_path
-    subprocess.check_call(cmd.split(), cwd=dst_dir)
+    if not args.x:
+        # Submit slurm job
+        cmd = "sbatch " + slurm_path
+        subprocess.check_call(cmd.split(), cwd=dst_dir)
+    else:
+        print(slurm_data)
 
     print(
         "\nSee output with:\ntail -F {}".format(
@@ -256,6 +294,12 @@ else:
     # Make sure folder exists
     assert os.path.isdir(dst_dir), "{} directory does not exist".format(dst_dir)
     os.makedirs(eval_dst_dir, exist_ok=True)
+    with open(os.path.join(eval_dst_dir, "automate_job_cmd.txt"), "w") as f:
+        f.write(automate_command)
+    print(
+        "Saved automate command: " + os.path.join(eval_dst_dir, "automate_job_cmd.txt")
+    )
+
     # Create task yaml file, using file within Habitat Lab repo as a template
     with open(task_yaml_path) as f:
         eval_yaml_data = f.read().splitlines()
@@ -264,7 +308,7 @@ else:
         if i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
-            eval_yaml_data[idx] = "    RADIUS: {}".format(succ_radius)
+            eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
         elif i.startswith("      ROBOT_URDF:"):
@@ -290,7 +334,13 @@ else:
             eval_yaml_data[idx] = "    SUCCESS_DISTANCE: {}".format(robot_goal)
         elif i.startswith("SEED:"):
             eval_yaml_data[idx] = "SEED: {}".format(args.seed)
-
+        elif i.startswith("  DATA_PATH:"):
+            if args.outdoor:
+                data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/{split}/{split}.json.gz"
+                eval_yaml_data[idx] = "  DATA_PATH: {}".format(data_path)
+            if args.dataset == "coda":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
+                eval_yaml_data[idx] = "  DATA_PATH: {}".format(data_path)
     with open(new_eval_task_yaml_path, "w") as f:
         f.write("\n".join(eval_yaml_data))
     print("Created " + new_eval_task_yaml_path)
@@ -343,7 +393,7 @@ else:
         elif i.startswith("NUM_ENVIRONMENTS:"):
             if args.use_gray or args.use_gray_depth:
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
-            if args.outdoor:
+            if args.outdoor or args.dataset == "coda":
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.video:
@@ -377,6 +427,10 @@ else:
                 eval_exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"
             elif args.cutout_noise:
                 eval_exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['CUTOUT']"
+        elif i.startswith("        NOISE_PERCENT:"):
+            eval_exp_yaml_data[idx] = "        NOISE_PERCENT: {}".format(
+                args.noise_percent
+            )
 
     if os.path.isdir(tb_dir):
         response = input(
@@ -412,18 +466,17 @@ else:
         slurm_data = slurm_data.replace("$PARTITION", args.partition)
         if args.partition == "overcap":
             slurm_data = slurm_data.replace("# ACCOUNT", "#SBATCH --account overcap")
-        elif args.partition == "user-overcap":
-            slurm_data = slurm_data.replace(
-                "# ACCOUNT", "#SBATCH --account user-overcap"
-            )
     slurm_path = os.path.join(eval_dst_dir, eval_experiment_name + ".sh")
     with open(slurm_path, "w") as f:
         f.write(slurm_data)
     print("Generated slurm job: " + slurm_path)
 
-    # Submit slurm job
-    cmd = "sbatch " + slurm_path
-    subprocess.check_call(cmd.split(), cwd=dst_dir)
+    if not args.x:
+        # Submit slurm job
+        cmd = "sbatch " + slurm_path
+        subprocess.check_call(cmd.split(), cwd=dst_dir)
+    else:
+        print(slurm_data)
     print(
         "\nSee output with:\ntail -F {}".format(
             os.path.join(eval_dst_dir, eval_experiment_name + ".err")

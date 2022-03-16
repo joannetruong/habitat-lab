@@ -12,20 +12,17 @@ import numpy as np
 import torch
 from gym import spaces
 from habitat.config import Config
-from habitat.tasks.nav.nav import (
-    EpisodicCompassSensor,
-    EpisodicGPSSensor,
-    HeadingSensor,
-    ImageGoalSensor,
-    IntegratedPointGoalGPSAndCompassSensor,
-    PointGoalSensor,
-    ProximitySensor,
-)
+from habitat.tasks.nav.nav import (EpisodicCompassSensor, EpisodicGPSSensor,
+                                   HeadingSensor, ImageGoalSensor,
+                                   IntegratedPointGoalGPSAndCompassSensor,
+                                   PointGoalSensor, ProximitySensor)
 from habitat.tasks.nav.object_nav_task import ObjectGoalSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.ddppo.policy import resnet
-from habitat_baselines.rl.ddppo.policy.running_mean_and_var import RunningMeanAndVar
-from habitat_baselines.rl.models.rnn_state_encoder import build_rnn_state_encoder
+from habitat_baselines.rl.ddppo.policy.running_mean_and_var import \
+    RunningMeanAndVar
+from habitat_baselines.rl.models.rnn_state_encoder import \
+    build_rnn_state_encoder
 from habitat_baselines.rl.ppo import Net, Policy
 from torch import nn as nn
 from torch.nn import functional as F
@@ -47,6 +44,7 @@ class PointNavResNetPolicy(Policy):
         normalize_visual_inputs: bool = False,
         force_blind_policy: bool = False,
         action_distribution_type: str = "categorical",
+        num_cnns: int = 1,
         **kwargs,
     ):
         discrete_actions = action_distribution_type == "categorical"
@@ -62,6 +60,7 @@ class PointNavResNetPolicy(Policy):
                 normalize_visual_inputs=normalize_visual_inputs,
                 force_blind_policy=force_blind_policy,
                 discrete_actions=discrete_actions,
+                num_cnns=num_cnns,
             ),
             dim_actions=action_space.n,  # for action distribution
             action_distribution_type=action_distribution_type,
@@ -80,6 +79,7 @@ class PointNavResNetPolicy(Policy):
             normalize_visual_inputs="rgb" in observation_space.spaces,
             force_blind_policy=config.FORCE_BLIND_POLICY,
             action_distribution_type=config.RL.POLICY.action_distribution_type,
+            num_cnns=config.RL.POLICY.num_cnns,
         )
 
 
@@ -164,7 +164,7 @@ class ResNetEncoder(nn.Module):
 
     @property
     def is_blind(self):
-        return self._n_input_rgb + self._n_input_depth == 0
+        return self._n_input_rgb + self._n_input_depth + self._n_input_gray == 0
 
     def layer_init(self):
         for layer in self.modules():
@@ -181,7 +181,9 @@ class ResNetEncoder(nn.Module):
         if self._n_input_rgb > 0:
             rgb_observations = observations["rgb"]
             rgb_observations = rgb_observations.permute(0, 3, 1, 2)
-            rgb_observations = rgb_observations.float() / 255.0  # normalize RGB
+            # if not already normalized
+            if torch.max(rgb_observations) > 1.0:
+                rgb_observations = rgb_observations.float() / 255.0  # normalize RGB
             cnn_input.append(rgb_observations)
 
         if self._n_input_gray > 0:
@@ -200,7 +202,9 @@ class ResNetEncoder(nn.Module):
                 raise Exception("Not implemented")
             # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
             gray_observations = gray_observations.permute(0, 3, 1, 2)
-            gray_observations = gray_observations.float() / 255.0  # normalize RGB
+            # if not already normalized
+            if torch.max(gray_observations) > 1.0:
+                gray_observations = gray_observations.float() / 255.0  # normalize RGB
             cnn_input.append(gray_observations)
 
         if self._n_input_depth > 0:
@@ -249,10 +253,12 @@ class PointNavResNetNet(Net):
         normalize_visual_inputs: bool,
         force_blind_policy: bool = False,
         discrete_actions: bool = True,
+        num_cnns: int = 1,
     ):
         super().__init__()
 
         self.discrete_actions = discrete_actions
+        self.num_cnns = num_cnns
         if discrete_actions:
             self.prev_action_embedding = nn.Embedding(action_space.n + 1, 32)
         else:
@@ -336,15 +342,41 @@ class PointNavResNetNet(Net):
 
         self._hidden_size = hidden_size
 
-        self.visual_encoder = ResNetEncoder(
-            observation_space if not force_blind_policy else spaces.Dict({}),
-            baseplanes=resnet_baseplanes,
-            ngroups=resnet_baseplanes // 2,
-            make_backbone=getattr(resnet, backbone),
-            normalize_visual_inputs=normalize_visual_inputs,
-        )
+        if self.num_cnns == 1:
+            self.visual_encoder = ResNetEncoder(
+                observation_space if not force_blind_policy else spaces.Dict({}),
+                baseplanes=resnet_baseplanes,
+                ngroups=resnet_baseplanes // 2,
+                make_backbone=getattr(resnet, backbone),
+                normalize_visual_inputs=normalize_visual_inputs,
+            )
+        elif self.num_cnns == 2:
+            left_obs_space, right_obs_space = [
+                spaces.Dict(
+                    {k: v for k, v in observation_space.spaces.items() if side not in k}
+                )
+                for side in ["right", "left"]
+            ]
+            # Left CNN
+            self.visual_encoder = ResNetEncoder(
+                left_obs_space if not force_blind_policy else spaces.Dict({}),
+                baseplanes=resnet_baseplanes,
+                ngroups=resnet_baseplanes // 2,
+                make_backbone=getattr(resnet, backbone),
+                normalize_visual_inputs=normalize_visual_inputs,
+            )
+            # Right CNN
+            self.visual_encoder2 = ResNetEncoder(
+                right_obs_space if not force_blind_policy else spaces.Dict({}),
+                baseplanes=resnet_baseplanes,
+                ngroups=resnet_baseplanes // 2,
+                make_backbone=getattr(resnet, backbone),
+                normalize_visual_inputs=normalize_visual_inputs,
+            )
         dim = np.prod(self.visual_encoder.output_shape)
         if not self.visual_encoder.is_blind:
+            if self.num_cnns == 2:
+                dim *= 2
             self.visual_fc = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(dim, hidden_size),
@@ -384,7 +416,14 @@ class PointNavResNetNet(Net):
             if "visual_features" in observations:
                 visual_feats = observations["visual_features"]
             else:
-                visual_feats = self.visual_encoder(observations)
+                if self.num_cnns == 1:
+                    visual_feats = self.visual_encoder(observations)
+                elif self.num_cnns == 2:
+                    left_visual_feats = self.visual_encoder(observations)
+                    right_visual_feats = self.visual_encoder2(observations)
+                    visual_feats = torch.cat(
+                        [left_visual_feats, right_visual_feats], dim=1
+                    )
             visual_feats = self.visual_fc(visual_feats)
             x.append(visual_feats)
 
