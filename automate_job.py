@@ -90,6 +90,12 @@ robot_urdfs_dict = {
     "Locobot":  os.path.join(URDFS, "locobot/urdf/locobot_description2.urdf"),
 }
 
+num_steps_dict = {
+    "a1": 326,
+    "aliengo": 268,
+    "spot": 150,
+}
+
 robot_goal_dict = {
     "A1": 0.24,
     "AlienGo": 0.3235,
@@ -110,6 +116,8 @@ robot_urdf = robot_urdfs_dict[robot]
 robot_lin_vel, robot_ang_vel = robot_vel_dict[robot]
 succ_radius = robot_goal_dict[robot]
 robot_radius = robot_radius_dict[robot]
+
+robot_num_steps = num_steps_dict[args.robot.lower()]
 
 # Training
 if not args.eval:
@@ -134,7 +142,9 @@ if not args.eval:
     # robots_heights = [robot_heights_dict[robot] for robot in robots]
 
     for idx, i in enumerate(task_yaml_data):
-        if i.startswith("  CURRICULUM:"):
+        if i.startswith("  MAX_EPISODE_STEPS:"):
+            task_yaml_data[idx] = "  MAX_EPISODE_STEPS: {}".format(robot_num_steps)
+        elif i.startswith("  CURRICULUM:"):
             task_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
             task_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
@@ -279,7 +289,9 @@ else:
         eval_yaml_data = f.read().splitlines()
 
     for idx, i in enumerate(eval_yaml_data):
-        if i.startswith("  CURRICULUM:"):
+        if i.startswith("  MAX_EPISODE_STEPS:"):
+            eval_yaml_data[idx] = "  MAX_EPISODE_STEPS: {}".format(robot_num_steps)
+        elif i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
             eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
