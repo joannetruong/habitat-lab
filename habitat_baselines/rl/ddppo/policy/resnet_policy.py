@@ -12,17 +12,20 @@ import numpy as np
 import torch
 from gym import spaces
 from habitat.config import Config
-from habitat.tasks.nav.nav import (EpisodicCompassSensor, EpisodicGPSSensor,
-                                   HeadingSensor, ImageGoalSensor,
-                                   IntegratedPointGoalGPSAndCompassSensor,
-                                   PointGoalSensor, ProximitySensor)
+from habitat.tasks.nav.nav import (
+    EpisodicCompassSensor,
+    EpisodicGPSSensor,
+    HeadingSensor,
+    ImageGoalSensor,
+    IntegratedPointGoalGPSAndCompassSensor,
+    PointGoalSensor,
+    ProximitySensor,
+)
 from habitat.tasks.nav.object_nav_task import ObjectGoalSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.ddppo.policy import resnet
-from habitat_baselines.rl.ddppo.policy.running_mean_and_var import \
-    RunningMeanAndVar
-from habitat_baselines.rl.models.rnn_state_encoder import \
-    build_rnn_state_encoder
+from habitat_baselines.rl.ddppo.policy.running_mean_and_var import RunningMeanAndVar
+from habitat_baselines.rl.models.rnn_state_encoder import build_rnn_state_encoder
 from habitat_baselines.rl.ppo import Net, Policy
 from torch import nn as nn
 from torch.nn import functional as F
@@ -99,15 +102,11 @@ class ResNetEncoder(nn.Module):
         self.gray_keys = [k for k in observation_space.spaces if "gray" in k]
         self.depth_keys = [k for k in observation_space.spaces if "depth" in k]
 
-        self.using_one_gray_camera = "gray" in observation_space.spaces
-        self.using_two_gray_cameras = any(
-            [k.endswith("_gray") for k in observation_space.spaces.keys()]
-        )
+        self.using_one_gray_camera = len(self.gray_keys) == 1
+        self.using_two_gray_cameras = len(self.gray_keys) == 2
 
-        self.using_one_depth_camera = "depth" in observation_space.spaces
-        self.using_two_depth_cameras = any(
-            [k.endswith("_depth") for k in observation_space.spaces.keys()]
-        )
+        self.using_one_depth_camera = len(self.depth_keys) == 1
+        self.using_two_depth_cameras = len(self.depth_keys) == 2
 
         self._n_input_rgb, self._n_input_depth, self._n_input_gray = [
             # sum() returns 0 for an empty list
@@ -188,7 +187,7 @@ class ResNetEncoder(nn.Module):
 
         if self._n_input_gray > 0:
             if self.using_one_gray_camera:
-                gray_observations = observations["gray"]
+                gray_observations = observations[self.gray_keys[0]]
             elif self.using_two_gray_cameras:
                 gray_observations = torch.cat(
                     [
@@ -209,7 +208,7 @@ class ResNetEncoder(nn.Module):
 
         if self._n_input_depth > 0:
             if self.using_one_depth_camera:
-                depth_observations = observations["depth"]
+                depth_observations = observations[self.depth_keys[0]]
             elif self.using_two_depth_cameras:
                 depth_observations = torch.cat(
                     [
