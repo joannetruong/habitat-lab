@@ -45,7 +45,9 @@ class A1():
                 mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
             )
         )
-
+        self.pos_gain = 0.6
+        self.vel_gain = 1.0
+        self.max_impulse = 1.0
         if reset:
             self.robot_specific_reset()
             # self.inverse_transform_quat = mn.Quaternion.from_matrix(inverse_transform.rotation())
@@ -221,7 +223,7 @@ class A1():
         set_pos[joint_idx] = angle
         self.robot.joint_positions = set_pos
 
-    def apply_robot_action(self, action, pos_gain, vel_gain):
+    def apply_robot_action(self, action):
         """Applies actions to the robot.
 
         Args:
@@ -241,10 +243,10 @@ class A1():
         else:
             self.robot.joint_positions = joint_pos
 
-    def step(self, action, pos_gain, vel_gain, dt=1 / 240.0, verbose=False,
+    def step(self, action, dt=1 / 240.0, verbose=False,
              get_frames=True, follow_robot=False):
 
-        self.apply_robot_action(action, pos_gain, vel_gain)
+        self.apply_robot_action(action)
         # simulate dt seconds at 60Hz to the nearest fixed timestep
         if verbose:
             print("Simulating " + str(dt) + " world seconds.")
@@ -335,6 +337,10 @@ class Spot(A1):
         self.robot_dist_to_goal = 0.425
         self.camera_spawn_offset = np.array([0.0, 0.325, -0.325])
         self.urdf_params = np.array([32.70, 0.88, 1.10, 0.50])
+
+        self.pos_gain = 0.4
+        self.vel_gain = 1.8
+        self.max_impulse = 1.0
 
 class Locobot(A1):
     def __init__(self, sim=None, robot=None, rand_id=None):

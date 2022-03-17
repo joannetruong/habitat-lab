@@ -1189,10 +1189,10 @@ class VelocityAction(SimulatorTaskAction):
                         task.robot_wrapper._initial_joint_positions[
                             i
                         ],  # position_target
-                        self.pos_gain[i % 3],  # position_gain
+                        task.robot_wrapper.pos_gain,  # position_gain
                         0,  # velocity_target
-                        self.vel_gain[i % 3],  # velocity_gain
-                        10.0,  # max_impulse
+                        task.robot_wrapper.vel_gain,  # velocity_gain
+                        task.robot_wrapper.max_impulse,  # max_impulse
                     ),
                 )
 
@@ -1438,8 +1438,6 @@ class DynamicVelocityAction(VelocityAction):
         # Joint motor gains
         config = kwargs["config"]
         self.time_per_step = config.TIME_PER_STEP
-        self.pos_gain = np.array([0.4, 0.4, 0.5])
-        self.vel_gain = np.ones((3,)) * 1.0  # 1.5
 
     @property
     def action_space(self):
@@ -1561,9 +1559,7 @@ class DynamicVelocityAction(VelocityAction):
 
                 for i in range(self.time_per_step):
                     raibert_action = self.raibert_controller.get_action(state, i + 1)
-                    task.robot_wrapper.apply_robot_action(
-                        raibert_action, self.pos_gain, self.vel_gain
-                    )
+                    task.robot_wrapper.apply_robot_action(raibert_action)
                     self._sim.step_physics(self.dt)
                     state = task.robot_wrapper.calc_state()
         else:
