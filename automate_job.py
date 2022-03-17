@@ -8,8 +8,8 @@ import os
 import shutil
 import subprocess
 
-HABITAT_LAB = os.environ['KIN2DYN_HLAB_PTH'] if 'KIN2DYN_HLAB_PTH' in os.environ else "/nethome/jtruong33/miniconda3/envs/kin2dyn/bin/python"
-CONDA_ENV = os.environ['KIN2DYN_CONDA_PTH'] if 'KIN2DYN_CONDA_PTH' in os.environ else "/coc/testnvme/jtruong33/kin2dyn/habitat-lab"
+HABITAT_LAB = os.environ['KIN2DYN_HLAB_PTH'] if 'KIN2DYN_HLAB_PTH' in os.environ else "/coc/testnvme/jtruong33/kin2dyn/habitat-lab"
+CONDA_ENV = os.environ['KIN2DYN_CONDA_PTH'] if 'KIN2DYN_CONDA_PTH' in os.environ else "/nethome/jtruong33/miniconda3/envs/kin2dyn/bin/python"
 RESULTS = os.environ['KIN2DYN_RESULT_PTH'] if 'KIN2DYN_RESULT_PTH' in os.environ else "/coc/pskynet3/jtruong33/develop/flash_results/kin2dyn_results"
 URDFS = os.environ['KIN2DYN_URDF_PTH'] if 'KIN2DYN_URDF_PTH' in os.environ else "/coc/testnvme/jtruong33/data/URDF_demo_assets"
 
