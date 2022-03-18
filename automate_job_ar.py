@@ -8,10 +8,10 @@ import os
 import shutil
 import subprocess
 
-HABITAT_LAB = os.environ['KIN2DYN_HLAB_PTH']
-CONDA_ENV = os.environ['KIN2DYN_CONDA_PTH']
-RESULTS = os.environ['KIN2DYN_RESULT_PTH']
-URDFS = os.environ['KIN2DYN_URDF_PTH']
+HABITAT_LAB = "/private/home/akshararai/kin2dyn/habitat-lab"
+CONDA_ENV = "/private/home/akshararai/.conda/envs/kin2dyn/bin/python"
+RESULTS = "/checkpoint/akshararai/kin2dyn"
+URDFS = "/private/home/akshararai/kin2dyn/habitat-lab/data/URDF_demo_assets"
 
 SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "slurm_template_ar.sh")
 EVAL_SLURM_TEMPLATE = os.path.join(HABITAT_LAB, "eval_slurm_template_ar.sh")
