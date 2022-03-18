@@ -30,8 +30,8 @@ class A1:
         self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
         self.urdf_params = [12.46, 0.40, 0.62, 0.30]
 
-        self.pos_gain = 0.03
-        self.vel_gain = 1.8
+        self.pos_gain = 0.6
+        self.vel_gain = 1.0
         self.max_impulse = 1.0
 
         self.gibson_mapping = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]

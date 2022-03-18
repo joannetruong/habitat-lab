@@ -307,6 +307,14 @@ else:
     for idx, i in enumerate(eval_yaml_data):
         if i.startswith("  CURRICULUM:"):
             eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
+        elif i.startswith("    ORIENTATION: [ -0.4415683, -0.57648225, 0.270526 ]"):
+            if args.no_roll_eyes:
+                eval_yaml_data[
+                    idx
+                ] = "    ORIENTATION: [ -0.4415683, -0.57648225, 0.0 ]"
+        elif i.startswith("    ORIENTATION: [ -0.4415683, 0.57648225, -0.270526 ]"):
+            if args.no_roll_eyes:
+                eval_yaml_data[idx] = "    ORIENTATION: [ -0.4415683, 0.57648225, 0.0 ]"
         elif i.startswith("    RADIUS:"):
             eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
@@ -422,6 +430,9 @@ else:
                 eval_exp_yaml_data[idx] = "    SPLIT: val"
             elif args.dataset == "ferst_20m":
                 eval_exp_yaml_data[idx] = "    SPLIT: val_20m"
+        elif i.startswith("    num_cnns:"):
+            if args.two_cnns:
+                eval_exp_yaml_data[idx] = "    num_cnns: 2"
         elif i.startswith("      ENABLED_TRANSFORMS: [ ]"):
             if args.pepper_noise:
                 eval_exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"

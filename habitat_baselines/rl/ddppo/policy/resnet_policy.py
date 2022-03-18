@@ -421,7 +421,7 @@ class PointNavResNetNet(Net):
                     left_visual_feats = self.visual_encoder(observations)
                     right_visual_feats = self.visual_encoder2(observations)
                     visual_feats = torch.cat(
-                        [left_visual_feats, right_visual_feats], dim=1
+                        [right_visual_feats, left_visual_feats], dim=1
                     )
             visual_feats = self.visual_fc(visual_feats)
             x.append(visual_feats)

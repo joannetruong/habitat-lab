@@ -197,7 +197,6 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
         generated image of a single frame.
     """
     egocentric_view_l: List[np.ndarray] = []
-    egocentric_view_l: List[np.ndarray] = []
     for k in ["rgb", "spot_right_rgb", "spot_left_rgb"]:
         if k in observation:
             rgb = observation[k]
@@ -205,6 +204,15 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
                 rgb = rgb.cpu().numpy()
 
             egocentric_view_l.append(rgb)
+
+    for k in ["gray", "spot_right_gray", "spot_left_gray"]:
+        if k in observation:
+            gray = observation[k]
+            if not isinstance(gray, np.ndarray):
+                gray = gray.cpu().numpy()
+            gray = np.stack([gray for _ in range(3)], axis=2).squeeze(-1)
+
+            egocentric_view_l.append(gray)
 
     # draw depth map if observation has depth info
     for k in ["depth", "spot_right_depth", "spot_left_depth"]:
@@ -215,6 +223,7 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
 
             depth_map = depth_map.astype(np.uint8)
             depth_map = np.stack([depth_map for _ in range(3)], axis=2)
+
             egocentric_view_l.append(depth_map)
 
     # add image goal if observation has image_goal info
