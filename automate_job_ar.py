@@ -151,8 +151,8 @@ if not args.eval:
             task_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             task_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
-        elif i.startswith("      ROBOT_URDF:"):
-            task_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
+        elif i.startswith("  ROBOT_URDF:"):
+            task_yaml_data[idx] = "  ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -296,8 +296,8 @@ else:
             eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
-        elif i.startswith("      ROBOT_URDF:"):
-            eval_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
+        elif i.startswith("  ROBOT_URDF:"):
+            eval_yaml_data[idx] = "  ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"

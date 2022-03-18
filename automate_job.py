@@ -113,6 +113,7 @@ robot_radius_dict = {"A1": 0.2, "AlienGo": 0.22, "Locobot": 0.23, "Spot": 0.3}
 
 robot = args.robot
 robot_urdf = robot_urdfs_dict[robot]
+print('ROBOT URDF: ', robot_urdf)
 
 robot_lin_vel, robot_ang_vel = robot_vel_dict[robot]
 succ_radius = robot_goal_dict[robot]
@@ -151,8 +152,8 @@ if not args.eval:
             task_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             task_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
-        elif i.startswith("      ROBOT_URDF:"):
-            task_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
+        elif i.startswith("  ROBOT_URDF:"):
+            task_yaml_data[idx] = "  ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
@@ -292,14 +293,12 @@ else:
     for idx, i in enumerate(eval_yaml_data):
         if i.startswith("  MAX_EPISODE_STEPS:"):
             eval_yaml_data[idx] = "  MAX_EPISODE_STEPS: {}".format(robot_num_steps)
-        elif i.startswith("  CURRICULUM:"):
-            eval_yaml_data[idx] = "  CURRICULUM: {}".format(args.curriculum)
         elif i.startswith("    RADIUS:"):
             eval_yaml_data[idx] = "    RADIUS: {}".format(robot_radius)
         elif i.startswith("  ROBOT:"):
             eval_yaml_data[idx] = "  ROBOT: '{}'".format(robot)
-        elif i.startswith("      ROBOT_URDF:"):
-            eval_yaml_data[idx] = "      ROBOT_URDF: {}".format(robot_urdf)
+        elif i.startswith("  ROBOT_URDF:"):
+            eval_yaml_data[idx] = "  ROBOT_URDF: {}".format(robot_urdf)
         elif i.startswith("  POSSIBLE_ACTIONS:"):
             if args.control_type == "dynamic":
                 control_type = "DYNAMIC_VELOCITY_CONTROL"
