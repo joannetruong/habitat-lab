@@ -60,7 +60,7 @@ _C.FORCE_TORCH_SINGLE_THREADED = False
 _C.EVAL = CN()
 # The split to evaluate on
 _C.EVAL.SPLIT = "val"
-_C.EVAL.USE_CKPT_CONFIG = True
+_C.EVAL.USE_CKPT_CONFIG = False
 # -----------------------------------------------------------------------------
 # REINFORCEMENT LEARNING (RL) ENVIRONMENT CONFIG
 # -----------------------------------------------------------------------------
@@ -93,6 +93,22 @@ _C.RL.preemption.save_state_batch_only = False
 _C.RL.POLICY = CN()
 _C.RL.POLICY.name = "PointNavResNetPolicy"
 _C.RL.POLICY.action_distribution_type = "categorical"
+# -----------------------------------------------------------------------------
+# SPLITNET CONFIG
+# -----------------------------------------------------------------------------
+_C.RL.SPLITNET = CN()
+_C.RL.SPLITNET = CN()
+_C.RL.SPLITNET.create_decoder = True
+_C.RL.SPLITNET.separate_optimizers = True
+_C.RL.SPLITNET.use_visual_loss = True
+_C.RL.SPLITNET.use_motion_loss = False
+_C.RL.SPLITNET.update_encoder_features = True
+_C.RL.SPLITNET.freeze_encoder_features = False
+_C.RL.SPLITNET.update_visual_decoder_features = True
+_C.RL.SPLITNET.freeze_visual_decoder_features = False
+_C.RL.SPLITNET.update_motion_decoder_features = False
+_C.RL.SPLITNET.freeze_motion_decoder_features = False
+_C.RL.SPLITNET.freeze_policy_decoder_features = False
 # -----------------------------------------------------------------------------
 # OBS_TRANSFORMS CONFIG
 # -----------------------------------------------------------------------------

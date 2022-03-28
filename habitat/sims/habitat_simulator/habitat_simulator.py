@@ -4,17 +4,8 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Union,
-    cast,
-)
+from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set,
+                    Union, cast)
 
 import numpy as np
 import quaternion
@@ -28,19 +19,10 @@ if TYPE_CHECKING:
 import habitat_sim
 from habitat.core.dataset import Episode
 from habitat.core.registry import registry
-from habitat.core.simulator import (
-    AgentState,
-    Config,
-    DepthSensor,
-    Observations,
-    RGBSensor,
-    SemanticSensor,
-    Sensor,
-    SensorSuite,
-    ShortestPathPoint,
-    Simulator,
-    VisualObservation,
-)
+from habitat.core.simulator import (AgentState, Config, DepthSensor,
+                                    Observations, RGBSensor, SemanticSensor,
+                                    Sensor, SensorSuite, ShortestPathPoint,
+                                    Simulator, VisualObservation)
 from habitat.core.spaces import Space
 from habitat.utils.geometry_utils import quaternion_from_coeff
 
@@ -273,7 +255,6 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
             habitat_sim.SensorSubType.ORTHOGRAPHIC,
         }
         for sensor in _sensor_suite.sensors.values():
-
             # Check if type VisualSensorSpec, we know that Sensor is one of HabitatSimRGBSensor, HabitatSimDepthSensor, HabitatSimSemanticSensor
             if getattr(sensor, "sim_sensor_type", []) not in VisualSensorTypeSet:
                 raise ValueError(
