@@ -89,12 +89,8 @@ def agent_state_target2ref(
         and need to be transformed to the local coordinate system defined by ref_agent_state.
     """
 
-    assert (
-        len(ref_agent_state[1]) == 3
-    ), "Only support Cartesian format currently."
-    assert (
-        len(target_agent_state[1]) == 3
-    ), "Only support Cartesian format currently."
+    assert len(ref_agent_state[1]) == 3, "Only support Cartesian format currently."
+    assert len(target_agent_state[1]) == 3, "Only support Cartesian format currently."
 
     ref_rotation, ref_position = ref_agent_state
     target_rotation, target_position = target_agent_state
@@ -143,9 +139,7 @@ def heading_to_quaternion(heading):
 
 def quat_to_rad(rotation):
     r"""Returns the yaw represented by the rotation np quaternion"""
-    heading_vector = quaternion_rotate_vector(
-        rotation.inverse(), np.array([0, 0, -1])
-    )
+    heading_vector = quaternion_rotate_vector(rotation.inverse(), np.array([0, 0, -1]))
     phi = np.arctan2(heading_vector[0], -heading_vector[2])
 
     return phi

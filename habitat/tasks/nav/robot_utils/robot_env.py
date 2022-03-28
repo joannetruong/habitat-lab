@@ -30,26 +30,52 @@ class A1:
         self.camera_spawn_offset = np.array([0.0, 0.18, -0.24])
         self.urdf_params = [12.46, 0.40, 0.62, 0.30]
 
-        self.pos_gain = 0.03
-        self.vel_gain = 1.8
+        self.pos_gain = 0.6
+        self.vel_gain = 1.0
         self.max_impulse = 1.0
 
         self.gibson_mapping = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
 
-    def reset(self, pos=None, yaw=0):
+        self.rotation_offset = (
+            mn.Matrix4.rotation_y(
+                mn.Rad(-np.pi / 2),  # Rotate -90 deg yaw (agent offset)
+            )
+            .__matmul__(
+                mn.Matrix4.rotation_y(
+                    mn.Rad(np.pi),  # Rotate 180 deg yaw
+                )
+            )
+            .__matmul__(
+                mn.Matrix4.rotation_x(
+                    mn.Rad(-np.pi / 2.0),  # Rotate 90 deg roll
+                )
+            )
+        )
+
+    def reset(self, pos=None, rot=0):
         """Resets robot's movement, moves it back to center of platform"""
         # Zero out the link and root velocities
+        self.robot_id.clear_joint_states()
 
-        self.base_transform = mn.Matrix4.rotation(
-            mn.Rad(np.deg2rad(-90)), mn.Vector3(1.0, 0.0, 0.0)
-        ) @ mn.Matrix4.rotation(mn.Rad(yaw), mn.Vector3(0.0, 0.0, 1.0))
+        self.robot_id.root_angular_velocity = mn.Vector3(0.0, 0.0, 0.0)
+        self.robot_id.root_linear_velocity = mn.Vector3(0.0, 0.0, 0.0)
 
-        self.base_transform.translation = mn.Vector3(*self.robot_spawn_offset)
-        if pos:
-            self.base_transform.translation += mn.Vector3(*pos)
-        self.start_height = self.base_transform.translation[1]
+        self.set_pose_jms(self._initial_joint_positions, True)
 
-        self.robot_id.transformation = self.base_transform
+        squat = np.normalized(np.quaternion(rot[3], *rot[:3]))
+
+        agent_rot = mn.Matrix4.from_(
+            mn.Quaternion(squat.imag, squat.real).to_matrix(),
+            mn.Vector3(0.0, 0.0, 0.0),
+        )  # 4x4 homogenous transform with no translation
+
+        self.robot_id.transformation = mn.Matrix4.from_(
+            (agent_rot @ self.rotation_offset).rotation(),  # 3x3 rotation
+            mn.Vector3(*pos)
+            + mn.Vector3(*self.robot_spawn_offset),  # translation vector
+        )  # 4x4 homogenous transform
+
+        self.start_height = self.robot_id.transformation.translation[1]
 
     def position(self):
         return self.robot_id.transformation.translation
@@ -70,9 +96,7 @@ class A1:
         """returns local velocity and corrects for initial rotation of quadruped robots
         [forward, right, up]
         """
-        local_vel = self.robot_id.transformation.inverted().transform_vector(
-            velocity
-        )
+        local_vel = self.robot_id.transformation.inverted().transform_vector(velocity)
         return np.array([local_vel[0], local_vel[2], -local_vel[1]])
 
     def get_base_ori(self):
@@ -134,12 +158,8 @@ class A1:
         """
         # joint_positions = self.robot.joint_positions
         # joint_velocities = self.robot.joint_velocities
-        joint_positions = np.array(self.robot_id.joint_positions)[
-            self.gibson_mapping
-        ]
-        joint_velocities = np.array(self.robot_id.joint_velocities)[
-            self.gibson_mapping
-        ]
+        joint_positions = np.array(self.robot_id.joint_positions)[self.gibson_mapping]
+        joint_velocities = np.array(self.robot_id.joint_velocities)[self.gibson_mapping]
         base_pos = self.position_xyz()
         base_ori_euler = self.get_ori_rpy()
         base_ori_quat = self.get_ori_quat()

@@ -1,4 +1,4 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_quadruped_train.yaml"
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot.yaml"
 TOTAL_NUM_STEPS: 5e8
 
 VERBOSE: False
@@ -13,8 +13,8 @@ EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_res
 CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 16
-SENSORS: ["DEPTH_SENSOR"]
+NUM_ENVIRONMENTS: 8
+SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']
 NUM_UPDATES: -1
 LOG_INTERVAL: 10
 NUM_CHECKPOINTS: 100
@@ -28,11 +28,18 @@ RL:
   COLLISION_PENALTY: 0.003
   BACKWARDS_PENALTY: 0.003
   FULL_GEODESIC_DECAY: -1.0
-  FALL_PENALTY: -5.0
 
   POLICY:
     name: "PointNavResNetPolicy"
     action_distribution_type: "gaussian"
+    num_cnns: 1
+    OBS_TRANSFORMS:
+      ENABLED_TRANSFORMS: [ ]
+      PEPPER_NOISE:
+        NOISE_PERCENT: 0.1
+        WHITE: False
+      CUTOUT:
+        WHITE: False
   PPO:
     # ppo params
     clip_param: 0.2
@@ -79,3 +86,5 @@ RL:
     backbone: resnet18
     rnn_type: LSTM
     num_recurrent_layers: 2
+EVAL:
+    SPLIT: "val"

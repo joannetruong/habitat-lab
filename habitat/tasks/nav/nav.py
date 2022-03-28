@@ -22,11 +22,7 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import (
-    EmbodiedTask,
-    Measure,
-    SimulatorTaskAction,
-)
+from habitat.core.embodied_task import EmbodiedTask, Measure, SimulatorTaskAction
 from habitat.core.logging import logger
 from habitat.core.registry import registry
 from habitat.core.simulator import (
@@ -59,9 +55,6 @@ try:
     from habitat_sim.physics import VelocityControl
 except ImportError:
     pass
-
-import torch
-from dg_util.python_utils import pytorch_util as pt_util
 
 from .robot_utils.raibert_controller import (
     Raibert_controller_turn,
@@ -959,6 +952,9 @@ class DistanceToGoal(Measure):
                     [goal.position for goal in episode.goals],
                     episode,
                 )
+                if distance_to_target == 0.0:
+                    logger.error("WARNING!! Distance_to_target was zero")
+                    distance_to_target = 999.99
                 if distance_to_target == np.inf:
                     logger.error("WARNING!! Distance_to_target was inf")
                     distance_to_target = 999.99
@@ -1168,6 +1164,10 @@ class VelocityAction(SimulatorTaskAction):
         task.is_stop_called = False  # type: ignore
         self.prev_ang_vel = 0.0
 
+        if self.robot.robot_id is not None and self.robot.robot_id.object_id != -1:
+            ao_mgr = self._sim.get_articulated_object_manager()
+            ao_mgr.remove_object_by_id(self.robot.robot_id.object_id)
+            self.robot.robot_id = None
         # If robot was never spawned or was removed with previous scene
         if self.robot.robot_id is None or self.robot.robot_id.object_id == -1:
             ao_mgr = self._sim.get_articulated_object_manager()
@@ -1177,8 +1177,7 @@ class VelocityAction(SimulatorTaskAction):
             self.robot.robot_id = robot_id
         agent_pos = kwargs["episode"].start_position
         agent_rot = kwargs["episode"].start_rotation
-        agent_yaw = euler_from_quaternion(*agent_rot)[-1]
-        self.robot.reset(agent_pos, agent_yaw)
+        self.robot.reset(agent_pos, agent_rot)
 
     def step(
         self,
@@ -1202,6 +1201,7 @@ class VelocityAction(SimulatorTaskAction):
             time_step: amount of time to move the agent for
             allow_sliding: whether the agent will slide on collision
         """
+        curr_rs = self.robot.robot_id.transformation
         if time_step is None:
             time_step = self.time_step
 
@@ -1221,7 +1221,7 @@ class VelocityAction(SimulatorTaskAction):
             and abs(hor_vel) < self.min_abs_hor_speed
         )
         if (
-            self.must_call_stzop
+            self.must_call_stop
             and called_stop
             or not self.must_call_stop
             and task.measurements.measures["distance_to_goal"].get_metric()
@@ -1232,8 +1232,7 @@ class VelocityAction(SimulatorTaskAction):
                 position=None,
                 rotation=None,
             )
-
-        self.vel_control.linear_velocity = np.array([hor_vel, 0.0, -lin_vel])
+        self.vel_control.linear_velocity = np.array([-hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
 
         """Get the current agent state"""
@@ -1292,19 +1291,25 @@ class VelocityAction(SimulatorTaskAction):
         robot_T_agent_rot_offset = mn.Matrix4.rotation(
             mn.Rad(0.0), mn.Vector3((1.0, 0.0, 0.0))
         ).rotation()
+        robot_translation_offset = mn.Vector3(self.robot.robot_spawn_offset)
         robot_T_agent = mn.Matrix4.from_(
-            robot_T_agent_rot_offset,
-            self.robot.base_transform.translation,
+            robot_T_agent_rot_offset, robot_translation_offset
         )
-
         robot_T_global = robot_T_agent @ agent_T_global
-        robot_global_rotation_offset = self.robot.base_transform
+        robot_global_rotation_offset = mn.Matrix4.rotation(
+            mn.Rad(-np.pi / 2.0),
+            mn.Vector3((1.0, 0.0, 0.0)),
+        ) @ mn.Matrix4.rotation(
+            mn.Rad(np.pi / 2.0),
+            mn.Vector3((0.0, 0.0, 1.0)),
+        )
         robot_T_global = robot_T_global @ robot_global_rotation_offset
         self.robot.robot_id.transformation = robot_T_global
 
         """See if goal state causes interpenetration with surroundings"""
         collided = self._sim.contact_test(self.robot.robot_id.object_id)
         if collided:
+            self.robot.robot_id.transformation = curr_rs
             agent_observations = self._sim.get_observations_at()
             self._sim._prev_sim_obs["collided"] = True  # type: ignore
             agent_observations["hit_navmesh"] = True
@@ -1378,13 +1383,6 @@ class DynamicVelocityAction(VelocityAction):
 
     def reset(self, task: EmbodiedTask, *args: Any, **kwargs: Any):
         super().reset(task=task, *args, **kwargs)
-        self.robot.robot_id.clear_joint_states()
-
-        self.robot.robot_id.root_angular_velocity = mn.Vector3(0.0, 0.0, 0.0)
-        self.robot.robot_id.root_linear_velocity = mn.Vector3(0.0, 0.0, 0.0)
-
-        self.robot.set_pose_jms(self.robot._initial_joint_positions, True)
-
         self.raibert_controller = Raibert_controller_turn(
             control_frequency=self.ctrl_freq,
             num_timestep_per_HL_action=self.time_per_step,
@@ -1431,7 +1429,7 @@ class DynamicVelocityAction(VelocityAction):
             and abs(hor_vel) < self.min_abs_hor_speed
         )
         if (
-            self.must_call_stzop
+            self.must_call_stop
             and called_stop
             or not self.must_call_stop
             and task.measurements.measures["distance_to_goal"].get_metric()
@@ -1633,38 +1631,3 @@ class SpotLeftDepthSensor(SpotDepthSensor):
 class SpotRightDepthSensor(SpotDepthSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_right_depth"
-
-
-@registry.register_sensor
-class SpotSurfaceNormalSensor(HabitatSimRGBSensor):
-    def _get_uuid(self, *args, **kwargs):
-        return "surface_normals"
-
-    ## Hack to get Spot cameras resized to 256,256 after concatenation
-    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
-        return spaces.Box(
-            low=0,
-            high=2,
-            shape=(256, 256, 3),
-            dtype=np.float32,
-        )
-
-    def get_observation(self, sim_obs):
-        left_depth_obs = sim_obs.get("spot_left_depth", None)
-        right_depth_obs = sim_obs.get("spot_right_depth", None)
-
-        depth_obs = np.concatenate(
-            [
-                # Spot is cross-eyed; right is on the left on the FOV
-                right_depth_obs,
-                left_depth_obs,
-            ],
-            axis=1,
-        )
-
-        depth_obs = depth_obs.reshape(1, 1, *depth_obs.shape[:2])
-        sn = pt_util.depth_to_surface_normals(torch.from_numpy(depth_obs))
-        sn = sn.squeeze(0)
-        sn = sn.permute(1, 2, 0)  # CHW => HWC
-        # sn = sn.permute((0, 3, 1, 2))  # NHWC => NCHW
-        return sn

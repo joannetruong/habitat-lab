@@ -128,9 +128,7 @@ class HabitatSimDepthSensor(DepthSensor):
         if isinstance(obs, np.ndarray):
             obs = np.clip(obs, self.config.MIN_DEPTH, self.config.MAX_DEPTH)
 
-            obs = np.expand_dims(
-                obs, axis=2
-            )  # make depth observation a 3D array
+            obs = np.expand_dims(obs, axis=2)  # make depth observation a 3D array
         else:
             obs = obs.clamp(self.config.MIN_DEPTH, self.config.MAX_DEPTH)  # type: ignore[attr-defined]
 
@@ -258,18 +256,12 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
         }
         for sensor in _sensor_suite.sensors.values():
             # Check if type VisualSensorSpec, we know that Sensor is one of HabitatSimRGBSensor, HabitatSimDepthSensor, HabitatSimSemanticSensor
-            if (
-                getattr(sensor, "sim_sensor_type", [])
-                not in VisualSensorTypeSet
-            ):
+            if getattr(sensor, "sim_sensor_type", []) not in VisualSensorTypeSet:
                 raise ValueError(
                     f"""{getattr(sensor, "sim_sensor_type", [])} is an illegal sensorType that is not implemented yet"""
                 )
             # Check if type CameraSensorSpec
-            if (
-                getattr(sensor, "sim_sensor_subtype", [])
-                not in CameraSensorSubTypeSet
-            ):
+            if getattr(sensor, "sim_sensor_subtype", []) not in CameraSensorSubTypeSet:
                 raise ValueError(
                     f"""{getattr(sensor, "sim_sensor_subtype", [])} is an illegal sensorSubType for a VisualSensor"""
                 )
@@ -287,7 +279,6 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
                 # or translated into the sensor config manually
                 ignore_keys={
                     "height",
-                    "hfov",
                     "max_depth",
                     "min_depth",
                     "normalize_depth",
@@ -296,9 +287,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
                 },
             )
             sim_sensor_cfg.uuid = sensor.uuid
-            sim_sensor_cfg.resolution = list(
-                sensor.observation_space.shape[:2]
-            )
+            sim_sensor_cfg.resolution = list(sensor.observation_space.shape[:2])
 
             # TODO(maksymets): Add configure method to Sensor API to avoid
             # accessing child attributes through parent interface
@@ -306,9 +295,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
             sensor = cast(HabitatSimVizSensors, sensor)
             sim_sensor_cfg.sensor_type = sensor.sim_sensor_type
             sim_sensor_cfg.sensor_subtype = sensor.sim_sensor_subtype
-            sim_sensor_cfg.gpu2gpu_transfer = (
-                self.habitat_config.HABITAT_SIM_V0.GPU_GPU
-            )
+            sim_sensor_cfg.gpu2gpu_transfer = self.habitat_config.HABITAT_SIM_V0.GPU_GPU
             sensor_specifications.append(sim_sensor_cfg)
 
         agent_config.sensor_specifications = sensor_specifications
@@ -400,9 +387,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
             if isinstance(position_b[0], (Sequence, np.ndarray)):
                 path.requested_ends = np.array(position_b, dtype=np.float32)
             else:
-                path.requested_ends = np.array(
-                    [np.array(position_b, dtype=np.float32)]
-                )
+                path.requested_ends = np.array([np.array(position_b, dtype=np.float32)])
         else:
             path = episode._shortest_path_cache
 
@@ -573,9 +558,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
         if position is None or rotation is None:
             success = True
         else:
-            success = self.set_agent_state(
-                position, rotation, reset_sensors=False
-            )
+            success = self.set_agent_state(position, rotation, reset_sensors=False)
 
         if success:
             sim_obs = self.get_sensor_observations()
@@ -596,9 +579,7 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
     def distance_to_closest_obstacle(
         self, position: ndarray, max_search_radius: float = 2.0
     ) -> float:
-        return self.pathfinder.distance_to_closest_obstacle(
-            position, max_search_radius
-        )
+        return self.pathfinder.distance_to_closest_obstacle(position, max_search_radius)
 
     def island_radius(self, position: Sequence[float]) -> float:
         return self.pathfinder.island_radius(position)
