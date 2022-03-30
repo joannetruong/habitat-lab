@@ -44,7 +44,6 @@ parser.add_argument("-pn", "--pepper_noise", default=False, action="store_true")
 parser.add_argument("-rn", "--redwood_noise", default=False, action="store_true")
 parser.add_argument("-mb", "--median_blur", default=False, action="store_true")
 parser.add_argument("-ks", "--kernel_size", type=float, default=9)
-parser.add_argument("-ni", "--num_iters", type=int, default=1)
 parser.add_argument("-np", "--noise_percent", type=float, default=0.4)
 parser.add_argument("-cn", "--cutout_noise", default=False, action="store_true")
 parser.add_argument("-curr", "--curriculum", default=False, action="store_true")
@@ -271,8 +270,6 @@ if not args.eval:
             exp_yaml_data[idx] = f"        NOISE_PERCENT: {args.noise_percent}"
         elif i.startswith("        KERNEL_SIZE:"):
             exp_yaml_data[idx] = f"        KERNEL_SIZE: {args.kernel_size}"
-        elif i.startswith("        NUM_ITERS:"):
-            exp_yaml_data[idx] = f"        NUM_ITERS: {args.num_iters}"
         elif i.startswith("    decoder_output:"):
             if args.surface_normal:
                 exp_yaml_data[idx] = "    decoder_output: ['depth', 'surface_normals']"
@@ -463,8 +460,6 @@ else:
             eval_exp_yaml_data[idx] = f"        NOISE_PERCENT: {args.noise_percent}"
         elif i.startswith("        KERNEL_SIZE:"):
             eval_exp_yaml_data[idx] = f"        KERNEL_SIZE: {args.kernel_size}"
-        elif i.startswith("        NUM_ITERS:"):
-            eval_exp_yaml_data[idx] = f"        NUM_ITERS: {args.num_iters}"
 
     if os.path.isdir(tb_dir):
         response = input(
