@@ -27,6 +27,7 @@ gdown "https://drive.google.com/uc?id=1_JtEWPIgPaZVkH8fw2VNVssyLqr9pD7T" -O data
 cd data/datasets/pointnav_hm3d_gibson && unzip pointnav_spot_0.3.zip && rm pointnav_spot_0.3.zip && \
 cd ../../scene_datasets && \
 ln -s /datasets01/hm3d/090121/ hm3d && \
+ln -s /datasets01/gibson/011719/491_scenes/ gibson && \
 cd .. && \
 gdown "https://drive.google.com/uc?id=1EH-429McoUV81lIlAJlPCVPR8WTQWaWE" -O URDF_demo_assets.zip && \
 unzip URDF_demo_assets.zip && rm URDF_demo_assets.zip && \
