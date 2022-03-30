@@ -66,6 +66,26 @@ cv2 = try_cv2_import()
 
 MAP_THICKNESS_SCALAR: int = 128
 
+import torch
+import torch.nn.functional as F
+
+
+def depth_to_surface_normals(depth, surfnorm_scalar=256):
+    SURFNORM_KERNEL = torch.from_numpy(
+        np.array(
+            [
+                [[1, 2, 1], [0, 0, 0], [-1, -2, -1]],
+                [[1, 0, -1], [2, 0, -2], [1, 0, -1]],
+                [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            ]
+        )
+    )[:, np.newaxis, ...].to(dtype=torch.float32, device=depth.device)
+    with torch.no_grad():
+        surface_normals = F.conv2d(depth, surfnorm_scalar * SURFNORM_KERNEL, padding=1)
+        surface_normals[:, 2, ...] = 1
+        surface_normals = surface_normals / surface_normals.norm(dim=1, keepdim=True)
+    return surface_normals
+
 
 def merge_sim_episode_config(sim_config: Config, episode: Episode) -> Any:
     sim_config.defrost()
@@ -1607,7 +1627,9 @@ class SpotDepthSensor(HabitatSimDepthSensor):
     def get_observation(self, sim_obs):
         obs = sim_obs.get(self.uuid, None)
         assert isinstance(obs, np.ndarray)
-        obs[obs > self.config.MAX_DEPTH] = 0.0  # Spot blacks out far pixels
+        # obs[obs > self.config.MAX_DEPTH] = 0.0  # Make far pixels white
+        obs[obs > self.config.MAX_DEPTH] = 255.0  # Make far pixels white
+        obs[obs == 0] = 255.0  # Make inf values white
         obs = np.clip(obs, self.config.MIN_DEPTH, self.config.MAX_DEPTH)
         obs = cv2.resize(obs, (128, 256))
 
@@ -1631,3 +1653,38 @@ class SpotLeftDepthSensor(SpotDepthSensor):
 class SpotRightDepthSensor(SpotDepthSensor):
     def _get_uuid(self, *args, **kwargs):
         return "spot_right_depth"
+
+
+@registry.register_sensor
+class SpotSurfaceNormalSensor(HabitatSimRGBSensor):
+    def _get_uuid(self, *args, **kwargs):
+        return "surface_normals"
+
+    ## Hack to get Spot cameras resized to 256,256 after concatenation
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Box:
+        return spaces.Box(
+            low=0,
+            high=2,
+            shape=(256, 256, 3),
+            dtype=np.float32,
+        )
+
+    def get_observation(self, sim_obs):
+        left_depth_obs = sim_obs.get("spot_left_depth", None)
+        right_depth_obs = sim_obs.get("spot_right_depth", None)
+
+        depth_obs = np.concatenate(
+            [
+                # Spot is cross-eyed; right is on the left on the FOV
+                right_depth_obs,
+                left_depth_obs,
+            ],
+            axis=1,
+        )
+
+        depth_obs = depth_obs.reshape(1, 1, *depth_obs.shape[:2])
+        sn = depth_to_surface_normals(torch.from_numpy(depth_obs))
+        sn = sn.squeeze(0)
+        sn = sn.permute(1, 2, 0)  # CHW => HWC
+        # sn = sn.permute((0, 3, 1, 2))  # NHWC => NCHW
+        return sn

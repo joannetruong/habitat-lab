@@ -1,4 +1,4 @@
-BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot_splitnet_train.yaml"
+BASE_TASK_CONFIG_PATH: "configs/tasks/pointnav_spot.yaml"
 TOTAL_NUM_STEPS: 5e7
 
 VERBOSE: False
@@ -14,7 +14,7 @@ CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_res
 TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'
 TEST_EPISODE_COUNT: -1
 NUM_ENVIRONMENTS: 8
-SENSORS: ['SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR', 'SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR', 'SPOT_SURFACE_NORMAL_SENSOR']
+SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']
 NUM_UPDATES: -1
 LOG_INTERVAL: 10
 NUM_CHECKPOINTS: 100
@@ -34,6 +34,7 @@ RL:
     action_distribution_type: "gaussian"
   SPLITNET:
     create_decoder: True
+    decoder_output: ["depth"]
     separate_optimizers: False
     use_visual_loss: True
     use_motion_loss: False
@@ -44,7 +45,7 @@ RL:
     update_motion_decoder_features: False
     freeze_motion_decoder_features: False
     freeze_policy_decoder_features: False
-    pretrained_encoder: True
+    pretrained_encoder: False
     pretrained_weights: /coc/testnvme/jtruong33/google_nav/splitnet/output_files/hm3d/splitnet_pretrain/checkpoints/2022_02_11_22_34_05/001001000.pt
   PPO:
     # ppo params

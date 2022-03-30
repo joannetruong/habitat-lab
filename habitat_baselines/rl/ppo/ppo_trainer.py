@@ -157,8 +157,8 @@ class PPOTrainer(BaseRLTrainer):
             observation_space, self.obs_transforms
         )
         # hack to prevent training with RGB; but still be able to evaluate / generate videos with RGB
-        # if "rgb" in observation_space.spaces:
-        #     del observation_space.spaces["rgb"]
+        if "rgb" in observation_space.spaces:
+            del observation_space.spaces["rgb"]
 
         self.actor_critic = policy.from_config(
             self.config,
@@ -201,59 +201,60 @@ class PPOTrainer(BaseRLTrainer):
             nn.init.orthogonal_(self.actor_critic.critic.fc.weight)
             nn.init.constant_(self.actor_critic.critic.fc.bias, 0)
 
-        if self.config.RL.SPLITNET.pretrained_encoder:
-            pretrained_state = torch.load(
-                self.config.RL.SPLITNET.pretrained_weights, map_location="cpu"
-            )
-            prefix = "base.visual_encoder.module."
-            self.actor_critic.net.visual_encoder.load_state_dict(
-                {
-                    k[len(prefix) :]: v
-                    for k, v in pretrained_state.items()
-                    if k.startswith(prefix)
-                }
-            )
-            print("LOADED SPLITNET PRETRAINED ENCODER ")
+        if self.config.RL.POLICY.name == "PointNavSplitNetPolicy":
+            if self.config.RL.SPLITNET.pretrained_encoder:
+                pretrained_state = torch.load(
+                    self.config.RL.SPLITNET.pretrained_weights, map_location="cpu"
+                )
+                prefix = "base.visual_encoder.module."
+                self.actor_critic.net.visual_encoder.load_state_dict(
+                    {
+                        k[len(prefix) :]: v
+                        for k, v in pretrained_state.items()
+                        if k.startswith(prefix)
+                    }
+                )
+                print("LOADED SPLITNET PRETRAINED ENCODER ")
 
-        visual_layers = self.actor_critic.net.visual_encoder
-        if self.config.RL.SPLITNET.freeze_encoder_features:
-            for param in visual_layers.encoder.parameters():
-                param.requires_grad = False
-        if self.config.RL.SPLITNET.freeze_visual_decoder_features:
-            if hasattr(visual_layers, "bridge"):
-                for param in visual_layers.bridge.parameters():
+            visual_layers = self.actor_critic.net.visual_encoder
+            if self.config.RL.SPLITNET.freeze_encoder_features:
+                for param in visual_layers.encoder.parameters():
                     param.requires_grad = False
-            if hasattr(visual_layers, "decoder"):
-                for param in visual_layers.decoder.parameters():
-                    param.requires_grad = False
-            if hasattr(visual_layers, "out"):
-                for param in visual_layers.out.parameters():
-                    param.requires_grad = False
-            if hasattr(visual_layers, "class_pred_layer"):
-                if visual_layers.class_pred_layer is not None:
-                    for param in visual_layers.class_pred_layer.parameters():
+            if self.config.RL.SPLITNET.freeze_visual_decoder_features:
+                if hasattr(visual_layers, "bridge"):
+                    for param in visual_layers.bridge.parameters():
                         param.requires_grad = False
+                if hasattr(visual_layers, "decoder"):
+                    for param in visual_layers.decoder.parameters():
+                        param.requires_grad = False
+                if hasattr(visual_layers, "out"):
+                    for param in visual_layers.out.parameters():
+                        param.requires_grad = False
+                if hasattr(visual_layers, "class_pred_layer"):
+                    if visual_layers.class_pred_layer is not None:
+                        for param in visual_layers.class_pred_layer.parameters():
+                            param.requires_grad = False
 
-        if (
-            self.config.RL.SPLITNET.freeze_motion_decoder_features
-            and self.config.RL.SPLITNET.freeze_policy_decoder_features
-        ):
-            for param in self.actor_critic.net.visual_fc.parameters():
-                param.requires_grad = False
+            if (
+                self.config.RL.SPLITNET.freeze_motion_decoder_features
+                and self.config.RL.SPLITNET.freeze_policy_decoder_features
+            ):
+                for param in self.actor_critic.net.visual_fc.parameters():
+                    param.requires_grad = False
 
-        if self.config.RL.SPLITNET.freeze_motion_decoder_features:
-            for param in self.actor_critic.net.egomotion_layer.parameters():
-                param.requires_grad = False
-            for param in self.actor_critic.net.motion_model_layer.parameters():
-                param.requires_grad = False
+            if self.config.RL.SPLITNET.freeze_motion_decoder_features:
+                for param in self.actor_critic.net.egomotion_layer.parameters():
+                    param.requires_grad = False
+                for param in self.actor_critic.net.motion_model_layer.parameters():
+                    param.requires_grad = False
 
-        if self.config.RL.SPLITNET.freeze_policy_decoder_features:
-            for param in self.actor_critic.net.state_encoder.parameters():
-                param.requires_grad = False
-            for param in self.actor_critic.critic.parameters():
-                param.requires_grad = False
-            for param in self.actor_critic.action_distribution.parameters():
-                param.requires_grad = False
+            if self.config.RL.SPLITNET.freeze_policy_decoder_features:
+                for param in self.actor_critic.net.state_encoder.parameters():
+                    param.requires_grad = False
+                for param in self.actor_critic.critic.parameters():
+                    param.requires_grad = False
+                for param in self.actor_critic.action_distribution.parameters():
+                    param.requires_grad = False
 
         self.agent = (DDPPO if self._is_distributed else PPO)(
             actor_critic=self.actor_critic,

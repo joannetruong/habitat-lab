@@ -28,16 +28,15 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from gym import spaces
 from habitat.config import Config
 from habitat.core.logging import logger
 from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.utils.common import (
-    center_crop,
-    get_image_height_width,
-    image_resize_shortest_edge,
-    overwrite_gym_box_shape,
-)
+from habitat_baselines.utils.common import (center_crop,
+                                            get_image_height_width,
+                                            image_resize_shortest_edge,
+                                            overwrite_gym_box_shape)
 from torch import nn
 
 
@@ -1343,6 +1342,89 @@ class PepperNoise(ObservationTransformer):
     def from_config(cls, config: Config):
         pepper_noise_config = config.RL.POLICY.OBS_TRANSFORMS.PEPPER_NOISE
         return cls(pepper_noise_config.WHITE, pepper_noise_config.NOISE_PERCENT)
+
+    def transform_observation_space(self, observation_space: spaces.Dict):
+        # No transform needed
+        return observation_space
+
+    @torch.no_grad()
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        observations.update(
+            {
+                sensor: self._transform_obs(observations[sensor])
+                for sensor in self.trans_keys
+                if sensor in observations
+            }
+        )
+        return observations
+
+
+@baseline_registry.register_obs_transformer(name="MEDIAN_BLUR")
+class MedianBlur(ObservationTransformer):
+    """Median blur"""
+
+    def __init__(
+        self,
+        kernel_size: float,
+        num_iters: int,
+        trans_keys: Tuple[str] = (
+            "depth",
+            "spot_left_depth",
+            "spot_right_depth",
+        ),
+    ):
+        """Args:
+        kernel_size: kernel size for blurring
+        num_iters: number of times to iterate blurring
+        trans_keys: list of keys it will try to transform from obs
+        """
+        super().__init__()
+        self.trans_keys = trans_keys
+        self.kernel = self.get_binary_kernel2d((kernel_size, kernel_size))
+        self.padding = self._compute_zero_padding((kernel_size, kernel_size))
+
+        self.num_iters = num_iters
+
+    def get_binary_kernel2d(self, window_size: Tuple[int, int]) -> torch.Tensor:
+        r"""Create a binary kernel to extract the patches. If the window size
+        is HxW will create a (H*W)xHxW kernel.
+        """
+        window_range: int = window_size[0] * window_size[1]
+        kernel: torch.Tensor = torch.zeros(window_range, window_range)
+        for i in range(window_range):
+            kernel[i, i] += 1.0
+        return kernel.view(window_range, 1, window_size[0], window_size[1])
+
+    def _compute_zero_padding(self, kernel_size: Tuple[int, int]) -> Tuple[int, int]:
+        r"""Utility function that computes zero padding tuple."""
+        computed: List[int] = [(k - 1) // 2 for k in kernel_size]
+        return computed[0], computed[1]
+
+    def _transform_obs(self, obs: torch.Tensor) -> torch.Tensor:
+        # NHWC -> NCHW
+        obs = obs.permute(0, 3, 1, 2)
+        b, c, h, w = obs.shape
+
+        kernel = self.kernel.to(obs)
+        # map the local window to single vector
+        features = F.conv2d(
+            obs.reshape(b * c, 1, h, w), kernel, padding=self.padding, stride=1
+        )
+        features = features.view(b, c, -1, h, w)  # BxCx(K_h * K_w)xHxW
+
+        # compute the median along the feature axis
+        for _ in range(self.num_iters):
+            median = torch.median(features, dim=2)[0]
+            features = median
+
+        # NCHW -> NHWC
+        features = features.permute(0, 2, 3, 1)
+        return features
+
+    @classmethod
+    def from_config(cls, config: Config):
+        median_blur_config = config.RL.POLICY.OBS_TRANSFORMS.MEDIAN_BLUR
+        return cls(median_blur_config.KERNEL_SIZE, median_blur_config.NUM_ITERS)
 
     def transform_observation_space(self, observation_space: spaces.Dict):
         # No transform needed

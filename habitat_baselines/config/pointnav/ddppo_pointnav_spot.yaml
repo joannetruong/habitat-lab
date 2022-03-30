@@ -40,6 +40,9 @@ RL:
         WHITE: False
       CUTOUT:
         WHITE: False
+      MEDIAN_BLUR:
+        KERNEL_SIZE: 9
+        NUM_ITERS: 1
   PPO:
     # ppo params
     clip_param: 0.2

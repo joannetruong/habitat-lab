@@ -33,6 +33,7 @@ class PointNavSplitNetPolicy(Policy):
         rnn_type: str = "GRU",
         action_distribution_type: str = "gaussian",
         create_decoder: bool = True,
+        decoder_output: list = ["depth"],
         separate_optimizers: bool = True,
         use_visual_loss: bool = True,
         use_motion_loss: bool = False,
@@ -42,7 +43,7 @@ class PointNavSplitNetPolicy(Policy):
         freeze_visual_decoder_features: bool = False,
         update_motion_decoder_features: bool = False,
         freeze_motion_decoder_features: bool = True,
-        **kwargs
+        **kwargs,
     ):
         discrete_actions = action_distribution_type == "categorical"
         super().__init__(
@@ -54,6 +55,7 @@ class PointNavSplitNetPolicy(Policy):
                 rnn_type=rnn_type,
                 discrete_actions=discrete_actions,
                 create_decoder=create_decoder,
+                decoder_output=decoder_output,
                 separate_optimizers=separate_optimizers,
                 use_visual_loss=use_visual_loss,
                 use_motion_loss=use_motion_loss,
@@ -70,9 +72,7 @@ class PointNavSplitNetPolicy(Policy):
         self.action_distribution_type = action_distribution_type
 
     @classmethod
-    def from_config(
-        cls, config: Config, observation_space: spaces.Dict, action_space
-    ):
+    def from_config(cls, config: Config, observation_space: spaces.Dict, action_space):
         return cls(
             observation_space=observation_space,
             action_space=action_space,
@@ -84,6 +84,7 @@ class PointNavSplitNetPolicy(Policy):
             force_blind_policy=config.FORCE_BLIND_POLICY,
             action_distribution_type=config.RL.POLICY.action_distribution_type,
             create_decoder=config.RL.SPLITNET.create_decoder,
+            decoder_output=config.RL.SPLITNET.decoder_output,
             separate_optimizers=config.RL.SPLITNET.separate_optimizers,
             use_visual_loss=config.RL.SPLITNET.use_visual_loss,
             use_motion_loss=config.RL.SPLITNET.use_motion_loss,
@@ -110,6 +111,7 @@ class PointNavSplitNetNet(Net):
         rnn_type: str,
         discrete_actions: bool = True,
         create_decoder=True,
+        decoder_output=["depth"],
         separate_optimizers=True,
         use_visual_loss=True,
         use_motion_loss=False,
@@ -131,10 +133,7 @@ class PointNavSplitNetNet(Net):
         self._n_prev_action = 32
         rnn_input_size = self._n_prev_action
 
-        if (
-            IntegratedPointGoalGPSAndCompassSensor.cls_uuid
-            in observation_space.spaces
-        ):
+        if IntegratedPointGoalGPSAndCompassSensor.cls_uuid in observation_space.spaces:
             n_input_goal = (
                 observation_space.spaces[
                     IntegratedPointGoalGPSAndCompassSensor.cls_uuid
@@ -146,10 +145,14 @@ class PointNavSplitNetNet(Net):
 
         self._hidden_size = hidden_size
 
-        self.decoder_output_info = [
+        decoder_output_info = [
             ("reconstruction", 1),
             ("depth", 1),
             ("surface_normals", 3),
+        ]
+
+        self.decoder_output_info = [
+            x for x in decoder_output_info if x[0] in decoder_output
         ]
 
         self.using_gray_camera = any(
@@ -160,7 +163,9 @@ class PointNavSplitNetNet(Net):
         )
 
         self.visual_encoder = ShallowVisualEncoder(
-            self.decoder_output_info, create_decoder, self.using_gray_camera
+            self.decoder_output_info,
+            create_decoder,
+            self.using_gray_camera or self.using_depth_camera,
         )
         self.num_output_channels = self.visual_encoder.num_output_channels
 
@@ -266,7 +271,7 @@ class PointNavSplitNetNet(Net):
         x = []
         if not self.is_blind:
             if "visual_features" in observations:
-                self.visual_feats = observations["visual_features"]
+                visual_feats = observations["visual_features"]
             else:
                 if self.using_gray_camera:
                     left_obs = observations["spot_left_gray"]
@@ -284,12 +289,12 @@ class PointNavSplitNetNet(Net):
                 )
                 obs = obs.permute(0, 3, 1, 2)  # NHWC => NCHW
                 (
-                    self.visual_feats,
-                    self.decoder_outputs,
-                    self.class_pred,
+                    visual_feats,
+                    decoder_outputs,
+                    class_pred,
                 ) = self.visual_encoder(obs, self.decoder_enabled)
-            self.visual_feats = self.visual_fc(self.visual_feats)
-            x.append(self.visual_feats)
+            visual_feats = self.visual_fc(visual_feats)
+            x.append(visual_feats)
 
         if IntegratedPointGoalGPSAndCompassSensor.cls_uuid in observations:
             goal_observations = observations[
@@ -307,19 +312,15 @@ class PointNavSplitNetNet(Net):
                     -1,
                 )
             else:
-                assert (
-                    goal_observations.shape[1] == 3
-                ), "Unsupported dimensionality"
+                assert goal_observations.shape[1] == 3, "Unsupported dimensionality"
                 vertical_angle_sin = torch.sin(goal_observations[:, 2])
                 # Polar Dimensionality 3
                 # 3D Polar transformation
                 goal_observations = torch.stack(
                     [
                         goal_observations[:, 0],
-                        torch.cos(-goal_observations[:, 1])
-                        * vertical_angle_sin,
-                        torch.sin(-goal_observations[:, 1])
-                        * vertical_angle_sin,
+                        torch.cos(-goal_observations[:, 1]) * vertical_angle_sin,
+                        torch.sin(-goal_observations[:, 1]) * vertical_angle_sin,
                         torch.cos(goal_observations[:, 2]),
                     ],
                     -1,
@@ -331,7 +332,5 @@ class PointNavSplitNetNet(Net):
         x.append(prev_actions)
 
         out = torch.cat(x, dim=1)
-        out, rnn_hidden_states = self.state_encoder(
-            out, rnn_hidden_states, masks
-        )
+        out, rnn_hidden_states = self.state_encoder(out, rnn_hidden_states, masks)
         return out, rnn_hidden_states

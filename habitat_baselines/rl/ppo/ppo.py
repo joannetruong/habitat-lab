@@ -40,9 +40,7 @@ def get_visual_loss(outputs, label_dict, output_info):
                 # Normalize
                 outputs_on = outputs_on / outputs_on.norm(dim=1, keepdim=True)
                 # Cosine similarity
-                visual_loss = -torch.sum(
-                    outputs_on * labels, dim=1, keepdim=True
-                )
+                visual_loss = -torch.sum(outputs_on * labels, dim=1, keepdim=True)
             else:
                 raise NotImplementedError("Loss not implemented")
         visual_loss = torch.mean(visual_loss)
@@ -62,20 +60,8 @@ def get_object_existence_loss(outputs, labels):
     return loss
 
 
-def get_visual_loss_with_rollout(
-    batch_obs, decoder_output_info, decoder_outputs
-):
+def get_visual_loss_with_rollout(batch_obs, decoder_output_info, decoder_outputs):
     labels = batch_obs.copy()
-    gray_obs = torch.cat(
-        [
-            # Spot is cross-eyed; right is on the left on the FOV
-            batch_obs["spot_right_gray"],
-            batch_obs["spot_left_gray"],
-        ],
-        dim=2,
-    )
-    labels["rgb"] = gray_obs.permute(0, 3, 1, 2)  # NHWC => NCHW
-
     depth_obs = torch.cat(
         [
             # Spot is cross-eyed; right is on the left on the FOV
@@ -86,13 +72,10 @@ def get_visual_loss_with_rollout(
     )
 
     labels["depth"] = depth_obs.permute(0, 3, 1, 2)  # NHWC => NCHW
-    labels["surface_normals"] = labels["surface_normals"].permute(
-        0, 3, 1, 2
-    )  # NHWC => NCHW
-
-    # labels = {
-    #     key: pt_util.remove_dim(val[:-1], 1) for key, val in labels.items()
-    # }
+    if "surface_normals" in batch_obs:
+        labels["surface_normals"] = batch_obs["surface_normals"].permute(
+            0, 3, 1, 2
+        )  # NHWC => NCHW
     return get_visual_loss(decoder_outputs, labels, decoder_output_info)
 
 
@@ -141,12 +124,8 @@ class PPO(nn.Module):
             self.use_visual_loss = actor_critic.net.use_visual_loss
             self.use_motion_loss = actor_critic.net.use_motion_loss
 
-            self.update_encoder_features = (
-                actor_critic.net.update_encoder_features
-            )
-            self.freeze_encoder_features = (
-                actor_critic.net.freeze_encoder_features
-            )
+            self.update_encoder_features = actor_critic.net.update_encoder_features
+            self.freeze_encoder_features = actor_critic.net.freeze_encoder_features
 
             self.update_visual_decoder_features = (
                 actor_critic.net.update_visual_decoder_features
@@ -174,15 +153,13 @@ class PPO(nn.Module):
             self.ac_parameters = [
                 param
                 for name, param in actor_critic.named_parameters()
-                if not any([i in name for i in SPLITNET_PARAMS])
-                and param.requires_grad
+                if not any([i in name for i in SPLITNET_PARAMS]) and param.requires_grad
             ]
 
             self.splitnet_params = [
                 param
                 for name, param in actor_critic.named_parameters()
-                if any([i in name for i in SPLITNET_PARAMS])
-                and param.requires_grad
+                if any([i in name for i in SPLITNET_PARAMS]) and param.requires_grad
             ]
             self.splitnet_optimizer = optim.Adam(
                 self.splitnet_params,
@@ -207,8 +184,7 @@ class PPO(nn.Module):
 
     def get_advantages(self, rollouts: RolloutStorage) -> Tensor:
         advantages = (
-            rollouts.buffers["returns"][:-1]
-            - rollouts.buffers["value_preds"][:-1]
+            rollouts.buffers["returns"][:-1] - rollouts.buffers["value_preds"][:-1]
         )
         if not self.use_normalized_advantage:
             return advantages
@@ -241,17 +217,15 @@ class PPO(nn.Module):
                 ):
                     if self.freeze_encoder_features:
                         visual_features = pt_util.remove_dim(
-                            batch["observations"]["visual_encoder_features"][
-                                :-1
-                            ],
+                            batch["observations"]["visual_encoder_features"][:-1],
                             1,
                         )
                     else:
                         obs = torch.cat(
                             [
                                 # Spot is cross-eyed; right is on the left on the FOV
-                                batch["observations"]["spot_right_gray"],
-                                batch["observations"]["spot_left_gray"],
+                                batch["observations"]["spot_right_depth"],
+                                batch["observations"]["spot_left_depth"],
                             ],
                             dim=2,
                         )
@@ -292,30 +266,20 @@ class PPO(nn.Module):
                             -1,
                         )
                         actions = batch["actions"][:-1].view(-1)
-                        egomotion_pred = (
-                            self.actor_critic.net.predict_egomotion(
-                                visual_features[1:], visual_features[:-1]
-                            )
+                        egomotion_pred = self.actor_critic.net.predict_egomotion(
+                            visual_features[1:], visual_features[:-1]
                         )
 
-                        egomotion_loss = get_egomotion_loss(
-                            actions, egomotion_pred
-                        )
-                        egomotion_loss = egomotion_loss * batch["masks"][
-                            1:-1
-                        ].view(-1)
-                        egomotion_loss_total = 0.25 * torch.mean(
-                            egomotion_loss
-                        )
+                        egomotion_loss = get_egomotion_loss(actions, egomotion_pred)
+                        egomotion_loss = egomotion_loss * batch["masks"][1:-1].view(-1)
+                        egomotion_loss_total = 0.25 * torch.mean(egomotion_loss)
                         egomotion_loss_value = egomotion_loss_total.item()
 
                         action_one_hot = pt_util.get_one_hot(
                             actions, self.actor_critic.num_actions
                         )
-                        next_feature_pred = (
-                            self.actor_critic.net.predict_next_features(
-                                visual_features[:-1], action_one_hot
-                            )
+                        next_feature_pred = self.actor_critic.net.predict_next_features(
+                            visual_features[:-1], action_one_hot
                         )
                         feature_loss = get_feature_prediction_loss(
                             visual_features[1:].detach(),
@@ -326,17 +290,13 @@ class PPO(nn.Module):
                         ].view(-1)
                         feature_loss_total = torch.mean(feature_loss)
 
-                        feature_prediction_loss_value = (
-                            feature_loss_total.item()
-                        )
-
+                        feature_prediction_loss_value = feature_loss_total.item()
+                    splitnet_total_loss = (
+                        visual_loss_total + egomotion_loss_total + feature_loss_total
+                    )
                     if self.separate_optimizers:
                         self.splitnet_optimizer.zero_grad()
-                        splitnet_total_loss = (
-                            visual_loss_total
-                            + egomotion_loss_total
-                            + feature_loss_total
-                        )
+
                         self.before_backward(splitnet_total_loss)
                         splitnet_total_loss.backward()
                         self.after_backward(splitnet_total_loss)
@@ -346,11 +306,7 @@ class PPO(nn.Module):
                         self.after_step()
                     else:
                         self.optimizer.zero_grad()
-                        splitnet_total_loss = (
-                            visual_loss_total
-                            + egomotion_loss_total
-                            + feature_loss_total
-                        )
+
                         self.before_backward(splitnet_total_loss)
                         splitnet_total_loss.backward()
                         self.after_backward(splitnet_total_loss)
@@ -366,12 +322,7 @@ class PPO(nn.Module):
                     self.actor_critic.net.disable_decoder()
 
                 ## PPO Policy Loss
-                (
-                    values,
-                    action_log_probs,
-                    dist_entropy,
-                    _,
-                ) = self._evaluate_actions(
+                (values, action_log_probs, dist_entropy, _,) = self._evaluate_actions(
                     batch["observations"],
                     batch["recurrent_hidden_states"],
                     batch["prev_actions"],
@@ -381,9 +332,7 @@ class PPO(nn.Module):
                 ratio = torch.exp(action_log_probs - batch["action_log_probs"])
                 surr1 = ratio * batch["advantages"]
                 surr2 = (
-                    torch.clamp(
-                        ratio, 1.0 - self.clip_param, 1.0 + self.clip_param
-                    )
+                    torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
                     * batch["advantages"]
                 )
                 action_loss = -(torch.min(surr1, surr2).mean())
@@ -393,12 +342,10 @@ class PPO(nn.Module):
                         values - batch["value_preds"]
                     ).clamp(-self.clip_param, self.clip_param)
                     value_losses = (values - batch["returns"]).pow(2)
-                    value_losses_clipped = (
-                        value_pred_clipped - batch["returns"]
-                    ).pow(2)
-                    value_loss = 0.5 * torch.max(
-                        value_losses, value_losses_clipped
+                    value_losses_clipped = (value_pred_clipped - batch["returns"]).pow(
+                        2
                     )
+                    value_loss = 0.5 * torch.max(value_losses, value_losses_clipped)
                 else:
                     value_loss = 0.5 * (batch["returns"] - values).pow(2)
 
@@ -465,9 +412,7 @@ class PPO(nn.Module):
         pass
 
     def before_step(self) -> None:
-        nn.utils.clip_grad_norm_(
-            self.actor_critic.parameters(), self.max_grad_norm
-        )
+        nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
 
     def after_step(self) -> None:
         pass

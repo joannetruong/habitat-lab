@@ -38,6 +38,9 @@ SIMULATOR:
     MAX_DEPTH: 3.5
     MIN_DEPTH: 0.3
     NORMALIZE_DEPTH: True
+    NOISE_MODEL: "RedwoodDepthNoiseModel"
+    NOISE_MODEL_KWARGS:
+      noise_multiplier: 2.0
   SPOT_RIGHT_DEPTH_SENSOR:
     TYPE: "SpotRightDepthSensor"
     WIDTH: 120
@@ -48,6 +51,9 @@ SIMULATOR:
     MAX_DEPTH: 3.5
     MIN_DEPTH: 0.3
     NORMALIZE_DEPTH: True
+    NOISE_MODEL: "RedwoodDepthNoiseModel"
+    NOISE_MODEL_KWARGS:
+      noise_multiplier: 2.0
   SPOT_SURFACE_NORMAL_SENSOR:
     TYPE: "SpotSurfaceNormalSensor"
     WIDTH: 256
