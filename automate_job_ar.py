@@ -39,6 +39,7 @@ parser.add_argument("-curr", "--curriculum", default=False, action="store_true")
 parser.add_argument("-e", "--eval", default=False, action="store_true")
 parser.add_argument("-cpt", "--ckpt", type=int, default=-1)
 parser.add_argument("-v", "--video", default=False, action="store_true")
+parser.add_argument("-ts", "--timestep", type=float, default=1.0)
 
 parser.add_argument("-d", "--debug", default=False, action="store_true")
 parser.add_argument("--ext", default="")
@@ -311,8 +312,10 @@ else:
             if not args.control_type == "dynamic":
                 eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      TIME_STEP:"):
+            eval_yaml_data[idx] = f"      TIME_STEP: {args.time_step}"
             if args.control_type == "dynamic":
                 eval_yaml_data[idx] = "      TIME_STEP: 0.33"
+
         elif i.startswith("      LIN_VEL_RANGE:"):
             eval_yaml_data[idx] = "      LIN_VEL_RANGE: [{}, {}]".format(
                 robot_lin_vel[0], robot_lin_vel[1]
