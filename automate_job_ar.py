@@ -72,6 +72,9 @@ if args.ext != "":
     eval_dst_dir += "_" + args.ext
 if args.outdoor:
     exp_name += "_ferst"
+if args.timestep != 1.0:
+    exp_name += f"_{args.timestep}"
+    eval_dst_dir += f"_{args.timestep}"
 
 new_eval_task_yaml_path = (
     os.path.join(eval_dst_dir, os.path.basename(task_yaml_path)).split(".yaml")[0]
