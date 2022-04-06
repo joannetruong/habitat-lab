@@ -312,7 +312,7 @@ else:
             if not args.control_type == "dynamic":
                 eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      TIME_STEP:"):
-            eval_yaml_data[idx] = f"      TIME_STEP: {args.time_step}"
+            eval_yaml_data[idx] = f"      TIME_STEP: {args.timestep}"
             if args.control_type == "dynamic":
                 eval_yaml_data[idx] = "      TIME_STEP: 0.33"
 
