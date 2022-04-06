@@ -222,6 +222,17 @@ def observations_to_image(observation: Dict, info: Dict) -> np.ndarray:
                 depth_map = depth_map.cpu().numpy()
 
             depth_map = depth_map.astype(np.uint8)
+            # if k == "spot_left_depth":
+            #     cv2.imwrite(
+            #         "/coc/pskynet3/jtruong33/develop/flash_results/outdoor_nav_results/spot_depth_splitnet/eval/kinematic_tmp/imgs/left_img_1.png",
+            #         depth_map,
+            #     )
+            #     print("saved image")
+            # elif k == "spot_right_depth":
+            #     cv2.imwrite(
+            #         "/coc/pskynet3/jtruong33/develop/flash_results/outdoor_nav_results/spot_depth_splitnet/eval/kinematic_tmp/imgs/right_img_1.png",
+            #         depth_map,
+            #     )
             depth_map = np.stack([depth_map for _ in range(3)], axis=2)
 
             egocentric_view_l.append(depth_map)

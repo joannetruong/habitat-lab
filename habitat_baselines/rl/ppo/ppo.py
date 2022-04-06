@@ -199,9 +199,10 @@ class PPO(nn.Module):
         dist_entropy_epoch = 0.0
 
         total_loss_epoch = 0
-        visual_loss_value = 0
-        egomotion_loss_value = 0
-        feature_prediction_loss_value = 0
+        visual_loss_epoch = 0
+        egomotion_loss_epoch = 0
+        feature_prediction_loss_epoch = 0
+        splitnet_total_loss_epoch = 0
         visual_losses = {}
 
         for _e in range(self.ppo_epoch):
@@ -254,7 +255,7 @@ class PPO(nn.Module):
                             self.actor_critic.net.decoder_output_info,
                             decoder_outputs,
                         )
-
+                        visual_loss_epoch += visual_loss_total.item()
                     if self.use_motion_loss:
                         visual_features = self.actor_critic.net.visual_fc(
                             visual_features
@@ -273,7 +274,6 @@ class PPO(nn.Module):
                         egomotion_loss = get_egomotion_loss(actions, egomotion_pred)
                         egomotion_loss = egomotion_loss * batch["masks"][1:-1].view(-1)
                         egomotion_loss_total = 0.25 * torch.mean(egomotion_loss)
-                        egomotion_loss_value = egomotion_loss_total.item()
 
                         action_one_hot = pt_util.get_one_hot(
                             actions, self.actor_critic.num_actions
@@ -291,9 +291,14 @@ class PPO(nn.Module):
                         feature_loss_total = torch.mean(feature_loss)
 
                         feature_prediction_loss_value = feature_loss_total.item()
+                        egomotion_loss_epoch += egomotion_loss_total.item()
+                        feature_prediction_loss_epoch += feature_loss_total.item()
+
                     splitnet_total_loss = (
                         visual_loss_total + egomotion_loss_total + feature_loss_total
                     )
+                    splitnet_total_loss_epoch += splitnet_total_loss.item()
+
                     if self.separate_optimizers:
                         self.splitnet_optimizer.zero_grad()
 
@@ -384,15 +389,21 @@ class PPO(nn.Module):
         dist_entropy_epoch /= num_updates
         total_loss_epoch /= num_updates
 
+        visual_loss_epoch /= num_updates
+        egomotion_loss_epoch /= num_updates
+        feature_prediction_loss_epoch /= num_updates
+        splitnet_total_loss_epoch /= num_updates
+
         return (
             value_loss_epoch,
             action_loss_epoch,
             dist_entropy_epoch,
             total_loss_epoch,
-            visual_loss_value,
+            visual_loss_epoch,
             visual_losses,
-            egomotion_loss_value,
-            feature_prediction_loss_value,
+            egomotion_loss_epoch,
+            feature_prediction_loss_epoch,
+            splitnet_total_loss_epoch,
         )
 
     def _evaluate_actions(

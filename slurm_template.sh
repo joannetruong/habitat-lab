@@ -6,7 +6,7 @@
 #SBATCH --nodes 1
 #SBATCH --ntasks-per-node $GPUS
 #SBATCH --partition $PARTITION
-#SBATCH --cpus-per-task=6
+#SBATCH --cpus-per-task=7
 # CONSTRAINT
 
 #SBATCH --chdir $HABITAT_REPO_PATH

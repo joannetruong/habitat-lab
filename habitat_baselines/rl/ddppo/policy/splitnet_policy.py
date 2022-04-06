@@ -8,17 +8,19 @@
 from collections import OrderedDict, deque
 from typing import Dict, Tuple
 
+import numpy as np
 import torch
 from dg_util.python_utils import pytorch_util as pt_util
 from gym import spaces
 from habitat.config import Config
 from habitat.tasks.nav.nav import IntegratedPointGoalGPSAndCompassSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.rl.models.rnn_state_encoder import \
-    build_rnn_state_encoder
+from habitat_baselines.rl.ddppo.policy import resnet
+from habitat_baselines.rl.ddppo.policy.resnet_policy import ResNetEncoder
+from habitat_baselines.rl.models.rnn_state_encoder import build_rnn_state_encoder
 from habitat_baselines.rl.ppo import Net, Policy
 from networks.building_blocks import ConvBlock
-from networks.networks import ShallowVisualEncoder
+from networks.networks import BaseResNetEncoder, ShallowVisualEncoder
 from torch import nn as nn
 
 
@@ -32,6 +34,7 @@ class PointNavSplitNetPolicy(Policy):
         num_recurrent_layers: int = 1,
         rnn_type: str = "GRU",
         action_distribution_type: str = "gaussian",
+        visual_encoder: str = "ShallowVisualEncoder",
         create_decoder: bool = True,
         decoder_output: list = ["depth"],
         separate_optimizers: bool = True,
@@ -54,6 +57,7 @@ class PointNavSplitNetPolicy(Policy):
                 num_recurrent_layers=num_recurrent_layers,
                 rnn_type=rnn_type,
                 discrete_actions=discrete_actions,
+                visual_encoder=visual_encoder,
                 create_decoder=create_decoder,
                 decoder_output=decoder_output,
                 separate_optimizers=separate_optimizers,
@@ -83,12 +87,13 @@ class PointNavSplitNetPolicy(Policy):
             normalize_visual_inputs="rgb" in observation_space.spaces,
             force_blind_policy=config.FORCE_BLIND_POLICY,
             action_distribution_type=config.RL.POLICY.action_distribution_type,
+            visual_encoder=config.RL.SPLITNET.visual_encoder,
             create_decoder=config.RL.SPLITNET.create_decoder,
             decoder_output=config.RL.SPLITNET.decoder_output,
             separate_optimizers=config.RL.SPLITNET.separate_optimizers,
             use_visual_loss=config.RL.SPLITNET.use_visual_loss,
             use_motion_loss=config.RL.SPLITNET.use_motion_loss,
-            update_encoder_features=config.RL.SPLITNET.update_encoder_features,
+            e_encoder_features=config.RL.SPLITNET.update_encoder_features,
             freeze_encoder_features=config.RL.SPLITNET.freeze_encoder_features,
             update_visual_decoder_features=config.RL.SPLITNET.update_visual_decoder_features,
             freeze_visual_decoder_features=config.RL.SPLITNET.freeze_visual_decoder_features,
@@ -110,6 +115,7 @@ class PointNavSplitNetNet(Net):
         num_recurrent_layers: int,
         rnn_type: str,
         discrete_actions: bool = True,
+        visual_encoder=ShallowVisualEncoder,
         create_decoder=True,
         decoder_output=["depth"],
         separate_optimizers=True,
@@ -123,6 +129,7 @@ class PointNavSplitNetNet(Net):
         freeze_motion_decoder_features=True,
     ):
         super().__init__()
+
         self.separate_optimizers = separate_optimizers
         self.discrete_actions = discrete_actions
         if discrete_actions:
@@ -161,21 +168,36 @@ class PointNavSplitNetNet(Net):
         self.using_depth_camera = any(
             [k.endswith("_depth") for k in observation_space.spaces.keys()]
         )
-
-        self.visual_encoder = ShallowVisualEncoder(
+        self.visual_encoder = eval(visual_encoder)(
             self.decoder_output_info,
             create_decoder,
             self.using_gray_camera or self.using_depth_camera,
         )
         self.num_output_channels = self.visual_encoder.num_output_channels
 
-        self.visual_fc = nn.Sequential(
-            ConvBlock(self.num_output_channels, hidden_size),
-            ConvBlock(hidden_size, hidden_size),
-            nn.AvgPool2d(2, 2),
-            pt_util.RemoveDim((2, 3)),
-            nn.Linear(hidden_size * 4 * 4, hidden_size),
-        )
+        if visual_encoder == "BaseResNetEncoder":
+            self.visual_encoder.encoder = ResNetEncoder(
+                observation_space,
+                baseplanes=64,
+                ngroups=64 // 2,
+                make_backbone=getattr(resnet, "resnet18"),
+                normalize_visual_inputs=False,
+            )
+            self.visual_fc = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(
+                    np.prod(self.visual_encoder.encoder.output_shape), hidden_size
+                ),
+                nn.ReLU(True),
+            )
+        else:
+            self.visual_fc = nn.Sequential(
+                ConvBlock(self.num_output_channels, hidden_size),
+                ConvBlock(hidden_size, hidden_size),
+                nn.AvgPool2d(2, 2),
+                pt_util.RemoveDim((2, 3)),
+                nn.Linear(hidden_size * 4 * 4, hidden_size),
+            )
 
         self.egomotion_layer = nn.Sequential(
             nn.Linear(2 * hidden_size, hidden_size),

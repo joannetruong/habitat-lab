@@ -33,10 +33,12 @@ from gym import spaces
 from habitat.config import Config
 from habitat.core.logging import logger
 from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.utils.common import (center_crop,
-                                            get_image_height_width,
-                                            image_resize_shortest_edge,
-                                            overwrite_gym_box_shape)
+from habitat_baselines.utils.common import (
+    center_crop,
+    get_image_height_width,
+    image_resize_shortest_edge,
+    overwrite_gym_box_shape,
+)
 from torch import nn
 
 
@@ -1409,10 +1411,10 @@ class MedianBlur(ObservationTransformer):
         features = features.view(b, c, -1, h, w)  # BxCx(K_h * K_w)xHxW
 
         # compute the median along the feature axis
-        median = torch.median(features, dim=2)
+        res = torch.median(features, dim=2)[0]
 
         # NCHW -> NHWC
-        median = median.permute(0, 2, 3, 1)
+        median = res.permute(0, 2, 3, 1)
         return median
 
     @classmethod
