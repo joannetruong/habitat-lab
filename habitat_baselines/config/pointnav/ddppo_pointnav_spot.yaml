@@ -37,9 +37,9 @@ RL:
       ENABLED_TRANSFORMS: [ ]
       PEPPER_NOISE:
         NOISE_PERCENT: 0.1
-        WHITE: False
+        WHITE: True
       CUTOUT:
-        WHITE: False
+        WHITE: True
       MEDIAN_BLUR:
         KERNEL_SIZE: 9
         NUM_ITERS: 1

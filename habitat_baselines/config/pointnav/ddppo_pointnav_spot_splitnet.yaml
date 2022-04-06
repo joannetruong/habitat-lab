@@ -32,7 +32,18 @@ RL:
   POLICY:
     name: "PointNavSplitNetPolicy"
     action_distribution_type: "gaussian"
+    OBS_TRANSFORMS:
+      ENABLED_TRANSFORMS: [ ]
+      PEPPER_NOISE:
+        NOISE_PERCENT: 0.1
+        WHITE: True
+      CUTOUT:
+        WHITE: True
+      MEDIAN_BLUR:
+        KERNEL_SIZE: 9
+        NUM_ITERS: 1
   SPLITNET:
+    visual_encoder: ShallowVisualEncoder
     create_decoder: True
     decoder_output: ["depth"]
     separate_optimizers: False

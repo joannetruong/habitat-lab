@@ -24,11 +24,12 @@ parser.add_argument("-sd", "--seed", type=int, default=100)
 parser.add_argument("-r", "--robot", default="Spot")
 parser.add_argument("-c", "--control-type", default="kinematic")
 parser.add_argument("-p", "--partition", default="long")
-parser.add_argument("--constraint", default=False, action="store_true")
+parser.add_argument("--constraint", default="x")
 
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
 parser.add_argument("-ne", "--num_environments", type=int, default=8)
+parser.add_argument("-ngpu", "--num_gpus", type=int, default=8)
 
 parser.add_argument("-g", "--use_gray", default=False, action="store_true")
 parser.add_argument("-gd", "--use_gray_depth", default=False, action="store_true")
@@ -37,6 +38,8 @@ parser.add_argument("--coda", default=False, action="store_true")
 
 parser.add_argument("--splitnet", default=False, action="store_true")
 parser.add_argument("-sn", "--surface_normal", default=False, action="store_true")
+parser.add_argument("-ve", "--visual-encoder", default="shallow")
+parser.add_argument("-ml", "--motion_loss", default=False, action="store_true")
 
 parser.add_argument("-2cnn", "--two_cnns", default=False, action="store_true")
 
@@ -95,9 +98,9 @@ if args.ext != "":
 if args.outdoor:
     exp_name += "_ferst"
     eval_dst_dir += "_ferst"
-if args.dataset == "coda":
-    exp_name += "_coda"
-    eval_dst_dir += "_coda"
+if "coda" in args.dataset:
+    exp_name += f"_{args.dataset}"
+    eval_dst_dir += f"_{args.dataset}"
 if args.pepper_noise:
     exp_name += f"_pepper_noise_{args.noise_percent}"
     eval_dst_dir += f"_pepper_noise_{args.noise_percent}"
@@ -203,6 +206,12 @@ if not args.eval:
             if args.dataset == "coda":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            if args.dataset == "coda_lobby":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby/coda_lobby.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            if args.dataset == "coda_lobby_hard":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby_hard/coda_lobby_hard.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             task_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
     with open(new_task_yaml_path, "w") as f:
@@ -225,7 +234,7 @@ if not args.eval:
             exp_yaml_data[idx] = f"NUM_ENVIRONMENTS: {args.num_environments}"
             if args.use_gray or args.use_gray_depth:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
-            if args.outdoor or args.dataset == "coda":
+            if args.outdoor or "coda" in args.dataset:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.use_gray:
@@ -271,8 +280,21 @@ if not args.eval:
         elif i.startswith("        KERNEL_SIZE:"):
             exp_yaml_data[idx] = f"        KERNEL_SIZE: {args.kernel_size}"
         elif i.startswith("    decoder_output:"):
-            if args.surface_normal:
+            if args.splitnet and args.surface_normal:
                 exp_yaml_data[idx] = "    decoder_output: ['depth', 'surface_normals']"
+        elif i.startswith("    use_motion_loss:"):
+            if args.splitnet and args.motion_loss:
+                exp_yaml_data[idx] = "    use_visual_loss: True"
+        elif i.startswith("    update_motion_decoder_features:"):
+            if args.splitnet and args.motion_loss:
+                exp_yaml_data[idx] = "    update_motion_decoder_features: True"
+        elif i.startswith("    visual_encoder:"):
+            if args.splitnet:
+                if args.visual_encoder == "shallow":
+                    visual_encoder = "ShallowVisualEncoder"
+                elif args.visual_encoder == "resnet":
+                    visual_encoder = "BaseResNetEncoder"
+                exp_yaml_data[idx] = f"    visual_encoder: {visual_encoder}"
 
     with open(new_exp_yaml_path, "w") as f:
         f.write("\n".join(exp_yaml_data))
@@ -290,11 +312,15 @@ if not args.eval:
     if args.debug:
         slurm_data = slurm_data.replace("$GPUS", "1")
     else:
-        slurm_data = slurm_data.replace("$GPUS", "8")
-    if args.constraint:
+        slurm_data = slurm_data.replace("$GPUS", f"{args.num_gpus}")
+    if args.constraint == "6000_a40":
         slurm_data = slurm_data.replace(
             "# CONSTRAINT", "#SBATCH --constraint rtx_6000|a40"
         )
+    elif args.constraint == "6000":
+        slurm_data = slurm_data.replace("# CONSTRAINT", "#SBATCH --constraint rtx_6000")
+    elif args.constraint == "a40":
+        slurm_data = slurm_data.replace("# CONSTRAINT", "#SBATCH --constraint a40")
     slurm_path = os.path.join(dst_dir, experiment_name + ".sh")
     with open(slurm_path, "w") as f:
         f.write(slurm_data)
@@ -362,7 +388,13 @@ else:
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             if args.dataset == "coda":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
-                eval_yaml_data[idx] = "  DATA_PATH: {data_path}"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            if args.dataset == "coda_lobby":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby/coda_lobby.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            if args.dataset == "coda_lobby_hard":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby_hard/coda_lobby_hard.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             eval_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
     with open(new_eval_task_yaml_path, "w") as f:
@@ -417,7 +449,7 @@ else:
         elif i.startswith("NUM_ENVIRONMENTS:"):
             if args.use_gray or args.use_gray_depth:
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
-            if args.outdoor or args.dataset == "coda":
+            if args.outdoor or "coda" in args.dataset:
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.video:
@@ -460,6 +492,18 @@ else:
             eval_exp_yaml_data[idx] = f"        NOISE_PERCENT: {args.noise_percent}"
         elif i.startswith("        KERNEL_SIZE:"):
             eval_exp_yaml_data[idx] = f"        KERNEL_SIZE: {args.kernel_size}"
+        elif i.startswith("    decoder_output:"):
+            if args.splitnet and args.surface_normal:
+                eval_exp_yaml_data[
+                    idx
+                ] = "    decoder_output: ['depth', 'surface_normals']"
+        elif i.startswith("    visual_encoder:"):
+            if args.splitnet:
+                if args.visual_encoder == "shallow":
+                    visual_encoder = "ShallowVisualEncoder"
+                elif args.visual_encoder == "resnet":
+                    visual_encoder = "BaseResNetEncoder"
+                eval_exp_yaml_data[idx] = f"    visual_encoder: {visual_encoder}"
 
     if os.path.isdir(tb_dir):
         response = input(
