@@ -65,8 +65,10 @@ if args.eval:
     exp_name += "_eval"
 if args.ckpt != -1:
     exp_name += "_ckpt_{}".format(args.ckpt)
+    eval_dst_dir += "_ckpt_{}".format(args.ckpt)
 if args.video:
     exp_name += "_video"
+    eval_dst_dir += "_video"
 if args.ext != "":
     exp_name += "_" + args.ext
     eval_dst_dir += "_" + args.ext
