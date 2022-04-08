@@ -19,73 +19,8 @@ from torch import optim as optim
 EPS_PPO = 1e-5
 
 
-def get_visual_loss(outputs, label_dict, output_info):
-    min_channel = 0
-    visual_losses = {}
-    for key, num_channels in output_info:
-        outputs_on = outputs[:, min_channel : min_channel + num_channels, ...]
-        if key == "reconstruction":
-            labels = label_dict["rgb"].to(torch.float32) / 128.0 - 1
-            visual_loss = F.l1_loss(outputs_on, labels, reduction="none")
-        else:
-            labels = label_dict[key]
-            if key == "depth":
-                visual_loss = F.l1_loss(outputs_on, labels, reduction="none")
-            elif key == "semantic":
-                assert labels.max() < outputs_on.shape[1]
-                visual_loss = 0.25 * F.cross_entropy(
-                    outputs_on, labels, reduction="none"
-                )
-            elif key == "surface_normals":
-                # Normalize
-                outputs_on = outputs_on / outputs_on.norm(dim=1, keepdim=True)
-                # Cosine similarity
-                visual_loss = -torch.sum(outputs_on * labels, dim=1, keepdim=True)
-            else:
-                raise NotImplementedError("Loss not implemented")
-        visual_loss = torch.mean(visual_loss)
-        if key == "surface_normals":
-            visual_loss = visual_loss + 1  # just a shift so it's not negative
-        visual_losses[key] = visual_loss
-        min_channel += num_channels
-
-    visual_loss_total = sum(visual_losses.values())
-    visual_losses = {key: val.item() for key, val in visual_losses.items()}
-    visual_loss_value = visual_loss_total.item()
-    return visual_loss_total, visual_loss_value, visual_losses
-
-
-def get_object_existence_loss(outputs, labels):
-    loss = F.binary_cross_entropy_with_logits(outputs, labels)
-    return loss
-
-
-def get_visual_loss_with_rollout(batch_obs, decoder_output_info, decoder_outputs):
-    labels = batch_obs.copy()
-    depth_obs = torch.cat(
-        [
-            # Spot is cross-eyed; right is on the left on the FOV
-            batch_obs["spot_right_depth"],
-            batch_obs["spot_left_depth"],
-        ],
-        dim=2,
-    )
-
-    labels["depth"] = depth_obs.permute(0, 3, 1, 2)  # NHWC => NCHW
-    if "surface_normals" in batch_obs:
-        labels["surface_normals"] = batch_obs["surface_normals"].permute(
-            0, 3, 1, 2
-        )  # NHWC => NCHW
-    return get_visual_loss(decoder_outputs, labels, decoder_output_info)
-
-
 def get_egomotion_loss(actions, egomotion_pred):
     loss = F.cross_entropy(egomotion_pred, actions, reduction="none")
-    return loss
-
-
-def get_feature_prediction_loss(features, features_pred):
-    loss = 1 - F.cosine_similarity(features, features_pred, dim=2)
     return loss
 
 
@@ -103,6 +38,7 @@ class PPO(nn.Module):
         max_grad_norm: Optional[float] = None,
         use_clipped_value_loss: bool = True,
         use_normalized_advantage: bool = True,
+        aux_tasks: list = [],
     ) -> None:
 
         super().__init__()
@@ -143,33 +79,12 @@ class PPO(nn.Module):
         except:
             self.separate_optimizers = False
 
-        if self.separate_optimizers:
-            SPLITNET_PARAMS = [
-                "visual_encoder",
-                "visual_fc",
-                "egomotion_layer",
-                "motion_model_layer",
-            ]
-            self.ac_parameters = [
-                param
-                for name, param in actor_critic.named_parameters()
-                if not any([i in name for i in SPLITNET_PARAMS]) and param.requires_grad
-            ]
+        self.ac_parameters = list(
+            filter(lambda p: p.requires_grad, actor_critic.parameters())
+        )
 
-            self.splitnet_params = [
-                param
-                for name, param in actor_critic.named_parameters()
-                if any([i in name for i in SPLITNET_PARAMS]) and param.requires_grad
-            ]
-            self.splitnet_optimizer = optim.Adam(
-                self.splitnet_params,
-                lr=lr,
-                eps=eps,
-            )
-        else:
-            self.ac_parameters = list(
-                filter(lambda p: p.requires_grad, actor_critic.parameters())
-            )
+        for task in aux_tasks:
+            self.ac_parameters += list(task.parameters())
 
         self.optimizer = optim.Adam(
             self.ac_parameters,
@@ -178,6 +93,8 @@ class PPO(nn.Module):
         )
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
+        self.aux_tasks = aux_tasks
+        # self.aux_tasks = [VisualReconstructionTask(None, None, None, None)]
 
     def forward(self, *x):
         raise NotImplementedError
@@ -212,120 +129,6 @@ class PPO(nn.Module):
             )
 
             for batch in data_generator:
-                ## Splitnet visual and motion auxiliary losses
-                if hasattr(self.actor_critic.net, "decoder_enabled") and (
-                    self.use_visual_loss or self.use_motion_loss
-                ):
-                    if self.freeze_encoder_features:
-                        visual_features = pt_util.remove_dim(
-                            batch["observations"]["visual_encoder_features"][:-1],
-                            1,
-                        )
-                    else:
-                        obs = torch.cat(
-                            [
-                                # Spot is cross-eyed; right is on the left on the FOV
-                                batch["observations"]["spot_right_depth"],
-                                batch["observations"]["spot_left_depth"],
-                            ],
-                            dim=2,
-                        )
-
-                        obs = obs.permute(0, 3, 1, 2)  # NHWC => NCHW
-
-                        (
-                            visual_features,
-                            decoder_outputs,
-                            class_pred,
-                        ) = self.actor_critic.net.visual_encoder(
-                            obs,
-                            self.use_visual_loss,
-                        )
-
-                    visual_loss_total = 0
-                    egomotion_loss_total = 0
-                    feature_loss_total = 0
-                    if self.use_visual_loss:
-                        (
-                            visual_loss_total,
-                            visual_loss_value,
-                            visual_losses,
-                        ) = get_visual_loss_with_rollout(
-                            batch["observations"],
-                            self.actor_critic.net.decoder_output_info,
-                            decoder_outputs,
-                        )
-                        visual_loss_epoch += visual_loss_total.item()
-                    if self.use_motion_loss:
-                        visual_features = self.actor_critic.net.visual_fc(
-                            visual_features
-                        )
-
-                        visual_features = visual_features.view(
-                            batch["observations"].shape[0] - 1,
-                            batch["observations"].shape[1],
-                            -1,
-                        )
-                        actions = batch["actions"][:-1].view(-1)
-                        egomotion_pred = self.actor_critic.net.predict_egomotion(
-                            visual_features[1:], visual_features[:-1]
-                        )
-
-                        egomotion_loss = get_egomotion_loss(actions, egomotion_pred)
-                        egomotion_loss = egomotion_loss * batch["masks"][1:-1].view(-1)
-                        egomotion_loss_total = 0.25 * torch.mean(egomotion_loss)
-
-                        action_one_hot = pt_util.get_one_hot(
-                            actions, self.actor_critic.num_actions
-                        )
-                        next_feature_pred = self.actor_critic.net.predict_next_features(
-                            visual_features[:-1], action_one_hot
-                        )
-                        feature_loss = get_feature_prediction_loss(
-                            visual_features[1:].detach(),
-                            next_feature_pred.view(visual_features[1:].shape),
-                        )
-                        feature_loss = feature_loss.view(-1) * batch["masks"][
-                            1:-1
-                        ].view(-1)
-                        feature_loss_total = torch.mean(feature_loss)
-
-                        feature_prediction_loss_value = feature_loss_total.item()
-                        egomotion_loss_epoch += egomotion_loss_total.item()
-                        feature_prediction_loss_epoch += feature_loss_total.item()
-
-                    splitnet_total_loss = (
-                        visual_loss_total + egomotion_loss_total + feature_loss_total
-                    )
-                    splitnet_total_loss_epoch += splitnet_total_loss.item()
-
-                    if self.separate_optimizers:
-                        self.splitnet_optimizer.zero_grad()
-
-                        self.before_backward(splitnet_total_loss)
-                        splitnet_total_loss.backward()
-                        self.after_backward(splitnet_total_loss)
-
-                        self.before_step()
-                        self.splitnet_optimizer.step()
-                        self.after_step()
-                    else:
-                        self.optimizer.zero_grad()
-
-                        self.before_backward(splitnet_total_loss)
-                        splitnet_total_loss.backward()
-                        self.after_backward(splitnet_total_loss)
-
-                        self.before_step()
-                        self.optimizer.step()
-                        self.after_step()
-                decoder_enabled = (
-                    hasattr(self.actor_critic.net, "decoder_enabled")
-                    and self.actor_critic.net.decoder_enabled
-                )
-                if decoder_enabled:
-                    self.actor_critic.net.disable_decoder()
-
                 ## PPO Policy Loss
                 (values, action_log_probs, dist_entropy, _,) = self._evaluate_actions(
                     batch["observations"],
@@ -354,6 +157,15 @@ class PPO(nn.Module):
                 else:
                     value_loss = 0.5 * (batch["returns"] - values).pow(2)
 
+                total_aux_loss = 0
+                aux_losses = []
+                if len(self.aux_tasks) > 0:  # Only nonempty in training
+                    raw_losses = self.actor_critic.evaluate_aux_losses(
+                        batch, self.aux_tasks
+                    )
+                    aux_losses = torch.stack(raw_losses)
+                total_aux_loss = torch.sum(aux_losses, dim=0)
+
                 value_loss = value_loss.mean()
                 dist_entropy = dist_entropy.mean()
                 self.optimizer.zero_grad()
@@ -361,6 +173,7 @@ class PPO(nn.Module):
                 total_loss = (
                     value_loss * self.value_loss_coef
                     + action_loss
+                    + total_aux_loss
                     - dist_entropy * self.entropy_coef
                 )
 
@@ -381,8 +194,8 @@ class PPO(nn.Module):
 
         num_updates = self.ppo_epoch * self.num_mini_batch
 
-        if decoder_enabled:
-            self.actor_critic.net.enable_decoder()
+        # if decoder_enabled:
+        #     self.actor_critic.net.enable_decoder()
 
         value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates

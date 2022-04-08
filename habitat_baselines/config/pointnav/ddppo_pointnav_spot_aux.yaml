@@ -60,6 +60,7 @@ RL:
     pretrained_weights: /coc/testnvme/jtruong33/google_nav/splitnet/output_files/hm3d/splitnet_pretrain/checkpoints/2022_02_11_22_34_05/001001000.pt
   PPO:
     # ppo params
+    actor_critic: BottleneckPolicy
     clip_param: 0.2
     ppo_epoch: 2
     num_mini_batch: 2
@@ -105,7 +106,7 @@ RL:
     rnn_type: LSTM
     num_recurrent_layers: 2
   AUX_TASKS:
-    tasks: ["VisualReconstructionTask"]
+    tasks: ["VisualReconstructionTask","EgomotionPredictionTask"]
     VisualReconstructionTask:
       type: ["depth"]
     EgomotionPredictionTask:
