@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=$TEMPLATE
+#SBATCH --job-name=jt_$TEMPLATE
 #SBATCH --output=$LOG.out
 #SBATCH --error=$LOG.err
 #SBATCH --gres gpu:1
