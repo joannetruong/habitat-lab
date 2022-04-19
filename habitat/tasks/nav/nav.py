@@ -1295,7 +1295,7 @@ class VelocityAction(SimulatorTaskAction):
         # tolerance of 1e-5. It is thus explicitly re-normalized here.
 
         # Convert from np.quaternion to mn.Quaternion
-        self.vel_control.linear_velocity = np.array([hor_vel, 0.0, -lin_vel])
+        self.vel_control.linear_velocity = np.array([-hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
         agent_state = self._sim.get_agent_state()
 
@@ -1454,12 +1454,12 @@ class DynamicVelocityAction(VelocityAction):
             ),
         }
 
-        # if self.has_hor_vel:
-        action_dict["horizontal_velocity"] = spaces.Box(
-            low=np.array([self.min_hor_vel]),
-            high=np.array([self.max_hor_vel]),
-            dtype=np.float32,
-        )
+        if self.has_hor_vel:
+            action_dict["horizontal_velocity"] = spaces.Box(
+                low=np.array([self.min_hor_vel]),
+                high=np.array([self.max_hor_vel]),
+                dtype=np.float32,
+            )
 
         return ActionSpace(action_dict)
 
@@ -1521,6 +1521,8 @@ class DynamicVelocityAction(VelocityAction):
         ang_vel = self.min_ang_vel + ang_vel * (self.max_ang_vel - self.min_ang_vel)
         ang_vel = np.deg2rad(ang_vel)
         hor_vel = self.min_hor_vel + hor_vel * (self.max_hor_vel - self.min_hor_vel)
+        if not self.has_hor_vel:
+            hor_vel = 0.0
 
         called_stop = (
             abs(lin_vel) < self.min_abs_lin_speed
