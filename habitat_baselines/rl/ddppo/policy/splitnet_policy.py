@@ -76,6 +76,7 @@ class PointNavSplitNetPolicy(Policy):
             action_distribution_type=action_distribution_type,
         )
         self.action_distribution_type = action_distribution_type
+        self.visual_features = None
 
     @classmethod
     def from_config(cls, config: Config, observation_space: spaces.Dict, action_space):
@@ -132,13 +133,16 @@ class PointNavSplitNetPolicy(Policy):
             obs = self.net.merge_spot_obs(observations)
             obs = obs.permute(0, 3, 1, 2)  # NHWC => NCHW
             visual_feats, _, _ = self.net.visual_encoder(obs, self.net.create_decoder)
-        observations["visual_features"] = visual_feats
+        self.visual_features = visual_feats
         return super().evaluate_actions(
             observations, rnn_hidden_states, prev_actions, masks, action
         )
 
-    def evaluate_aux_losses(self, batch, aux_tasks):
-        return [task.get_loss(batch) for task in aux_tasks]
+    def visual_features(self):
+        return self.visual_features
+
+    def evaluate_aux_losses(self, batch, visual_feats, aux_tasks):
+        return [task.get_loss(batch, visual_feats) for task in aux_tasks]
 
 
 class PointNavSplitNetNet(Net):

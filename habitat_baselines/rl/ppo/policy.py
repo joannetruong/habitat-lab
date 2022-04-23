@@ -8,9 +8,7 @@ import abc
 import torch
 from gym import spaces
 from habitat.config import Config
-from habitat.tasks.nav.nav import (ImageGoalSensor,
-                                   IntegratedPointGoalGPSAndCompassSensor,
-                                   PointGoalSensor)
+from habitat.tasks.nav.nav import IntegratedPointGoalGPSAndCompassSensor
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.rl.models.rnn_state_encoder import \
     build_rnn_state_encoder
@@ -110,6 +108,7 @@ class PointNavBaselinePolicy(Policy):
         observation_space: spaces.Dict,
         action_space,
         hidden_size: int = 512,
+        action_distribution_type: str = "gaussian",
         **kwargs,
     ):
         super().__init__(
@@ -119,6 +118,7 @@ class PointNavBaselinePolicy(Policy):
                 **kwargs,
             ),
             action_space.n,
+            action_distribution_type=action_distribution_type,
         )
 
     @classmethod
@@ -167,23 +167,20 @@ class PointNavBaselineNet(Net):
             self._n_input_goal = observation_space.spaces[
                 IntegratedPointGoalGPSAndCompassSensor.cls_uuid
             ].shape[0]
-        elif PointGoalSensor.cls_uuid in observation_space.spaces:
-            self._n_input_goal = observation_space.spaces[
-                PointGoalSensor.cls_uuid
-            ].shape[0]
-        elif ImageGoalSensor.cls_uuid in observation_space.spaces:
-            goal_observation_space = spaces.Dict(
-                {"rgb": observation_space.spaces[ImageGoalSensor.cls_uuid]}
-            )
-            self.goal_visual_encoder = SimpleCNN(goal_observation_space, hidden_size)
-            self._n_input_goal = hidden_size
 
         self._hidden_size = hidden_size
 
         self.visual_encoder = SimpleCNN(observation_space, hidden_size)
+        self.tgt_embeding_size = 512  # TODO: Don't hardcode
+        self.tgt_encoder = nn.Sequential(
+            nn.Linear(self._n_input_goal, self.tgt_embeding_size),
+            nn.ReLU(),
+            nn.Linear(self.tgt_embeding_size, self.tgt_embeding_size),
+            nn.ReLU(),
+        )
 
         self.state_encoder = build_rnn_state_encoder(
-            (0 if self.is_blind else self._hidden_size) + self._n_input_goal,
+            (0 if self.is_blind else self._hidden_size) + self.tgt_embeding_size,
             self._hidden_size,
         )
 
@@ -202,24 +199,15 @@ class PointNavBaselineNet(Net):
         return self.state_encoder.num_recurrent_layers
 
     def forward(self, observations, rnn_hidden_states, prev_actions, masks):
+        x = []
+        if not self.is_blind:
+            x.append(self.visual_encoder(observations))
         if IntegratedPointGoalGPSAndCompassSensor.cls_uuid in observations:
-            target_encoding = observations[
+            goal_observations = observations[
                 IntegratedPointGoalGPSAndCompassSensor.cls_uuid
             ]
-
-        elif PointGoalSensor.cls_uuid in observations:
-            target_encoding = observations[PointGoalSensor.cls_uuid]
-        elif ImageGoalSensor.cls_uuid in observations:
-            image_goal = observations[ImageGoalSensor.cls_uuid]
-            target_encoding = self.goal_visual_encoder({"rgb": image_goal})
-
-        x = [target_encoding]
-
-        if not self.is_blind:
-            perception_embed = self.visual_encoder(observations)
-            x = [perception_embed] + x
+            x.append(self.tgt_encoder(goal_observations))
 
         x_out = torch.cat(x, dim=1)
         x_out, rnn_hidden_states = self.state_encoder(x_out, rnn_hidden_states, masks)
-
         return x_out, rnn_hidden_states

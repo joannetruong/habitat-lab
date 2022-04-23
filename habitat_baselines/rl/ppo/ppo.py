@@ -93,7 +93,9 @@ class PPO(nn.Module):
         )
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
-        self.aux_tasks = aux_tasks
+        self.aux_tasks = nn.Sequential(*aux_tasks)
+        # self.actor_critic.decoder = aux_tasks.
+        print("AUX TASKS: ", self.aux_tasks)
         # self.aux_tasks = [VisualReconstructionTask(None, None, None, None)]
 
     def forward(self, *x):
@@ -158,13 +160,12 @@ class PPO(nn.Module):
                     value_loss = 0.5 * (batch["returns"] - values).pow(2)
 
                 total_aux_loss = 0
-                aux_losses = []
                 if len(self.aux_tasks) > 0:  # Only nonempty in training
                     raw_losses = self.actor_critic.evaluate_aux_losses(
-                        batch, self.aux_tasks
+                        batch, self.actor_critic.visual_features, self.aux_tasks
                     )
                     aux_losses = torch.stack(raw_losses)
-                total_aux_loss = torch.sum(aux_losses, dim=0)
+                    total_aux_loss = torch.sum(aux_losses, dim=0)
 
                 value_loss = value_loss.mean()
                 dist_entropy = dist_entropy.mean()
@@ -236,7 +237,10 @@ class PPO(nn.Module):
         pass
 
     def before_step(self) -> None:
-        nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
+        params = list(self.actor_critic.parameters())
+        for task in self.aux_tasks:
+            params += list(task.parameters())
+        nn.utils.clip_grad_norm_(params, self.max_grad_norm)
 
     def after_step(self) -> None:
         pass
