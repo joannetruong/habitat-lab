@@ -32,6 +32,6 @@ class RolloutAuxTask(nn.Module):
     def get_loss(
         self,
         observations,
-        actions,
+        visual_features,
     ):
         pass

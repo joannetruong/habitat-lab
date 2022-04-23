@@ -43,7 +43,7 @@ RL:
         KERNEL_SIZE: 9
         NUM_ITERS: 1
   SPLITNET:
-    visual_encoder: ShallowVisualEncoder
+    visual_encoder: BaseResNetEncoder
     create_decoder: True
     decoder_output: ["depth"]
     separate_optimizers: False

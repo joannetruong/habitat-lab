@@ -89,5 +89,12 @@ RL:
     backbone: resnet18
     rnn_type: LSTM
     num_recurrent_layers: 2
+  AUX_TASKS:
+    tasks: []
+    VisualReconstructionTask:
+      type: ["depth"]
+    EgomotionPredictionTask:
+      hidden_size: 256
+      num_actions: 3
 EVAL:
     SPLIT: "val"

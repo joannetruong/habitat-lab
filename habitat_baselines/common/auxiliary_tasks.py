@@ -8,14 +8,10 @@ from typing import Type
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from habitat import logger
 from habitat_baselines.common.aux_utils import RolloutAuxTask
 from habitat_baselines.common.baseline_registry import baseline_registry
 from networks.building_blocks import (Bridge, ConvBlock,
                                       ShallowUpBlockForHourglassNet)
-from networks.networks import BaseResNetEncoder, ShallowVisualEncoder
-from torch.distributions import Categorical, kl_divergence
 
 
 def get_aux_task_class(aux_task_name: str) -> Type[nn.Module]:
@@ -60,12 +56,12 @@ class EgomotionPredictionTask(RolloutAuxTask):
 
         return egomotion_pred
 
-    def get_loss(self, batch_obs):
+    def get_loss(self, batch_obs, visual_features):
         actions = batch_obs["actions"][:-1]
-        visual_feats = batch_obs["observations"]["visual_features"]
+        # visual_features = batch_obs["observations"]["visual_features"]
 
-        visual_features_curr = visual_feats[1:]
-        visual_features_prev = visual_feats[:-1]
+        visual_features_curr = visual_features[1:]
+        visual_features_prev = visual_features[:-1]
         decoder_in = torch.cat((visual_features_curr, visual_features_prev), dim=-1)
         decoder_in = decoder_in.view(-1, self.decoder[0].weight.shape[1])
 
@@ -82,7 +78,6 @@ class VisualReconstructionTask(RolloutAuxTask):
 
     def __init__(self, cfg, aux_cfg, task_cfg, device, **kwargs):
         super().__init__(cfg, aux_cfg, task_cfg, device, **kwargs)
-        print("INIT VISUAL RECONSTRUCTION TASK")
         self.bridge = Bridge(128, 128)
         up_blocks = [
             ShallowUpBlockForHourglassNet(128, 128, upsampling_method="bilinear"),
@@ -99,20 +94,22 @@ class VisualReconstructionTask(RolloutAuxTask):
             num_outputs += 1
         if "surface_normal" in aux_cfg.type:
             num_outputs += 3
-        print("NUM OUTPUTS: ", num_outputs)
         self.out = nn.Conv2d(32, num_outputs, kernel_size=1, stride=1)
 
         self.criterion = nn.L1Loss(reduction="none")
 
     def get_depth_loss(self, batch_obs, pred):
-        depth_label = torch.cat(
-            [
-                # Spot is cross-eyed; right is on the left on the FOV
-                batch_obs["observations"]["spot_right_depth"],
-                batch_obs["observations"]["spot_left_depth"],
-            ],
-            dim=2,
-        )
+        if "spot_right_depth" in batch_obs["observations"]:
+            depth_label = torch.cat(
+                [
+                    # Spot is cross-eyed; right is on the left on the FOV
+                    batch_obs["observations"]["spot_right_depth"],
+                    batch_obs["observations"]["spot_left_depth"],
+                ],
+                dim=2,
+            )
+        else:
+            depth_label = batch_obs["observations"]["depth"]
 
         depth_label = depth_label.permute(0, 3, 1, 2)  # NHWC => NCHW
         depth_pred = pred[:, 0:1, ...]
@@ -134,9 +131,9 @@ class VisualReconstructionTask(RolloutAuxTask):
         )
         return surface_normal_loss
 
-    def get_loss(self, batch_obs):
+    def get_loss(self, batch_obs, visual_features):
         visual_loss = 0
-        visual_features = batch_obs["observations"]["visual_features"]
+        # visual_features = batch_obs["observations"]["visual_features"]
         x = self.bridge(visual_features)
 
         for i, block in enumerate(self.decoder, 1):
