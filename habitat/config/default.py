@@ -87,10 +87,13 @@ ACTIONS.VELOCITY_CONTROL.MIN_ABS_HOR_SPEED = 0.025  # meters per sec
 ACTIONS.VELOCITY_CONTROL.MIN_ABS_ANG_SPEED = 1.0  # deg per sec
 
 ACTIONS.VELOCITY_CONTROL.TIME_STEP = 1.0  # seconds
+ACTIONS.VELOCITY_CONTROL.CONTACT_TEST = True  # seconds
 ACTIONS.VELOCITY_CONTROL.DISCRETE_ACTIONS = []
 ACTIONS.VELOCITY_CONTROL.MUST_CALL_STOP = True
 ACTIONS.VELOCITY_CONTROL.CTRL_FREQ = 240.0
 ACTIONS.VELOCITY_CONTROL.ROBOT_URDF = "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+ACTIONS.VELOCITY_CONTROL.MIN_RAND_PITCH = 0.0
+ACTIONS.VELOCITY_CONTROL.MAX_RAND_PITCH = 0.0
 
 # DYNAMIC VELOCITY ACTION
 ACTIONS.DYNAMIC_VELOCITY_CONTROL = CN()
@@ -133,9 +136,7 @@ _C.TASK.POINTGOAL_SENSOR.DIMENSIONALITY = 2
 # POINTGOAL WITH GPS+COMPASS SENSOR
 # -----------------------------------------------------------------------------
 _C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR = _C.TASK.POINTGOAL_SENSOR.clone()
-_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = (
-    "PointGoalWithGPSCompassSensor"
-)
+_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = "PointGoalWithGPSCompassSensor"
 # -----------------------------------------------------------------------------
 # OBJECTGOAL SENSOR
 # -----------------------------------------------------------------------------
@@ -211,9 +212,7 @@ _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 # -----------------------------------------------------------------------------
 _C.TASK.SOCIAL_TOP_DOWN_MAP = CN()
 _C.TASK.SOCIAL_TOP_DOWN_MAP.TYPE = "SocialTopDownMap"
-_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = (
-    _C.ENVIRONMENT.MAX_EPISODE_STEPS
-)
+_C.TASK.SOCIAL_TOP_DOWN_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_PADDING = 3
 _C.TASK.SOCIAL_TOP_DOWN_MAP.MAP_RESOLUTION = 1024
 _C.TASK.SOCIAL_TOP_DOWN_MAP.DRAW_SOURCE = True
@@ -286,9 +285,7 @@ _C.SIMULATOR = CN()
 _C.SIMULATOR.TYPE = "Sim-v0"
 _C.SIMULATOR.ACTION_SPACE_CONFIG = "v0"
 _C.SIMULATOR.FORWARD_STEP_SIZE = 0.25  # in metres
-_C.SIMULATOR.SCENE = (
-    "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
-)
+_C.SIMULATOR.SCENE = "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
 _C.SIMULATOR.SEED = _C.SEED
 _C.SIMULATOR.TURN_ANGLE = 10  # angle to rotate left or right in degrees
 _C.SIMULATOR.TILT_ANGLE = 15  # angle to tilt the camera up or down in degrees
@@ -352,9 +349,7 @@ _C.SIMULATOR.HABITAT_SIM_V0.GPU_GPU = False
 # Whether or not the agent slides on collisions
 _C.SIMULATOR.HABITAT_SIM_V0.ALLOW_SLIDING = True
 _C.SIMULATOR.HABITAT_SIM_V0.ENABLE_PHYSICS = False
-_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = (
-    "./data/default.physics_config.json"
-)
+_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = "./data/default.physics_config.json"
 _C.SIMULATOR.NUM_PEOPLE = 1
 # -----------------------------------------------------------------------------
 # PYROBOT
