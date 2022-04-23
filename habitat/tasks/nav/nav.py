@@ -22,30 +22,21 @@ from gym import spaces
 from gym.spaces.box import Box
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
-from habitat.core.embodied_task import EmbodiedTask, Measure, SimulatorTaskAction
+from habitat.core.embodied_task import (EmbodiedTask, Measure,
+                                        SimulatorTaskAction)
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import (
-    AgentState,
-    RGBSensor,
-    Sensor,
-    SensorTypes,
-    ShortestPathPoint,
-    Simulator,
-)
+from habitat.core.simulator import (AgentState, RGBSensor, Sensor, SensorTypes,
+                                    ShortestPathPoint, Simulator)
 from habitat.core.spaces import ActionSpace
 from habitat.core.utils import not_none_validator, try_cv2_import
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.sims.habitat_simulator.habitat_simulator import (
-    HabitatSimDepthSensor,
-    HabitatSimRGBSensor,
-)
+    HabitatSimDepthSensor, HabitatSimRGBSensor)
 from habitat.tasks.utils import cartesian_to_polar
-from habitat.utils.geometry_utils import (
-    euler_from_quaternion,
-    quaternion_from_coeff,
-    quaternion_rotate_vector,
-)
+from habitat.utils.geometry_utils import (euler_from_quaternion,
+                                          quaternion_from_coeff,
+                                          quaternion_rotate_vector)
 from habitat.utils.visualizations import fog_of_war, maps
 
 try:
@@ -56,10 +47,8 @@ try:
 except ImportError:
     pass
 
-from .robot_utils.raibert_controller import (
-    Raibert_controller_turn,
-    Raibert_controller_turn_stable,
-)
+from .robot_utils.raibert_controller import (Raibert_controller_turn,
+                                             Raibert_controller_turn_stable)
 from .robot_utils.robot_env import *
 
 cv2 = try_cv2_import()
@@ -1143,6 +1132,7 @@ class VelocityAction(SimulatorTaskAction):
         self.min_abs_ang_speed = config.MIN_ABS_ANG_SPEED
         self.robot_file = config.ROBOT_URDF
         self.time_step = config.TIME_STEP
+        self.use_contact_test = config.CONTACT_TEST
 
         # Horizontal velocity
         self.min_hor_vel, self.max_hor_vel = config.HOR_VEL_RANGE
@@ -1155,6 +1145,9 @@ class VelocityAction(SimulatorTaskAction):
         self.ctrl_freq = config.CTRL_FREQ
 
         self.must_call_stop = config.MUST_CALL_STOP
+
+        self.min_rand_pitch = config.MIN_RAND_PITCH
+        self.max_rand_pitch = config.MAX_RAND_PITCH
 
     @property
     def action_space(self):
@@ -1197,6 +1190,24 @@ class VelocityAction(SimulatorTaskAction):
             self.robot.robot_id = robot_id
         agent_pos = kwargs["episode"].start_position
         agent_rot = kwargs["episode"].start_rotation
+
+        if self._sim._sensors.get("spot_right_depth", False):
+            right_depth_sensor = self._sim._sensors["spot_right_depth"]
+            left_depth_sensor = self._sim._sensors["spot_left_depth"]
+            rand_tilt = np.random.uniform(self.min_rand_pitch, self.max_rand_pitch)
+
+            orig_right_ori = right_depth_sensor._spec.orientation.copy()
+            right_depth_sensor._spec.orientation = orig_right_ori + np.array(
+                [rand_tilt, 0, 0]
+            )
+            right_depth_sensor._sensor_object.set_transformation_from_spec()
+
+            orig_left_ori = left_depth_sensor._spec.orientation.copy()
+            left_depth_sensor._spec.orientation = orig_left_ori + np.array(
+                [rand_tilt, 0, 0]
+            )
+            left_depth_sensor._sensor_object.set_transformation_from_spec()
+
         self.robot.reset(agent_pos, agent_rot)
 
     def step(
@@ -1252,6 +1263,8 @@ class VelocityAction(SimulatorTaskAction):
                 position=None,
                 rotation=None,
             )
+        if not self.has_hor_vel:
+            hor_vel = 0.0
         self.vel_control.linear_velocity = np.array([-hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
 
@@ -1327,20 +1340,21 @@ class VelocityAction(SimulatorTaskAction):
         self.robot.robot_id.transformation = robot_T_global
 
         """See if goal state causes interpenetration with surroundings"""
-        collided = self._sim.contact_test(self.robot.robot_id.object_id)
-        if collided:
-            self.robot.robot_id.transformation = curr_rs
-            agent_observations = self._sim.get_observations_at()
-            self._sim._prev_sim_obs["collided"] = True  # type: ignore
-            agent_observations["hit_navmesh"] = True
-            agent_observations["moving_backwards"] = False
-            agent_observations["moving_sideways"] = False
-            agent_observations["ang_accel"] = 0.0
-            if kwargs.get("num_steps", -1) != -1:
-                agent_observations["num_steps"] = kwargs["num_steps"]
+        if self.use_contact_test:
+            collided = self._sim.contact_test(self.robot.robot_id.object_id)
+            if collided:
+                self.robot.robot_id.transformation = curr_rs
+                agent_observations = self._sim.get_observations_at()
+                self._sim._prev_sim_obs["collided"] = True  # type: ignore
+                agent_observations["hit_navmesh"] = True
+                agent_observations["moving_backwards"] = False
+                agent_observations["moving_sideways"] = False
+                agent_observations["ang_accel"] = 0.0
+                if kwargs.get("num_steps", -1) != -1:
+                    agent_observations["num_steps"] = kwargs["num_steps"]
 
-            self.prev_ang_vel = 0.0
-            return agent_observations
+                self.prev_ang_vel = 0.0
+                return agent_observations
 
         final_rotation = [
             *goal_rigid_state.rotation.vector,
