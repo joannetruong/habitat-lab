@@ -1153,12 +1153,12 @@ class VelocityAction(SimulatorTaskAction):
             ),
         }
 
-        # if self.has_hor_vel:
-        action_dict["horizontal_velocity"] = spaces.Box(
-            low=np.array([self.min_hor_vel]),
-            high=np.array([self.max_hor_vel]),
-            dtype=np.float32,
-        )
+        if self.has_hor_vel:
+            action_dict["horizontal_velocity"] = spaces.Box(
+                low=np.array([self.min_hor_vel]),
+                high=np.array([self.max_hor_vel]),
+                dtype=np.float32,
+            )
 
         return ActionSpace(action_dict)
 
@@ -1295,6 +1295,8 @@ class VelocityAction(SimulatorTaskAction):
         # tolerance of 1e-5. It is thus explicitly re-normalized here.
 
         # Convert from np.quaternion to mn.Quaternion
+        if not self.has_hor_vel:
+            hor_vel = 0.0
         self.vel_control.linear_velocity = np.array([-hor_vel, 0.0, -lin_vel])
         self.vel_control.angular_velocity = np.array([0.0, ang_vel, 0.0])
         agent_state = self._sim.get_agent_state()
@@ -1553,6 +1555,8 @@ class DynamicVelocityAction(VelocityAction):
             robot_start_rigid_state = task.robot_id.rigid_state
             for i in range(int(1 / self.time_step)):
                 state = task.robot_wrapper.calc_state()
+                if not self.has_hor_vel:
+                    hor_vel = 0.0
                 lin_hor = np.array([lin_vel, hor_vel])
                 latent_action = self.raibert_controller.plan_latent_action(
                     state, lin_hor, target_ang_vel=ang_vel

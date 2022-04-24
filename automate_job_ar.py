@@ -26,6 +26,7 @@ parser.add_argument("-c", "--control-type", required=True)
 parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
+parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
 
 ## using spot's camera instead of intel realsense
 parser.add_argument("-sc", "--spot_cameras", default=False, action="store_true")
@@ -186,6 +187,8 @@ if not args.eval:
             task_yaml_data[idx] = "      HOR_VEL_RANGE: [{}, {}]".format(
                 robot_lin_vel[0], robot_lin_vel[1]
             )
+            if args.no_hor_vel:
+                task_yaml_data[idx] = "      HOR_VEL_RANGE: [ 0.0, 0.0 ]"
         elif i.startswith("  SUCCESS_DISTANCE:"):
             task_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(succ_radius - 0.05)
         elif i.startswith("    SUCCESS_DISTANCE:"):
@@ -320,7 +323,6 @@ else:
             eval_yaml_data[idx] = f"      TIME_STEP: {args.timestep}"
             if args.control_type == "dynamic":
                 eval_yaml_data[idx] = "      TIME_STEP: 0.33"
-
         elif i.startswith("      LIN_VEL_RANGE:"):
             eval_yaml_data[idx] = "      LIN_VEL_RANGE: [{}, {}]".format(
                 robot_lin_vel[0], robot_lin_vel[1]
@@ -333,6 +335,8 @@ else:
             eval_yaml_data[idx] = "      HOR_VEL_RANGE: [{}, {}]".format(
                 robot_lin_vel[0], robot_lin_vel[1]
             )
+            if args.no_hor_vel:
+                eval_yaml_data[idx] = "      HOR_VEL_RANGE: [ 0.0, 0.0 ]"
         elif i.startswith("  SUCCESS_DISTANCE:"):
             eval_yaml_data[idx] = "  SUCCESS_DISTANCE: {}".format(succ_radius)
         elif i.startswith("    SUCCESS_DISTANCE:"):
