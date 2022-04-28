@@ -27,6 +27,12 @@ parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
 parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
+parser.add_argument("-mx", "--mean-x", type=float, default=0.0)
+parser.add_argument("-my", "--mean-y", type=float, default=0.0)
+parser.add_argument("-mt", "--mean-t", type=float, default=0.0)
+parser.add_argument("-vx", "--var-x", type=float, default=0.0)
+parser.add_argument("-vy", "--var-y", type=float, default=0.0)
+parser.add_argument("-vt", "--var-t", type=float, default=0.0)
 
 ## using spot's camera instead of intel realsense
 parser.add_argument("-sc", "--spot_cameras", default=False, action="store_true")
@@ -198,6 +204,18 @@ if not args.eval:
         elif i.startswith("  DATA_PATH:"):
             if args.outdoor:
                 data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/{split}/{split}.json.gz"
+        elif i.startswith("      NOISE_MEAN_X:"):
+            task_yaml_data[idx] = f"      NOISE_MEAN_X: {args.mean_x}"
+        elif i.startswith("      NOISE_MEAN_Y:"):
+            task_yaml_data[idx] = f"      NOISE_MEAN_Y: {args.mean_y}"
+        elif i.startswith("      NOISE_MEAN_T:"):
+            task_yaml_data[idx] = f"      NOISE_MEAN_T: {args.mean_t}"
+        elif i.startswith("      NOISE_VAR_X:"):
+            task_yaml_data[idx] = f"      NOISE_VAR_X: {args.var_x}"
+        elif i.startswith("      NOISE_VAR_Y:"):
+            task_yaml_data[idx] = f"      NOISE_VAR_Y: {args.var_y}"
+        elif i.startswith("      NOISE_VAR_T:"):
+            task_yaml_data[idx] = f"      NOISE_VAR_T: {args.var_t}"
 
     with open(new_task_yaml_path, "w") as f:
         f.write("\n".join(task_yaml_data))
