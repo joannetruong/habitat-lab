@@ -27,6 +27,8 @@ parser.add_argument("-p", "--partition", default="long")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
 parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
+
+# variances are converted to std in nav.py; angular means and variances are in degrees
 parser.add_argument("-mx", "--mean-x", type=float, default=0.0)
 parser.add_argument("-my", "--mean-y", type=float, default=0.0)
 parser.add_argument("-mt", "--mean-t", type=float, default=0.0)
