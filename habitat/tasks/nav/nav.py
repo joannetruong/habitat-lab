@@ -1317,10 +1317,10 @@ class VelocityAction(SimulatorTaskAction):
         )
 
         """Check if point is on navmesh"""
-        goal_rigid_state.translation.x += np.random.normal(loc=self.noise_mean_x, scale=self.noise_var_x)
-        goal_rigid_state.translation.z += np.random.normal(loc=self.noise_mean_y, scale=self.noise_var_y)
+        goal_rigid_state.translation.x += np.random.normal(loc=self.noise_mean_x, scale=np.sqrt(self.noise_var_x))
+        goal_rigid_state.translation.z += np.random.normal(loc=self.noise_mean_y, scale=np.sqrt(self.noise_var_y))
         ang = np.arctan2(goal_rigid_state.rotation.vector.y, goal_rigid_state.rotation.scalar) * 2 + \
-              np.random.normal(loc=self.noise_mean_t, scale=self.noise_var_t)
+              np.random.normal(loc=np.deg2rad(self.noise_mean_t), scale=np.sqrt(np.deg2rad(self.noise_var_t)))
         goal_rigid_state.rotation = mn.Quaternion.rotation(mn.Rad(ang), mn.Vector3(0, 1, 0))
 
         final_position = self._sim.pathfinder.try_step_no_sliding(  # type: ignore
