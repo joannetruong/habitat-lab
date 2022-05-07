@@ -111,10 +111,7 @@ class NavRLEnv(habitat.RLEnv):
             reward += self._rl_config.SUCCESS_REWARD
 
         if observations.get("hit_navmesh", False):
-            reward -= self._rl_config.COLLISION_PENALTY * min(
-                -10.0,
-                (observations["num_steps"] / 1e5) * self._rl_config.COLLISION_PENALTY,
-            )
+            reward -= self._rl_config.COLLISION_PENALTY
 
         if observations.get("moving_backwards", False):
             reward -= self._rl_config.BACKWARDS_PENALTY

@@ -28,9 +28,11 @@ parser.add_argument("-s", "--sliding", default=False, action="store_true")
 parser.add_argument("-nct", "--no-contact-test", default=False, action="store_true")
 parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
 parser.add_argument("-cp", "--collision-penalty", type=float, default=0.003)
+parser.add_argument("-vy", "--velocity-y", type=float, default=-1.0)
 parser.add_argument("-rpl", "--randomize-pitch-min", type=float, default=0.0)
 parser.add_argument("-rpu", "--randomize-pitch-max", type=float, default=0.0)
 parser.add_argument("-ts", "--time-step", type=float, default=1.0)
+parser.add_argument("-odn", "--outdoor-nav", default=False, action="store_true")
 parser.add_argument("--constraint", default="x")
 
 ## options for dataset are hm3d_gibson, hm3d, gibson
@@ -199,6 +201,10 @@ if not args.eval:
             if not args.control_type == "dynamic":
                 task_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      HOR_VEL_RANGE:"):
+            if args.velocity_y != -1.0:
+                task_yaml_data[
+                    idx
+                ] = f"      HOR_VEL_RANGE: [ {-args.velocity_y, -args.velocity_y} ]"
             if args.no_hor_vel:
                 task_yaml_data[idx] = "      HOR_VEL_RANGE: [ 0.0, 0.0 ]"
         elif i.startswith("      MIN_RAND_PITCH:"):
@@ -295,6 +301,8 @@ if not args.eval:
         elif i.startswith("    name:"):
             if args.policy_name == "cnn":
                 exp_yaml_data[idx] = "    name: PointNavBaselinePolicy"
+            if args.outdoor_nav:
+                exp_yaml_data[idx] = "    name: OutdoorPolicy"
         elif i.startswith("      ENABLED_TRANSFORMS: [ ]"):
             if args.pepper_noise:
                 exp_yaml_data[idx] = "      ENABLED_TRANSFORMS: ['PEPPER_NOISE']"
@@ -330,6 +338,9 @@ if not args.eval:
                     ] = f"    tasks: ['VisualReconstructionTask', 'EgomotionPredictionTask']"
                 else:
                     exp_yaml_data[idx] = f"    tasks: ['VisualReconstructionTask']"
+        elif i.startswith("  USE_OUTDOOR:"):
+            if args.outdoor_nav:
+                exp_yaml_data[idx] = f"  USE_OUTDOOR: True"
 
     with open(new_exp_yaml_path, "w") as f:
         f.write("\n".join(exp_yaml_data))
@@ -415,6 +426,10 @@ else:
             if not args.control_type == "dynamic":
                 eval_yaml_data[idx] = "    VELOCITY_CONTROL:"
         elif i.startswith("      HOR_VEL_RANGE:"):
+            if args.velocity_y != -1.0:
+                eval_yaml_data[
+                    idx
+                ] = f"      HOR_VEL_RANGE: [ {-args.velocity_y, -args.velocity_y} ]"
             if args.no_hor_vel:
                 eval_yaml_data[idx] = "      HOR_VEL_RANGE: [ 0.0, 0.0 ]"
         elif i.startswith("      TIME_STEP:"):
@@ -472,6 +487,11 @@ else:
             ] = f"TENSORBOARD_DIR:    '{os.path.join(eval_dst_dir, 'tb_evals', tb_dir)}'"
         elif i.startswith("NUM_PROCESSES:"):
             eval_exp_yaml_data[idx] = "NUM_PROCESSES: 13"
+        elif i.startswith("    name:"):
+            if args.policy_name == "cnn":
+                eval_exp_yaml_data[idx] = "    name: PointNavBaselinePolicy"
+            if args.outdoor_nav:
+                eval_exp_yaml_data[idx] = "    name: OutdoorPolicy"
         elif i.startswith("  COLLISION_PENALTY:"):
             eval_exp_yaml_data[idx] = f"  COLLISION_PENALTY: {args.collision_penalty}"
         elif i.startswith("CHECKPOINT_FOLDER:"):

@@ -7,6 +7,7 @@
 #SBATCH --ntasks-per-node $GPUS
 #SBATCH --partition $PARTITION
 #SBATCH --cpus-per-task=7
+#SBATCH --exclude randotron
 # CONSTRAINT
 
 #SBATCH --chdir $HABITAT_REPO_PATH

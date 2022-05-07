@@ -7,8 +7,6 @@
 from typing import Optional, Tuple
 
 import torch
-import torch.nn.functional as F
-from dg_util.python_utils import pytorch_util as pt_util
 from habitat.utils import profiling_wrapper
 from habitat_baselines.common.rollout_storage import RolloutStorage
 from habitat_baselines.rl.ppo.policy import Policy
@@ -17,11 +15,6 @@ from torch import nn as nn
 from torch import optim as optim
 
 EPS_PPO = 1e-5
-
-
-def get_egomotion_loss(actions, egomotion_pred):
-    loss = F.cross_entropy(egomotion_pred, actions, reduction="none")
-    return loss
 
 
 class PPO(nn.Module):
@@ -38,7 +31,8 @@ class PPO(nn.Module):
         max_grad_norm: Optional[float] = None,
         use_clipped_value_loss: bool = True,
         use_normalized_advantage: bool = True,
-        aux_tasks: list = [],
+        use_second_optimizer: bool = False,
+        second_optimizer_key=None,
     ) -> None:
 
         super().__init__()
@@ -55,55 +49,44 @@ class PPO(nn.Module):
         self.max_grad_norm = max_grad_norm
         self.use_clipped_value_loss = use_clipped_value_loss
 
-        try:
-            self.separate_optimizers = actor_critic.net.separate_optimizers
-            self.use_visual_loss = actor_critic.net.use_visual_loss
-            self.use_motion_loss = actor_critic.net.use_motion_loss
-
-            self.update_encoder_features = actor_critic.net.update_encoder_features
-            self.freeze_encoder_features = actor_critic.net.freeze_encoder_features
-
-            self.update_visual_decoder_features = (
-                actor_critic.net.update_visual_decoder_features
-            )
-            self.freeze_visual_decoder_features = (
-                actor_critic.net.freeze_visual_decoder_features
-            )
-
-            self.update_motion_decoder_features = (
-                actor_critic.net.update_motion_decoder_features
-            )
-            self.freeze_motion_decoder_features = (
-                actor_critic.net.freeze_motion_decoder_features
-            )
-        except:
-            self.separate_optimizers = False
-
-        self.ac_parameters = list(
-            filter(lambda p: p.requires_grad, actor_critic.parameters())
+        self.use_second_optimizer = use_second_optimizer
+        print("ACTOR CRITIC PARAMS: ")
+        print(
+            "USE SECOND OPTIMIZER: ",
+            use_second_optimizer,
+            " KEY : ",
+            second_optimizer_key,
         )
+        params_1, params_2 = [], []
+        for name, p in actor_critic.named_parameters():
+            if not p.requires_grad:
+                continue
+            if use_second_optimizer and second_optimizer_key in name:
+                params_2.append(p)
+            else:
+                params_1.append(p)
 
-        for task in aux_tasks:
-            self.ac_parameters += list(task.parameters())
+        self.optimizer = optim.Adam(params_1, lr=lr, eps=eps)
+        if use_second_optimizer:
+            self.optimizer2 = optim.Adam(params_2, lr=lr, eps=eps)
+        else:
+            self.optimizer2 = None
 
-        self.optimizer = optim.Adam(
-            self.ac_parameters,
-            lr=lr,
-            eps=eps,
-        )
+        # self.optimizer = optim.Adam(
+        #     list(filter(lambda p: p.requires_grad, actor_critic.parameters())),
+        #     lr=lr,
+        #     eps=eps,
+        # )
         self.device = next(actor_critic.parameters()).device
         self.use_normalized_advantage = use_normalized_advantage
-        self.aux_tasks = nn.Sequential(*aux_tasks)
-        # self.actor_critic.decoder = aux_tasks.
-        print("AUX TASKS: ", self.aux_tasks)
-        # self.aux_tasks = [VisualReconstructionTask(None, None, None, None)]
 
     def forward(self, *x):
         raise NotImplementedError
 
     def get_advantages(self, rollouts: RolloutStorage) -> Tensor:
         advantages = (
-            rollouts.buffers["returns"][:-1] - rollouts.buffers["value_preds"][:-1]
+            rollouts.buffers["returns"][:-1]  # type: ignore
+            - rollouts.buffers["value_preds"][:-1]
         )
         if not self.use_normalized_advantage:
             return advantages
@@ -117,13 +100,6 @@ class PPO(nn.Module):
         action_loss_epoch = 0.0
         dist_entropy_epoch = 0.0
 
-        total_loss_epoch = 0
-        visual_loss_epoch = 0
-        egomotion_loss_epoch = 0
-        feature_prediction_loss_epoch = 0
-        splitnet_total_loss_epoch = 0
-        visual_losses = {}
-
         for _e in range(self.ppo_epoch):
             profiling_wrapper.range_push("PPO.update epoch")
             data_generator = rollouts.recurrent_generator(
@@ -131,7 +107,6 @@ class PPO(nn.Module):
             )
 
             for batch in data_generator:
-                ## PPO Policy Loss
                 (values, action_log_probs, dist_entropy, _,) = self._evaluate_actions(
                     batch["observations"],
                     batch["recurrent_hidden_states"],
@@ -139,6 +114,7 @@ class PPO(nn.Module):
                     batch["masks"],
                     batch["actions"],
                 )
+
                 ratio = torch.exp(action_log_probs - batch["action_log_probs"])
                 surr1 = ratio * batch["advantages"]
                 surr2 = (
@@ -159,72 +135,80 @@ class PPO(nn.Module):
                 else:
                     value_loss = 0.5 * (batch["returns"] - values).pow(2)
 
-                total_aux_loss = 0
-                if len(self.aux_tasks) > 0:  # Only nonempty in training
-                    raw_losses = self.actor_critic.evaluate_aux_losses(
-                        batch, self.actor_critic.visual_features, self.aux_tasks
-                    )
-                    aux_losses = torch.stack(raw_losses)
-                    total_aux_loss = torch.sum(aux_losses, dim=0)
-
                 value_loss = value_loss.mean()
                 dist_entropy = dist_entropy.mean()
-                self.optimizer.zero_grad()
 
-                total_loss = (
-                    value_loss * self.value_loss_coef
-                    + action_loss
-                    + total_aux_loss
-                    - dist_entropy * self.entropy_coef
-                )
+                if self.use_second_optimizer:
+                    with torch.autograd.detect_anomaly():
+                        for (
+                            param
+                        ) in self.actor_critic.net.sim_visual_decoder.parameters():
+                            param.requires_grad = False
 
-                self.before_backward(total_loss)
-                total_loss.backward()
-                self.after_backward(total_loss)
+                        self.optimizer.zero_grad()
+                        self.optimizer2.zero_grad()
 
-                self.before_step()
-                self.optimizer.step()
-                self.after_step()
+                        total_loss = (
+                            value_loss * self.value_loss_coef
+                            + action_loss
+                            - dist_entropy * self.entropy_coef
+                        )
+                        for v in self.losses.values():
+                            total_loss += v
+
+                        self.before_backward(total_loss)
+                        total_loss.backward()
+                        self.after_backward(total_loss)
+
+                        self.before_step()
+                        self.optimizer.step()
+                        self.after_step()
+
+                        # optimize discriminator
+                        for (
+                            param
+                        ) in self.actor_critic.net.sim_visual_decoder.parameters():
+                            param.requires_grad = True
+                        decoder_total_loss = sum(self.decoder_losses.values())
+
+                        decoder_total_loss.backward()
+                        self.optimizer2.step()
+                else:
+                    self.optimizer.zero_grad()
+
+                    total_loss = (
+                        value_loss * self.value_loss_coef
+                        + action_loss
+                        - dist_entropy * self.entropy_coef
+                    )
+
+                    self.before_backward(total_loss)
+                    total_loss.backward()
+                    self.after_backward(total_loss)
+
+                    self.before_step()
+                    self.optimizer.step()
+                    self.after_step()
 
                 value_loss_epoch += value_loss.item()
                 action_loss_epoch += action_loss.item()
                 dist_entropy_epoch += dist_entropy.item()
-                total_loss_epoch += total_loss.item()
 
             profiling_wrapper.range_pop()  # PPO.update epoch
 
         num_updates = self.ppo_epoch * self.num_mini_batch
 
-        # if decoder_enabled:
-        #     self.actor_critic.net.enable_decoder()
-
         value_loss_epoch /= num_updates
         action_loss_epoch /= num_updates
         dist_entropy_epoch /= num_updates
-        total_loss_epoch /= num_updates
 
-        visual_loss_epoch /= num_updates
-        egomotion_loss_epoch /= num_updates
-        feature_prediction_loss_epoch /= num_updates
-        splitnet_total_loss_epoch /= num_updates
-
-        return (
-            value_loss_epoch,
-            action_loss_epoch,
-            dist_entropy_epoch,
-            total_loss_epoch,
-            visual_loss_epoch,
-            visual_losses,
-            egomotion_loss_epoch,
-            feature_prediction_loss_epoch,
-            splitnet_total_loss_epoch,
-        )
+        return value_loss_epoch, action_loss_epoch, dist_entropy_epoch
 
     def _evaluate_actions(
         self, observations, rnn_hidden_states, prev_actions, masks, action
     ):
         r"""Internal method that calls Policy.evaluate_actions.  This is used instead of calling
-        that directly so that that call can be overrided with inheritence
+        that directly so that that call can be overrided with inheritance
         """
         return self.actor_critic.evaluate_actions(
             observations, rnn_hidden_states, prev_actions, masks, action
@@ -237,10 +221,7 @@ class PPO(nn.Module):
         pass
 
     def before_step(self) -> None:
-        params = list(self.actor_critic.parameters())
-        for task in self.aux_tasks:
-            params += list(task.parameters())
-        nn.utils.clip_grad_norm_(params, self.max_grad_norm)
+        nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
 
     def after_step(self) -> None:
         pass

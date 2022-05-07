@@ -28,6 +28,7 @@ RL:
   COLLISION_PENALTY: 0.003
   BACKWARDS_PENALTY: 0.003
   FULL_GEODESIC_DECAY: -1.0
+  USE_OUTDOOR: False
 
   POLICY:
     name: "PointNavResNetPolicy"
@@ -96,5 +97,18 @@ RL:
     EgomotionPredictionTask:
       hidden_size: 256
       num_actions: 3
+  OUTDOOR:
+    dir_names:
+      - "/coc/testnvme/jtruong33/data/outdoor_imgs/bay_trail/filtered"
+      - "/coc/testnvme/jtruong33/data/outdoor_imgs/outdoor_inspection_route/filtered"
+      - "/coc/testnvme/jtruong33/data/outdoor_imgs/2022-04-19-14-17-58/filtered"
+      - "/coc/testnvme/jtruong33/data/outdoor_imgs/2022-04-22-16-56-00/filtered"
+    kl_coeff: 0.125
+    disc_coeff: 8.0
+    enc_gen_coeff: 1.0
+    recon_coeff: 1.0
+    use_second_optimizer: True
+    second_optimizer_key: "decoder"
+
 EVAL:
     SPLIT: "val"

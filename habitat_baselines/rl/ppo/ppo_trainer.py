@@ -56,6 +56,9 @@ from habitat_baselines.utils.env_utils import construct_envs
 from torch import nn
 from torch.optim.lr_scheduler import LambdaLR
 
+import indoor2outdoornav.outdoor_policy
+from indoor2outdoornav.outdoor_ppo import OutdoorDDPPO, OutdoorPPO
+
 
 @baseline_registry.register_trainer(name="ddppo")
 @baseline_registry.register_trainer(name="ppo")
@@ -287,7 +290,22 @@ class PPOTrainer(BaseRLTrainer):
                 for param in self.actor_critic.action_distribution.parameters():
                     param.requires_grad = False
 
-        self.agent = (DDPPO if self._is_distributed else PPO)(
+        if self.config.RL.USE_OUTDOOR:
+            agent_type = OutdoorDDPPO if self._is_distributed else OutdoorPPO
+            kwargs = {
+                "dir_names": self.config.RL.OUTDOOR.dir_names,
+                "batch_size": int(
+                    (self.config.RL.PPO.num_steps * self.config.NUM_ENVIRONMENTS)
+                    / self.config.RL.PPO.num_mini_batch
+                ),
+                "use_second_optimizer": self.config.RL.OUTDOOR.use_second_optimizer,
+                "second_optimizer_key": self.config.RL.OUTDOOR.second_optimizer_key,
+            }
+        else:
+            agent_type = DDPPO if self._is_distributed else PPO
+            # kwargs = {"aux_tasks": init_aux_tasks}
+            kwargs = {}
+        self.agent = agent_type(
             actor_critic=self.actor_critic,
             clip_param=ppo_cfg.clip_param,
             ppo_epoch=ppo_cfg.ppo_epoch,
@@ -298,7 +316,7 @@ class PPOTrainer(BaseRLTrainer):
             eps=ppo_cfg.eps,
             max_grad_norm=ppo_cfg.max_grad_norm,
             use_normalized_advantage=ppo_cfg.use_normalized_advantage,
-            aux_tasks=init_aux_tasks,
+            **kwargs,
         )
 
     def _init_envs(self, config=None):
@@ -332,7 +350,8 @@ class PPOTrainer(BaseRLTrainer):
             self.config.defrost()
             self.config.TORCH_GPU_ID = local_rank
             self.config.SIMULATOR_GPU_ID = local_rank
-            # Multiply by the number of simulators to make sure they also get unique seeds
+            # Multiply by the number of simulators to make sure they also get unique
+            # seeds
             self.config.TASK_CONFIG.SEED += (
                 torch.distributed.get_rank() * self.config.NUM_ENVIRONMENTS
             )
@@ -687,17 +706,16 @@ class PPOTrainer(BaseRLTrainer):
         )
 
         self.agent.train()
-
         (
             value_loss,
             action_loss,
             dist_entropy,
-            loss_total_epoch,
-            visual_loss,
-            visual_loss_dict,
-            egomotion_loss,
-            feature_pred_loss,
-            splitnet_total_loss,
+            # loss_total_epoch,
+            # visual_loss,
+            # visual_loss_dict,
+            # egomotion_loss,
+            # feature_pred_loss,
+            # splitnet_total_loss,
         ) = self.agent.update(self.rollouts)
 
         self.rollouts.after_update()
@@ -707,12 +725,12 @@ class PPOTrainer(BaseRLTrainer):
             value_loss,
             action_loss,
             dist_entropy,
-            loss_total_epoch,
-            visual_loss,
-            visual_loss_dict,
-            egomotion_loss,
-            feature_pred_loss,
-            splitnet_total_loss,
+            # loss_total_epoch,
+            # visual_loss,
+            # visual_loss_dict,
+            # egomotion_loss,
+            # feature_pred_loss,
+            # splitnet_total_loss,
         )
 
     def _coalesce_post_step(
@@ -769,7 +787,8 @@ class PPOTrainer(BaseRLTrainer):
         }
         if len(metrics) > 0:
             writer.add_scalars("metrics", metrics, self.num_steps_done)
-
+        if isinstance(self.agent, (OutdoorDDPPO, OutdoorPPO)):
+            losses.update(self.agent.losses)
         writer.add_scalars(
             "losses",
             losses,
@@ -950,12 +969,12 @@ class PPOTrainer(BaseRLTrainer):
                     value_loss,
                     action_loss,
                     dist_entropy,
-                    loss_total_epoch,
-                    visual_loss,
-                    visual_loss_dict,
-                    egomotion_loss,
-                    feature_pred_loss,
-                    splitnet_total_loss,
+                    # loss_total_epoch,
+                    # visual_loss,
+                    # visual_loss_dict,
+                    # egomotion_loss,
+                    # feature_pred_loss,
+                    # splitnet_total_loss,
                 ) = self._update_agent()
 
                 if ppo_cfg.use_linear_lr_decay:
@@ -965,12 +984,12 @@ class PPOTrainer(BaseRLTrainer):
                 loss_dict = dict(
                     value_loss=value_loss,
                     action_loss=action_loss,
-                    visual_loss=visual_loss,
-                    egomotion_loss=egomotion_loss,
-                    feature_pred_loss=feature_pred_loss,
-                    splitnet_total_loss=splitnet_total_loss,
+                    # visual_loss=visual_loss,
+                    # egomotion_loss=egomotion_loss,
+                    # feature_pred_loss=feature_pred_loss,
+                    # splitnet_total_loss=splitnet_total_loss,
                 )
-                loss_dict.update(visual_loss_dict)
+                # loss_dict.update(visual_loss_dict)
                 losses = self._coalesce_post_step(
                     loss_dict,
                     count_steps_delta,
