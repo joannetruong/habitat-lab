@@ -139,40 +139,35 @@ class PPO(nn.Module):
                 dist_entropy = dist_entropy.mean()
 
                 if self.use_second_optimizer:
-                    with torch.autograd.detect_anomaly():
-                        for (
-                            param
-                        ) in self.actor_critic.net.sim_visual_decoder.parameters():
-                            param.requires_grad = False
+                    for param in self.actor_critic.net.sim_visual_decoder.parameters():
+                        param.requires_grad = False
 
-                        self.optimizer.zero_grad()
-                        self.optimizer2.zero_grad()
+                    self.optimizer.zero_grad()
+                    self.optimizer2.zero_grad()
 
-                        total_loss = (
-                            value_loss * self.value_loss_coef
-                            + action_loss
-                            - dist_entropy * self.entropy_coef
-                        )
-                        for v in self.losses.values():
-                            total_loss += v
+                    total_loss = (
+                        value_loss * self.value_loss_coef
+                        + action_loss
+                        - dist_entropy * self.entropy_coef
+                    )
+                    for v in self.losses.values():
+                        total_loss += v
 
-                        self.before_backward(total_loss)
-                        total_loss.backward()
-                        self.after_backward(total_loss)
+                    self.before_backward(total_loss)
+                    total_loss.backward()
+                    self.after_backward(total_loss)
 
-                        self.before_step()
-                        self.optimizer.step()
-                        self.after_step()
+                    self.before_step()
+                    self.optimizer.step()
+                    self.after_step()
 
-                        # optimize discriminator
-                        for (
-                            param
-                        ) in self.actor_critic.net.sim_visual_decoder.parameters():
-                            param.requires_grad = True
-                        decoder_total_loss = sum(self.decoder_losses.values())
+                    # optimize discriminator
+                    for param in self.actor_critic.net.sim_visual_decoder.parameters():
+                        param.requires_grad = True
+                    decoder_total_loss = sum(self.decoder_losses.values())
 
-                        decoder_total_loss.backward()
-                        self.optimizer2.step()
+                    decoder_total_loss.backward()
+                    self.optimizer2.step()
                 else:
                     self.optimizer.zero_grad()
 
