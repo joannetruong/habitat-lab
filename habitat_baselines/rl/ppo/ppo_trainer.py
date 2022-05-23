@@ -20,7 +20,7 @@ from habitat import Config, VectorEnv, logger
 from habitat.core.spaces import ActionSpace, EmptySpace
 from habitat.utils import profiling_wrapper
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.auxiliary_tasks import *
+# from habitat_baselines.common.auxiliary_tasks import *
 from habitat_baselines.common.base_trainer import BaseRLTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.environments import get_env_class
@@ -401,12 +401,13 @@ class PPOTrainer(BaseRLTrainer):
 
         task_cfg = self.config.TASK_CONFIG.TASK
         aux_cfg = self.config.RL.AUX_TASKS
-        (
-            init_aux_tasks,
-            aux_task_strings,
-        ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
+        # (
+        #     init_aux_tasks,
+        #     aux_task_strings,
+        # ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
 
-        self._setup_actor_critic_agent(ppo_cfg, init_aux_tasks)
+        # self._setup_actor_critic_agent(ppo_cfg, init_aux_tasks)
+        self._setup_actor_critic_agent(ppo_cfg)
         if self._is_distributed:
             self.agent.init_distributed(find_unused_params=True)
 
@@ -1073,12 +1074,12 @@ class PPOTrainer(BaseRLTrainer):
 
         task_cfg = self.config.TASK_CONFIG.TASK
         aux_cfg = self.config.RL.AUX_TASKS
-        (
-            init_aux_tasks,
-            aux_task_strings,
-        ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
+        # (
+        #     init_aux_tasks,
+        #     aux_task_strings,
+        # ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
 
-        self._setup_actor_critic_agent(ppo_cfg, init_aux_tasks)
+        self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
         self.actor_critic = self.agent.actor_critic
