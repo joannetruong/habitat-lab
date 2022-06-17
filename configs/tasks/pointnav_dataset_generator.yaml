@@ -1,5 +1,5 @@
 ENVIRONMENT:
-  MAX_EPISODE_STEPS: 150
+  MAX_EPISODE_STEPS: 500
 SIMULATOR:
   AGENT_0:
     SENSORS: ['DEPTH_SENSOR']
@@ -29,7 +29,7 @@ TASK:
   # ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"]
   ROBOT_URDFS: ["/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"]
 
-  SUCCESS_DISTANCE: 0.425
+  SUCCESS_DISTANCE: 0.3
 
   SENSORS: ['POINTGOAL_WITH_GPS_COMPASS_SENSOR']
   POINTGOAL_WITH_GPS_COMPASS_SENSOR:
@@ -44,13 +44,13 @@ TASK:
       MIN_ABS_HOR_SPEED: 0.035
       MIN_ABS_LIN_SPEED: 0.035
       MIN_ABS_ANG_SPEED: 1.0
-      LIN_VEL_RANGES: [ [ -0.35, 0.35 ] ]
-      HOR_VEL_RANGES: [ [ -0.35, 0.35 ] ]
-      ANG_VEL_RANGES: [ [ -10.0, 10.0 ] ]
+      LIN_VEL_RANGES: [ [ -0.5, 0.5 ] ]
+      HOR_VEL_RANGES: [ [ -0.5, 0.5 ] ]
+      ANG_VEL_RANGES: [ [ -30.0, 30.0 ] ]
 
   MEASUREMENTS: ['DISTANCE_TO_GOAL', 'SUCCESS', 'SPL', 'COLLISIONS']
   SUCCESS:
-    SUCCESS_DISTANCE: 0.425
+    SUCCESS_DISTANCE: 0.3
 
 DATASET:
   TYPE: PointNav-v1

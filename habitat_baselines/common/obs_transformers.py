@@ -1152,7 +1152,7 @@ class Equirect2CubeMap(ProjectionTransformer):
 
 
 import cv2
-from torchvision.transforms import Compose, RandomErasing, RandomResizedCrop
+from torchvision.transforms import Compose, RandomErasing, RandomResizedCrop, RandomHorizontalFlip
 
 
 @baseline_registry.register_obs_transformer(name="CUTOUT")
@@ -1204,6 +1204,55 @@ class Cutout(ObservationTransformer):
         )
         return observations
 
+@baseline_registry.register_obs_transformer(name="FLIP")
+class Flip(ObservationTransformer):
+    """Flip images along vertical axis"""
+
+    def __init__(
+        self,
+        trans_keys: Tuple[str] = (
+            "spot_left_depth",
+            "spot_right_depth",
+        ),
+    ):
+        """Args:
+        noise_percent: what percent of randomly selected pixel turn black
+        trans_keys: list of keys it will try to transform from obs
+        """
+        super().__init__()
+        self.trans_keys = trans_keys
+        self.flip = RandomHorizontalFlip(p=1.0)
+
+    def _transform_obs(self, obs: torch.Tensor) -> torch.Tensor:
+        # NHWC -> NCHW
+        obs = obs.permute(0, 3, 1, 2)
+        
+        obs = self.flip(obs)
+
+        # NCHW -> NHWC
+        obs = obs.permute(0, 2, 3, 1)
+        return obs
+
+    @classmethod
+    def from_config(cls, config: Config):
+        return cls()
+
+    def transform_observation_space(self, observation_space: spaces.Dict):
+        # No transform needed
+        return observation_space
+
+    @torch.no_grad()
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        observations.update(
+            {
+                sensor: self._transform_obs(observations[sensor])
+                for sensor in self.trans_keys
+                if sensor in observations
+            }
+        )
+        observations['spot_left_depth'], observations['spot_right_depth'], = observations['spot_right_depth'], observations['spot_left_depth']
+
+        return observations
 
 @baseline_registry.register_obs_transformer(name="SPOT_DR")
 class SpotDr(ObservationTransformer):
@@ -1302,7 +1351,6 @@ class SpotDr(ObservationTransformer):
                 }
             )
         return observations
-
 
 @baseline_registry.register_obs_transformer(name="PEPPER_NOISE")
 class PepperNoise(ObservationTransformer):

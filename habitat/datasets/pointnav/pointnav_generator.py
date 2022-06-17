@@ -54,12 +54,14 @@ def is_compatible_episode(
     near_dist: float,
     far_dist: float,
     geodesic_to_euclid_ratio: float,
+    multi_floor: bool = False
 ) -> Union[Tuple[bool, float], Tuple[bool, int]]:
     euclid_dist = np.power(np.power(np.array(s) - np.array(t), 2).sum(0), 0.5)
 
-    if np.abs(s[1] - t[1]) > 0.5:  # check height difference to assure s and
-        #  t are from same floor
-        return False, 0
+    if not multi_floor:
+        if np.abs(s[1] - t[1]) < 0.5:  # check height difference to assure s and
+            #  t are from same floor
+            return False, 0
     d_separation = sim.geodesic_distance(s, [t])
     if d_separation == np.inf:
         return False, 0
@@ -111,6 +113,7 @@ def generate_pointnav_episode(
     geodesic_to_euclid_min_ratio: float = 1.1,
     number_retries_per_target: int = 10,
     robot: str = "Spot",
+    multi_floor: bool = False
 ) -> Generator[NavigationEpisode, None, None]:
     r"""Generator function that generates PointGoal navigation episodes.
 
@@ -143,7 +146,6 @@ def generate_pointnav_episode(
     :return: navigation episode that satisfy specified distribution for
     currently loaded into simulator scene.
     """
-
     # Load Spot model
     if robot == "A1":
         robot_file = "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf"
@@ -270,6 +272,7 @@ def generate_pointnav_episode(
                 near_dist=closest_dist_limit,
                 far_dist=furthest_dist_limit,
                 geodesic_to_euclid_ratio=geodesic_to_euclid_min_ratio,
+                multi_floor=multi_floor
             )
             if is_compatible:
                 break
@@ -356,4 +359,5 @@ def generate_pointnav_episode(
             )
 
             episode_count += 1
+            print("episode count: ", episode_count, 'min: ', closest_dist_limit, 'max: ', furthest_dist_limit, 'actual: ', dist)
             yield episode

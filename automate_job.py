@@ -27,7 +27,9 @@ parser.add_argument("-p", "--partition", default="long")
 parser.add_argument("-s", "--sliding", default=False, action="store_true")
 parser.add_argument("-nct", "--no-contact-test", default=False, action="store_true")
 parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
-parser.add_argument("-cp", "--collision-penalty", type=float, default=0.003)
+parser.add_argument("-cp", "--collision-penalty", type=float, default=0.03)
+parser.add_argument("-bp", "--backwards-penalty", type=float, default=0.03)
+parser.add_argument("-ap", "--acc-penalty", type=float, default=0.03)
 parser.add_argument("-vy", "--velocity-y", type=float, default=-1.0)
 parser.add_argument("-rpl", "--randomize-pitch-min", type=float, default=0.0)
 parser.add_argument("-rpu", "--randomize-pitch-max", type=float, default=0.0)
@@ -228,6 +230,24 @@ if not args.eval:
             elif args.dataset == "coda":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_5m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_5m/coda_spot_test_straight_5m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_6m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_6m/coda_spot_test_straight_6m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_7m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_7m/coda_spot_test_straight_7m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_8m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_8m/coda_spot_test_straight_8m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_9m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_9m/coda_spot_test_straight_9m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_10m_straight":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_10m/coda_spot_test_straight_10m.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "coda_lobby":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby/coda_lobby.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
@@ -239,6 +259,12 @@ if not args.eval:
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "hm3d_gibson_0.5":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.5/{split}/{split}.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "ny_uf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson_ny_unfurnished/{split}/{split}.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "uf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_spot_unfurnished/train/content/{split}/{split}.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             task_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
@@ -260,12 +286,14 @@ if not args.eval:
             exp_yaml_data[idx] = f"TENSORBOARD_DIR:    '{os.path.join(dst_dir, 'tb')}'"
         elif i.startswith("NUM_ENVIRONMENTS:"):
             exp_yaml_data[idx] = f"NUM_ENVIRONMENTS: {args.num_environments}"
-            if args.use_gray or args.use_gray_depth:
-                exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
             if "ferst" in args.dataset or "coda" in args.dataset:
                 exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("  COLLISION_PENALTY:"):
             exp_yaml_data[idx] = f"  COLLISION_PENALTY: {args.collision_penalty}"
+        elif i.startswith("  BACKWARDS_PENALTY:"):
+            exp_yaml_data[idx] = f"  BACKWARDS_PENALTY: {args.backwards_penalty}"
+        elif i.startswith("  ANG_ACCEL_PENALTY_COEFF:"):
+            exp_yaml_data[idx] = f"  ANG_ACCEL_PENALTY_COEFF: {args.acc_penalty}"
         elif i.startswith("SENSORS:"):
             if args.use_gray:
                 exp_yaml_data[
@@ -432,6 +460,10 @@ else:
                 ] = f"      HOR_VEL_RANGE: [ {-args.velocity_y, -args.velocity_y} ]"
             if args.no_hor_vel:
                 eval_yaml_data[idx] = "      HOR_VEL_RANGE: [ 0.0, 0.0 ]"
+        elif i.startswith("      MIN_RAND_PITCH:"):
+            eval_yaml_data[idx] = f"      MIN_RAND_PITCH: {args.randomize_pitch_min}"
+        elif i.startswith("      MAX_RAND_PITCH:"):
+            eval_yaml_data[idx] = f"      MAX_RAND_PITCH: {args.randomize_pitch_max}"
         elif i.startswith("      TIME_STEP:"):
             eval_yaml_data[idx] = f"      TIME_STEP: {args.time_step}"
             if args.control_type == "dynamic":
@@ -449,17 +481,47 @@ else:
             elif args.dataset == "coda":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test/coda_spot_test.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_5m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_5m/coda_spot_test_straight_5m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_6m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_6m/coda_spot_test_straight_6m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_7m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_7m/coda_spot_test_straight_7m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_8m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_8m/coda_spot_test_straight_8m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_9m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_9m/coda_spot_test_straight_9m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "coda_straight_10m":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_spot_test_straight_10m/coda_spot_test_straight_10m.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "coda_lobby":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby/coda_lobby.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "coda_lobby_hard":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/coda/coda_lobby_hard/coda_lobby_hard.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "google":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/google/mtv1157-1_lab/train/content/mtv1157-1_lab.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "ny":
                 data_path = "/coc/testnvme/nyokoyama3/fair/spot_nav/habitat-lab/data/spot_goal_headings_hm3d/{split}/{split}.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "hm3d_gibson_0.5":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.5/{split}/{split}.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "uf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_spot_unfurnished/train/train.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "ferst_mf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/multi_floor/val/val.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "ferst_mf_1":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/multi_floor/val_1/val.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             eval_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
@@ -520,9 +582,7 @@ else:
             else:
                 eval_exp_yaml_data[idx] = "VIDEO_OPTION: []"
         elif i.startswith("NUM_ENVIRONMENTS:"):
-            if args.use_gray or args.use_gray_depth:
-                eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 8"
-            if "ferst" in args.dataset or "coda" in args.dataset:
+            if "ferst" in args.dataset or "coda" in args.dataset or "google" in args.dataset:
                 eval_exp_yaml_data[idx] = "NUM_ENVIRONMENTS: 1"
         elif i.startswith("SENSORS:"):
             if args.video:
@@ -537,6 +597,14 @@ else:
                     eval_exp_yaml_data[
                         idx
                     ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+            elif args.use_gray_depth:
+                eval_exp_yaml_data[
+                    idx
+                ] = "SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
+                if args.video:
+                    eval_exp_yaml_data[
+                        idx
+                    ] = "SENSORS: ['RGB_SENSOR', 'SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR', 'SPOT_LEFT_GRAY_SENSOR', 'SPOT_RIGHT_GRAY_SENSOR']"
         elif i.startswith("VIDEO_DIR:"):
             video_dir = (
                 "video_dir"

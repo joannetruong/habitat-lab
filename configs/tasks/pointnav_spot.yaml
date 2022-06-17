@@ -4,7 +4,7 @@ ENVIRONMENT:
   CURRICULUM: False
 SIMULATOR:
   AGENT_0:
-    SENSORS: [ "SPOT_LEFT_DEPTH_SENSOR", "SPOT_RIGHT_DEPTH_SENSOR" ]
+    SENSORS: [ "SPOT_LEFT_DEPTH_SENSOR", "SPOT_RIGHT_DEPTH_SENSOR", "RGB_SENSOR" ]
     HEIGHT: 0.60
     RADIUS: 0.3
   HABITAT_SIM_V0:
@@ -89,3 +89,4 @@ DATASET:
   TYPE: PointNav-v1
   SPLIT: train
   DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_gibson/pointnav_spot_0.3/{split}/{split}.json.gz
+  # DATA_PATH: /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3_multi_floor/train/train.json.gz

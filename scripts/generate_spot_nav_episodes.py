@@ -12,16 +12,44 @@ import habitat
 import tqdm
 from habitat.datasets.pointnav.pointnav_generator import generate_pointnav_episode
 
+'''
+python scripts/generate_spot_nav_episodes.py \
+       /coc/testnvme/jtruong33/google_nav/habitat-lab/configs/tasks/pointnav_dataset_generator.yaml \
+       /coc/testnvme/jtruong33/data/datasets/pointnav_gibson/pointnav_spot_0.5_long/train/content \
+       10000 \
+       /coc/testnvme/datasets/habitat-sim-datasets/gibson_train_val \
+       gibson \
+       -mind 5 \
+       -maxd 20
+'''
+
+'''
+python scripts/generate_spot_nav_episodes.py \
+       /coc/testnvme/jtruong33/google_nav/habitat-lab/configs/tasks/pointnav_dataset_generator.yaml \
+       /coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3_multi_floor/train/content \
+       10000 \
+       /coc/testnvme/datasets/habitat-sim-datasets/hm3d/train \
+       hm3d \
+       -mind 1 \
+       -maxd 500 \
+       -si 0 \
+       -ei 9
+       
+'''
+
 parser = argparse.ArgumentParser()
 parser.add_argument("config_yaml")
 parser.add_argument("out_dir")
-parser.add_argument("num_episodes", type=int)
+parser.add_argument("num_episodes_per_scene", type=int)
 parser.add_argument("glb_dir")
-parser.add_argument("robot")
-parser.add_argument("-t", "--ty", type=str)
+parser.add_argument("ty", type=str, help="hm3d or gibson")
+parser.add_argument("-r", "--robot", default="Spot")
+parser.add_argument("-mind", "--min-dist", type=float, default=5.0)
+parser.add_argument("-maxd", "--max_dist", type=float, default=20.0)
 parser.add_argument("-si", "--start-idx", type=int)
 parser.add_argument("-ei", "--end-idx", type=int)
 parser.add_argument("-v", "--val", action="store_true")
+parser.add_argument("-u", "--unfurnished", action="store_true")
 args = parser.parse_args()
 
 # Task config yaml file. Needed for agent radius and height, not sure what else...
@@ -30,7 +58,7 @@ CONFIG_YAML = args.config_yaml
 # Folder where json.gz files will be saved:
 TRAIN_EP_DIR = args.out_dir
 
-NUM_EPISODES_PER_SCENE = args.num_episodes
+NUM_EPISODES_PER_SCENE = args.num_episodes_per_scene
 
 if args.ty == "hm3d":
     VAL = [
@@ -938,6 +966,55 @@ if args.ty == "hm3d":
         "00798-bpqKLXHnxei",
         "00799-deNrXzuSss5",
     ]
+    TRAIN_UNFURNISHED = [
+        "00760-5Poh4Qz68hd",
+        "00761-s7kPJndncRy",
+        "00762-33ypawbKCQf",
+        "00763-pVnwDTdMD3h",
+        "00764-rzzVnFnBLtg",
+        "00765-AuGMayXVFkc",
+        "00766-XxbS57Z6PDU",
+        "00767-Yr35Q49vqwV",
+        "00768-Gg8W275oKZE",
+        "00769-F1Vhvu3osn6",
+        "00770-NBg5UqG3di3",
+        "00771-8oSQng53cGV",
+        "00772-zJ3fVx3BZYR",
+        "00773-9K1WbyTZ456",
+        "00774-S3YyrKoJ7k6",
+        "00775-3z5dc2yzyCb",
+        "00776-qxwfVS8MQ67",
+        "00777-N17ddiDvJr9",
+        "00778-vj4rZPfVjBQ",
+        "00779-3YSDRj9kTU7",
+        "00780-3iZkJUc7KhX",
+        "00781-6TPCFES8fhh",
+        "00782-oQPVc6vwgaq",
+        "00783-J9adB1bm54A",
+        "00784-pYGGNqSbHp1",
+        "00785-AdNTcRg3THp",
+        "00786-E9hxHD5h4FY",
+        "00787-S9M7ybC5ZHu",
+        "00788-BEuB32yj7Fb",
+        "00789-UAByLdpaokx",
+        "00790-qQgcM8T4hiD",
+        "00791-JPMDv7zL4bF",
+        "00792-4tdJ3qe1x7P",
+        "00793-NRsmXFcVTbN",
+        "00794-WRphMcFxfhe",
+        "00795-awcRF7AZnJu",
+        "00796-m49MsVC7BwA",
+        "00797-99ML7CGPqsQ",
+        "00798-bpqKLXHnxei",
+        "00799-deNrXzuSss5",
+    ]
+    VAL_UNFURNISHED = [
+        "00895-auFeVz9Go4m",
+        "00896-5hGmubEE6ZF",
+        "00897-LEFTm3JecaC",
+        "00898-8CRYizAb6yd",
+        "00899-58NLZxWBSpk",
+    ]
 elif args.ty == "gibson":
     # 14 scenes
     VAL = [
@@ -1033,16 +1110,23 @@ elif args.ty == "gibson":
         "Woonsocket",
     ]
 
-split = VAL if args.val else TRAIN
-print("SPLIT: ", split)
+split = TRAIN
+if args.unfurnished:
+    split = TRAIN_UNFURNISHED
+if args.val:
+    split = VAL
+    if args.unfurnished:
+        split = VAL_UNFURNISHED
+
+print("SPLIT: ", split, len(split))
 if args.ty == "hm3d":
-    # split = split[args.start_idx : args.end_idx + 1]
+    split = split[args.start_idx : args.end_idx + 1]
 
     SCENES = []
     for x in split:
         SCENES.append(glob.glob(osp.abspath(osp.join(args.glb_dir, x, "*.glb")))[1])
 elif args.ty == "gibson":
-    # split = split[args.start_idx : args.end_idx + 1]
+    split = split[args.start_idx : args.end_idx + 1]
     # List of paths to glb files
     SCENES = list(
         filter(
@@ -1086,8 +1170,8 @@ def _generate_fn(scene):
         radius = 0.45 / 2
         succ_dist = 0.20
     elif args.robot == "Spot":
-        radius = 1.0 / 2
-        succ_dist = 0.425
+        radius = 0.6 / 2
+        succ_dist = 0.3
 
     cfg = habitat.get_config(CONFIG_YAML)
     cfg.defrost()
@@ -1098,18 +1182,66 @@ def _generate_fn(scene):
     sim = habitat.sims.make_sim("Sim-v0", config=cfg.SIMULATOR)
 
     dset = habitat.datasets.make_dataset("PointNav-v1")
-    dset.episodes = list(
-        generate_pointnav_episode(
-            sim,
-            NUM_EPISODES_PER_SCENE,
-            is_gen_shortest_path=False,
-            shortest_path_max_steps=500,
-            geodesic_to_euclid_min_ratio=1.1,
-            furthest_dist_limit=7,
-            shortest_path_success_distance=succ_dist,
-            robot=args.robot,
+
+
+    episodes = []
+    min_range = args.min_dist
+    dist_step_size = 5
+    # num_eps_per_scene = args.num_episodes_per_scene // ((args.max_dist - args.min_dist) // dist_step_size)
+    num_eps_per_scene = 500
+
+    print("num_eps_per_scene: ", num_eps_per_scene)
+    rng = int((args.max_dist - args.min_dist) // dist_step_size)
+    print("range: ", rng, min_range, min_range+dist_step_size)
+
+    for _ in range(rng):
+        episodes += list(
+            generate_pointnav_episode(
+                sim,
+                int(num_eps_per_scene),
+                is_gen_shortest_path=False,
+                shortest_path_max_steps=1000,
+                geodesic_to_euclid_min_ratio=1.0,
+                closest_dist_limit=min_range,
+                furthest_dist_limit=min_range + dist_step_size,
+                shortest_path_success_distance=succ_dist,
+                robot=args.robot,
+                multi_floor=False
+            )
         )
-    )
+        new_mf_eps = list(
+            generate_pointnav_episode(
+                sim,
+                int(num_eps_per_scene),
+                is_gen_shortest_path=False,
+                shortest_path_max_steps=1000,
+                geodesic_to_euclid_min_ratio=1.0,
+                closest_dist_limit=min_range,
+                furthest_dist_limit=min_range + dist_step_size,
+                shortest_path_success_distance=succ_dist,
+                robot=args.robot,
+                multi_floor=True
+            )
+        )
+        if len(new_mf_eps) == 0:
+            break
+        episodes += new_mf_eps
+        min_range += dist_step_size
+    dset.episodes = episodes
+
+    # dset.episodes = list(
+    #     generate_pointnav_episode(
+    #         sim,
+    #         NUM_EPISODES_PER_SCENE,
+    #         is_gen_shortest_path=False,
+    #         shortest_path_max_steps=500,
+    #         geodesic_to_euclid_min_ratio=1,
+    #         closest_dist_limit=args.min_dist,
+    #         furthest_dist_limit=args.max_dist,
+    #         shortest_path_success_distance=succ_dist,
+    #         robot=args.robot,
+    #     )
+    # )
     print("scene: ", scene)
     for ep in dset.episodes:
         if args.ty == "hm3d":

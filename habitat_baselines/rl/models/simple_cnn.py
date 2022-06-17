@@ -3,7 +3,12 @@ from typing import Dict
 import numpy as np
 import torch
 from torch import nn as nn
+import time
+import cv2
+import os
 
+DEBUGGING = False
+SAVE_PTH = "/coc/testnvme/jtruong33/google_nav/habitat-lab/depth_img_tmp/"
 
 class SimpleCNN(nn.Module):
     r"""A Simple 3-Conv CNN followed by a fully connected layer
@@ -22,19 +27,23 @@ class SimpleCNN(nn.Module):
     ):
         super().__init__()
 
-        # HACK: Never use RGB for policies.
-        # if "rgb" in observation_space.spaces:
-        #     self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
-        # else:
-        #     self._n_input_rgb = 0
-        self._n_input_rgb = 0
+        if "rgb" in observation_space.spaces:
+            self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
+        else:
+            self._n_input_rgb = 0
 
         # Ensure both the single camera AND two camera setup is NOT being used
         self.using_one_camera = "depth" in observation_space.spaces
+        self.using_one_camera_gray = "gray" in observation_space.spaces
+
         self.using_two_cameras = any(
             [k.endswith("_depth") for k in observation_space.spaces.keys()]
         )
+        self.using_two_cameras_gray = any(
+            [k.endswith("_gray") for k in observation_space.spaces.keys()]
+        )
         assert not (self.using_one_camera and self.using_two_cameras)
+        assert not (self.using_one_camera_gray and self.using_two_cameras_gray)
 
         # Ensure both eyes are being used if at all
         if self.using_two_cameras:
@@ -45,10 +54,24 @@ class SimpleCNN(nn.Module):
                 ]
             )
 
+        # Ensure both eyes are being used if at all
+        if self.using_two_cameras_gray:
+            assert all(
+                [
+                    i in observation_space.spaces
+                    for i in ["spot_left_gray", "spot_right_gray"]
+                ]
+            )
+
         if self.using_one_camera or self.using_two_cameras:
             self._n_input_depth = 1
         else:
             self._n_input_depth = 0
+
+        if self.using_one_camera_gray or self.using_two_cameras_gray:
+            self._n_input_gray = 1
+        else:
+            self._n_input_gray = 0
 
         # kernel size for different CNN layers
         self._cnn_layers_kernel_size = [(8, 8), (4, 4), (3, 3)]
@@ -66,8 +89,15 @@ class SimpleCNN(nn.Module):
             if self.using_two_cameras:
                 width *= 2
             cnn_dims = np.array([height, width], dtype=np.float32)
+        elif self._n_input_gray > 0:
+            gray_key = "gray" if self.using_one_camera else "spot_left_gray"
+            height, width = observation_space.spaces[gray_key].shape[:2]
+            if self.using_two_cameras_gray:
+                width *= 2
+            cnn_dims = np.array([height, width], dtype=np.float32)
 
         if self.is_blind:
+            print('#################### WARNING!!!! POLICY IS BLIND !!!!! ####################')
             self.cnn = nn.Sequential()
         else:
             for kernel_size, stride in zip(
@@ -83,7 +113,7 @@ class SimpleCNN(nn.Module):
 
             self.cnn = nn.Sequential(
                 nn.Conv2d(
-                    in_channels=self._n_input_rgb + self._n_input_depth,
+                    in_channels=self._n_input_rgb + self._n_input_gray + self._n_input_depth,
                     out_channels=32,
                     kernel_size=self._cnn_layers_kernel_size[0],
                     stride=self._cnn_layers_stride[0],
@@ -109,6 +139,8 @@ class SimpleCNN(nn.Module):
             )
 
         self.layer_init()
+        self.count = 0
+        self.debug_prefix = f"{time.time() * 1e7:.0f}"[-5:]
 
     def _conv_output_dim(self, dimension, padding, dilation, kernel_size, stride):
         r"""Calculates the output height and width based on the input
@@ -146,7 +178,7 @@ class SimpleCNN(nn.Module):
 
     @property
     def is_blind(self):
-        return self._n_input_rgb + self._n_input_depth == 0
+        return self._n_input_rgb + self._n_input_gray + self._n_input_depth == 0
 
     def forward(self, observations: Dict[str, torch.Tensor]):
         cnn_input = []
@@ -161,20 +193,59 @@ class SimpleCNN(nn.Module):
             if self.using_one_camera:
                 depth_observations = observations["depth"]
             elif self.using_two_cameras:
-                depth_observations = torch.cat(
-                    [
-                        # Spot is cross-eyed; right is on the left on the FOV
-                        observations["spot_right_depth"],
-                        observations["spot_left_depth"],
-                    ],
-                    dim=2,
-                )
+                if DEBUGGING:
+                    img = cv2.imread("/coc/testnvme/jtruong33/google_nav/habitat-lab/depth_img/depth_61218_000028.png")
+                    depth_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    exp_1 = np.expand_dims(depth_img, axis=0)
+                    exp_2 = np.expand_dims(exp_1, axis=3)
+                    obs = torch.from_numpy(exp_2 / 255.0)
+                    depth_observations = obs.to(observations["spot_right_depth"].device, dtype=torch.float)
+                else:
+                    depth_observations = torch.cat(
+                        [
+                            # Spot is cross-eyed; right is on the left on the FOV
+                            observations["spot_right_depth"],
+                            observations["spot_left_depth"],
+                        ],
+                        dim=2,
+                    )
+                # if DEBUGGING:
+                #     img = (depth_observations.squeeze().cpu().numpy() * 255.0).astype(np.uint8)
+                #     out_path = os.path.join(SAVE_PTH, f"depth_{self.debug_prefix}_{self.count:06}.png")
+                #     cv2.imwrite(out_path, img)
+                #     print("Saved visual observations to", out_path)
+                #     self.count += 1
             else:
                 raise Exception("Not implemented")
             # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
             depth_observations = depth_observations.permute(0, 3, 1, 2)
             cnn_input.append(depth_observations)
 
+        if self._n_input_gray > 0:
+            if self.using_one_camera:
+                gray_observations = observations["gray"]
+            elif self.using_two_cameras_gray:
+                gray_observations = torch.cat(
+                    [
+                        # Spot is cross-eyed; right is on the left on the FOV
+                        observations["spot_right_gray"],
+                        observations["spot_left_gray"],
+                    ],
+                    dim=2,
+                )
+                if DEBUGGING:
+                    img = (gray_observations.squeeze().cpu().numpy()).astype(np.uint8)
+                    out_path = os.path.join(SAVE_PTH, f"gray_{self.debug_prefix}_{self.count:06}.png")
+                    cv2.imwrite(out_path, img)
+                    print("Saved visual observations to", out_path)
+                    self.count += 1
+            else:
+                raise Exception("Not implemented")
+            # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
+            gray_observations = gray_observations.permute(0, 3, 1, 2)
+            gray_observations = gray_observations.float() / 255.0  # normalize RGB
+            cnn_input.append(gray_observations)
+            
         cnn_inputs = torch.cat(cnn_input, dim=1)
 
         return self.cnn(cnn_inputs)

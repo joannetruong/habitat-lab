@@ -20,7 +20,6 @@ from habitat import Config, VectorEnv, logger
 from habitat.core.spaces import ActionSpace, EmptySpace
 from habitat.utils import profiling_wrapper
 from habitat.utils.visualizations.utils import observations_to_image
-# from habitat_baselines.common.auxiliary_tasks import *
 from habitat_baselines.common.base_trainer import BaseRLTrainer
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.environments import get_env_class
@@ -143,36 +142,9 @@ class PPOTrainer(BaseRLTrainer):
 
         return t
 
-    def _setup_auxiliary_tasks(self, aux_cfg, ppo_cfg, task_cfg, is_eval=False):
-        aux_task_strings = [task.lower() for task in aux_cfg.tasks]
-        # Differentiate instances of tasks by adding letters
-        aux_counts = {}
-        for i, x in enumerate(aux_task_strings):
-            if x in aux_counts:
-                aux_task_strings[i] = f"{aux_task_strings[i]}_{aux_counts[x]}"
-                aux_counts[x] += 1
-            else:
-                aux_counts[x] = 1
-
-        logger.info(f"Auxiliary tasks: {aux_task_strings}")
-
-        init_aux_tasks = []
-        if not is_eval:
-            for task in aux_cfg.tasks:
-                aux_module = eval(task)(
-                    ppo_cfg,
-                    aux_cfg[task],
-                    task_cfg,
-                    self.device,
-                ).to(self.device)
-                init_aux_tasks.append(aux_module)
-
-        return init_aux_tasks, aux_task_strings
-
     def _setup_actor_critic_agent(
         self,
         ppo_cfg: Config,
-        init_aux_tasks=[],
     ) -> None:
         r"""Sets up actor critic and agent for PPO.
 
@@ -303,7 +275,6 @@ class PPOTrainer(BaseRLTrainer):
             }
         else:
             agent_type = DDPPO if self._is_distributed else PPO
-            # kwargs = {"aux_tasks": init_aux_tasks}
             kwargs = {}
         self.agent = agent_type(
             actor_critic=self.actor_critic,
@@ -400,13 +371,6 @@ class PPOTrainer(BaseRLTrainer):
             os.makedirs(self.config.CHECKPOINT_FOLDER)
 
         task_cfg = self.config.TASK_CONFIG.TASK
-        aux_cfg = self.config.RL.AUX_TASKS
-        # (
-        #     init_aux_tasks,
-        #     aux_task_strings,
-        # ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
-
-        # self._setup_actor_critic_agent(ppo_cfg, init_aux_tasks)
         self._setup_actor_critic_agent(ppo_cfg)
         if self._is_distributed:
             self.agent.init_distributed(find_unused_params=True)
@@ -1073,12 +1037,6 @@ class PPOTrainer(BaseRLTrainer):
             action_type = torch.long
 
         task_cfg = self.config.TASK_CONFIG.TASK
-        aux_cfg = self.config.RL.AUX_TASKS
-        # (
-        #     init_aux_tasks,
-        #     aux_task_strings,
-        # ) = self._setup_auxiliary_tasks(aux_cfg, ppo_cfg, task_cfg)
-
         self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
