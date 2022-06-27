@@ -78,7 +78,8 @@ TASK:
       HOR_VEL_RANGE: [ -0.5, 0.5 ] # meters per sec
       MIN_RAND_PITCH: 0.0
       MAX_RAND_PITCH: 0.0
-      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+      # ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf"
+      ROBOT_URDF: "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid_rot_fix.urdf"
       CONTACT_TEST: True
 
   MEASUREMENTS: ['DISTANCE_TO_GOAL', 'EPISODE_DISTANCE', 'SUCCESS', 'SPL', 'COLLISIONS']

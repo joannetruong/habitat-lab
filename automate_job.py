@@ -29,7 +29,7 @@ parser.add_argument("-nct", "--no-contact-test", default=False, action="store_tr
 parser.add_argument("-nhv", "--no-hor-vel", default=False, action="store_true")
 parser.add_argument("-cp", "--collision-penalty", type=float, default=0.03)
 parser.add_argument("-bp", "--backwards-penalty", type=float, default=0.03)
-parser.add_argument("-ap", "--acc-penalty", type=float, default=0.03)
+parser.add_argument("-ap", "--acc-penalty", type=float, default=0.0)
 parser.add_argument("-vy", "--velocity-y", type=float, default=-1.0)
 parser.add_argument("-rpl", "--randomize-pitch-min", type=float, default=0.0)
 parser.add_argument("-rpu", "--randomize-pitch-max", type=float, default=0.0)
@@ -138,7 +138,7 @@ robot_urdfs_dict = {
     "A1": "/coc/testnvme/jtruong33/data/URDF_demo_assets/a1/a1.urdf",
     "AlienGo": "/coc/testnvme/jtruong33/data/URDF_demo_assets/aliengo/urdf/aliengo.urdf",
     "Daisy": "/coc/testnvme/jtruong33/data/URDF_demo_assets/daisy/daisy_advanced_akshara.urdf",
-    "Spot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid.urdf",
+    "Spot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/spot_hybrid_urdf/habitat_spot_urdf/urdf/spot_hybrid_rot_fix.urdf",
     "Locobot": "/coc/testnvme/jtruong33/data/URDF_demo_assets/locobot/urdf/locobot_description2.urdf",
 }
 
@@ -265,6 +265,9 @@ if not args.eval:
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "uf":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_spot_unfurnished/train/content/{split}/{split}.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "hm3d_mf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3_multi_floor/{split}/{split}.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             task_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
