@@ -40,7 +40,7 @@ parser.add_argument("--constraint", default="x")
 ## options for dataset are hm3d_gibson, hm3d, gibson
 parser.add_argument("--policy-name", default="PointNavResNetPolicy")
 parser.add_argument("-ds", "--dataset", default="hm3d_gibson")
-parser.add_argument("-ne", "--num_environments", type=int, default=8)
+parser.add_argument("-ne", "--num_environments", type=int, default=24)
 parser.add_argument("-ngpu", "--num_gpus", type=int, default=8)
 
 parser.add_argument("-g", "--use_gray", default=False, action="store_true")
@@ -268,6 +268,9 @@ if not args.eval:
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "hm3d_mf":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3_multi_floor/{split}/{split}.json.gz"
+                task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "hm3d_mf_uf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d_mf_unfurnished/{split}/{split}.json.gz"
                 task_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             task_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"
@@ -525,6 +528,12 @@ else:
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
             elif args.dataset == "ferst_mf_1":
                 data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/multi_floor/val_1/val.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "ferst_stairs":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/ferst/stairs/val/val.json.gz"
+                eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
+            elif args.dataset == "hm3d_mf":
+                data_path = "/coc/testnvme/jtruong33/data/datasets/pointnav_hm3d/pointnav_spot_0.3_multi_floor/{split}/{split}.json.gz"
                 eval_yaml_data[idx] = f"  DATA_PATH: {data_path}"
         elif i.startswith("      noise_multiplier:"):
             eval_yaml_data[idx] = f"      noise_multiplier: {args.noise_percent}"

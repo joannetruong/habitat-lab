@@ -1394,10 +1394,10 @@ class VelocityAction(SimulatorTaskAction):
         try:
             robot_rigid_state = self.robot.robot_id.rigid_state
             img = np.copy(agent_observations["rgb"])
-            vel_text = "PA. Vx: {:.2f}, Vy: {:.2f}, Vt: {:.2f}".format(
+            vel_text = "x: {:.2f}, y: {:.2f}, t: {:.2f}".format(
                 lin_vel, hor_vel, ang_vel
             )
-            robot_pos_text = "pos: {:.2f}, {:.2f}, {:.2f}".format(
+            robot_pos_text = "p: {:.2f}, {:.2f}, {:.2f}".format(
                 robot_rigid_state.translation.x,
                 robot_rigid_state.translation.y,
                 robot_rigid_state.translation.z,
@@ -1408,11 +1408,12 @@ class VelocityAction(SimulatorTaskAction):
 
             # rpy = np.rad2deg(get_rpy(robot_rigid_state.rotation))
             rpy = np.rad2deg(euler_from_quaternion(robot_rigid_state.rotation))
-            robot_rot_text = "rot: {:.2f}, {:.2f}, {:.2f}".format(
-                scipy_rpy[0],
-                scipy_rpy[1],
-                scipy_rpy[2],
-            )
+            robot_rot_text = "r: {:.2f}, {:.2f}, {:.2f}, {:.2f}".format(rot_quat[0], rot_quat[1], rot_quat[2], rot_quat[3])
+            # robot_rot_text = "r: {:.2f}, {:.2f}, {:.2f}".format(
+            #     scipy_rpy[0],
+            #     scipy_rpy[1],
+            #     scipy_rpy[2],
+            # )
             dist_to_goal_text = "Dist2Goal: {:.2f}".format(
                 task.measurements.measures["distance_to_goal"].get_metric()
             )
@@ -1509,8 +1510,9 @@ class VelocityAction(SimulatorTaskAction):
 
         # snap goal state to height at navmesh
         snapped_goal_rigid_state = self._sim.pathfinder.snap_point(goal_rigid_state.translation)
-        # print('snapped_goal_rigid_state: ', snapped_goal_rigid_state, self.prev_rs)
+        goal_rigid_state.translation.x = snapped_goal_rigid_state.x
         goal_rigid_state.translation.y = snapped_goal_rigid_state.y
+        goal_rigid_state.translation.z = snapped_goal_rigid_state.z
 
         # # calculate new pitch of robot
         rpy = euler_from_quaternion(goal_rigid_state.rotation)
@@ -1545,15 +1547,13 @@ class VelocityAction(SimulatorTaskAction):
 
         pitch = np.arctan2(z_diff,xy_diff)
 
-        # pitch = np.deg2rad(30)
         robot_T_agent_pitch_offset = mn.Matrix4.rotation_x(
-            mn.Rad(pitch)
+            mn.Rad(-pitch)
         )
 
         if self.min_rand_pitch == 0.0 and self.max_rand_pitch == 0.0:
-            curr_left_ori, curr_right_ori = self.get_camera_ori()
-            left_ori = curr_left_ori + np.array([pitch, 0.0, 0.0])
-            right_ori = curr_right_ori + np.array([pitch, 0.0, 0.0])
+            left_ori = self.left_orig_ori + np.array([-pitch, 0.0, 0.0])
+            right_ori = self.right_orig_ori + np.array([-pitch, 0.0, 0.0])
             self.set_camera_ori(left_ori, right_ori)
 
         # goal_mn_quat = mn.Quaternion(

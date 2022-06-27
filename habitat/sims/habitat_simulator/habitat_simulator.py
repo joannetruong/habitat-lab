@@ -244,6 +244,18 @@ class HabitatSim(habitat_sim.Simulator, Simulator):
             },
         )
 
+        # navmesh_settings = habitat_sim.NavMeshSettings()
+        # navmesh_settings.agent_max_climb = 0.5
+        # navmesh_settings.agent_max_slope = 85
+        # print('ABOUT TO RECOMPUTE NAVMESH')
+        # navmesh_success = habitat_sim.recompute_navmesh(
+        #     self.pathfinder, navmesh_settings, include_static_objects=False
+        # )
+
+        # if not navmesh_success:
+        #     print("############# Failed to build the navmesh! Try different parameters? #############")
+        # else:
+        #     print("############# RECOMPUTED NAVMESH #############")
         sensor_specifications = []
         VisualSensorTypeSet = {
             habitat_sim.SensorType.COLOR,

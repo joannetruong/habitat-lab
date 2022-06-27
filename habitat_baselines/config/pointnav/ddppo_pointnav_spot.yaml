@@ -13,7 +13,7 @@ EVAL_CKPT_PATH_DIR: '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_res
 CHECKPOINT_FOLDER:  '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/checkpoints'
 TXT_DIR:            '/coc/pskynet3/jtruong33/develop/flash_results/cont_ctrl_results/junk/txts'
 TEST_EPISODE_COUNT: -1
-NUM_ENVIRONMENTS: 8
+NUM_ENVIRONMENTS: 24
 SENSORS: ['SPOT_LEFT_DEPTH_SENSOR', 'SPOT_RIGHT_DEPTH_SENSOR']
 NUM_UPDATES: -1
 LOG_INTERVAL: 10
