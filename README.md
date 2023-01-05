@@ -96,15 +96,11 @@ To use pre-trained weights, modify the path [here](https://github.com/joannetruo
 
 ### Rethinking Sim2real
 | Robot | Control-Type | Actuation Noise | Download Weights | Extract Path |
-|-|-|-|-|-|
-| A1 | Kinematic | - | [Link](https://drive.google.com/file/d/1yAjVvrWMcyIvCl6elsdZnQtMleOeUUgF/view?usp=share_link) | `results/a1/a1_kinematic.pth` |
-| A1 | Dynamic | - | [Link](https://drive.google.com/file/d/1v8QVz0T87kKa4-UbjcovPPYzjS6Zocrd/view?usp=share_link) | `results/a1/a1_dynamic.pth` |
-| AlienGo | Kinematic | - | [Link](https://drive.google.com/file/d/1mCP7axTr6Adl3FsDAftqwHB5ZNt9o2LF/view?usp=share_link) | `results/aliengo/aliengo_kinematic.pth` |
-| AlienGo | Dynamic | - | [Link](https://drive.google.com/file/d/1_DSlqYloo-Y3MR5jl-muQFZg5vD2CjZ7/view?usp=share_link) | `results/aliengo/aliengo_dynamic.pth` |
-| Spot | Kinematic | - | [Link](https://drive.google.com/file/d/1br8hGMuI56xuZRFZHFSHAfIEF49PezyF/view?usp=share_link) | `results/spot/spot_kinematic.pth` |
-| Spot | Dynamic | - | [Link](https://drive.google.com/file/d/1p7y8AXuMF8hhxfp_YE0jOPJBbNmzi4Tp/view?usp=share_link) | `results/spot/spot_dynamic.pth` |
-| Spot | Kinematic | Decoupled Noise | [Link](https://drive.google.com/file/d/1dMLKo03SkG6p-9ZT_pKeNp1IuEIzHkGa/view?usp=share_link) | `results/spot/spot_kinematic_decoupled_noise.pth` |
-| Spot | Kinematic | Coupled Noise | [Link](https://drive.google.com/file/d/1svcz91276irH5B7Pl4Ry_sF97F5u9bTA/view?usp=share_link) | `results/spot/spot_kinematic_coupled_noise.pth` |
+|:-:|:-:|:-:|:-:|:-:|
+| A1 | Kinematic <br> Dynamic | - <br> - | [Link](https://drive.google.com/file/d/1yAjVvrWMcyIvCl6elsdZnQtMleOeUUgF/view?usp=share_link) <br> [Link](https://drive.google.com/file/d/1v8QVz0T87kKa4-UbjcovPPYzjS6Zocrd/view?usp=share_link) | `results/a1/a1_kinematic.pth` <br> `results/a1/a1_dynamic.pth`|
+| AlienGo | Kinematic <br> Dynamic | - <br> -| [Link](https://drive.google.com/file/d/1mCP7axTr6Adl3FsDAftqwHB5ZNt9o2LF/view?usp=share_link) <br> [Link](https://drive.google.com/file/d/1_DSlqYloo-Y3MR5jl-muQFZg5vD2CjZ7/view?usp=share_link)| `results/aliengo/aliengo_kinematic.pth` <br> `results/aliengo/aliengo_dynamic.pth`|
+| Spot | Kinematic <br> Dynamic | - <br> - | [Link](https://drive.google.com/file/d/1br8hGMuI56xuZRFZHFSHAfIEF49PezyF/view?usp=share_link) <br> [Link](https://drive.google.com/file/d/1p7y8AXuMF8hhxfp_YE0jOPJBbNmzi4Tp/view?usp=share_link) | `results/spot/spot_kinematic.pth` <br> `results/spot/spot_dynamic.pth` |
+| Spot | Kinematic | Decoupled Noise <br> Coupled Noise | [Link](https://drive.google.com/file/d/1dMLKo03SkG6p-9ZT_pKeNp1IuEIzHkGa/view?usp=share_link) <br> [Link](https://drive.google.com/file/d/1svcz91276irH5B7Pl4Ry_sF97F5u9bTA/view?usp=share_link) | `results/spot/spot_kinematic_decoupled_noise.pth` <br> `results/spot/spot_kinematic_coupled_noise.pth` <br> |
 
 ### ViNL
 Weights used in [ViNL: Visual Locomotion and Navigation Over Obstacles](https://arxiv.org/abs/2210.14791)
