@@ -6,5 +6,6 @@
 
 
 from habitat_baselines.rl.ddppo.policy.resnet_policy import (
+    PointNavResNetNet,
     PointNavResNetPolicy,
 )

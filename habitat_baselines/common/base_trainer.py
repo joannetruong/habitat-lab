@@ -120,6 +120,7 @@ class BaseTrainer:
                             self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind
                         )
                         time.sleep(2)  # sleep for 2 secs before polling again
+                        print("waiting for checkpoint...")
                     logger.info(f"=======current_ckpt: {current_ckpt}=======")
                     prev_ckpt_ind += 1
                     self._eval_checkpoint(

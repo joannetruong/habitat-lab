@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import glob
+import math
 import os
 import re
 import shutil
@@ -40,6 +41,18 @@ from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 cv2 = try_cv2_import()
 
 
+if hasattr(torch, "inference_mode"):
+    inference_mode = torch.inference_mode
+else:
+    inference_mode = torch.no_grad
+
+
+def cosine_decay(progress: float) -> float:
+    progress = min(max(progress, 0.0), 1.0)
+
+    return (1.0 + math.cos(progress * math.pi)) / 2.0
+
+
 class CustomFixedCategorical(torch.distributions.Categorical):  # type: ignore
     def sample(
         self, sample_shape: Size = torch.Size()  # noqa: B008
@@ -71,6 +84,85 @@ class CategoricalNet(nn.Module):
     def forward(self, x: Tensor) -> CustomFixedCategorical:
         x = self.linear(x)
         return CustomFixedCategorical(logits=x)
+
+
+class CustomNormal(torch.distributions.normal.Normal):
+    def sample(
+        self, sample_shape: Size = torch.Size()  # noqa: B008
+    ) -> Tensor:
+        return self.rsample(sample_shape)
+
+    def log_probs(self, actions) -> Tensor:
+        return super().log_prob(actions).sum(-1, keepdim=True)
+
+    def entropy(self) -> Tensor:
+        return super().entropy().sum(-1, keepdim=True)
+
+
+class GaussianNet(nn.Module):
+    def __init__(
+        self,
+        num_inputs: int,
+        num_outputs: int,
+        config: "DictConfig",
+    ) -> None:
+        super().__init__()
+
+        self.action_activation = config.action_activation
+        self.use_softplus = config.use_softplus
+        self.use_log_std = config.use_log_std
+        use_std_param = config.use_std_param
+        self.clamp_std = config.clamp_std
+
+        if self.use_log_std:
+            self.min_std = config.min_log_std
+            self.max_std = config.max_log_std
+            std_init = config.log_std_init
+        elif self.use_softplus:
+            inv_softplus = lambda x: math.log(math.exp(x) - 1)
+            self.min_std = inv_softplus(config.min_std)
+            self.max_std = inv_softplus(config.max_std)
+            std_init = inv_softplus(1.0)
+        else:
+            self.min_std = config.min_std
+            self.max_std = config.max_std
+            std_init = 1.0  # initialize std value so that std ~ 1
+
+        if use_std_param:
+            self.std = torch.nn.parameter.Parameter(
+                torch.randn(num_outputs) * 0.01 + std_init
+            )
+            num_linear_outputs = num_outputs
+        else:
+            self.std = None
+            num_linear_outputs = 2 * num_outputs
+
+        self.mu_maybe_std = nn.Linear(num_inputs, num_linear_outputs)
+        nn.init.orthogonal_(self.mu_maybe_std.weight, gain=0.01)
+        nn.init.constant_(self.mu_maybe_std.bias, 0)
+
+        if not use_std_param:
+            nn.init.constant_(self.mu_maybe_std.bias[num_outputs:], std_init)
+
+    def forward(self, x: Tensor) -> CustomNormal:
+        mu_maybe_std = self.mu_maybe_std(x).float()
+        if self.std is not None:
+            mu = mu_maybe_std
+            std = self.std
+        else:
+            mu, std = torch.chunk(mu_maybe_std, 2, -1)
+
+        if self.action_activation == "tanh":
+            mu = torch.tanh(mu)
+
+        if self.clamp_std:
+            std = torch.clamp(std, self.min_std, self.max_std)
+        if self.use_log_std:
+            std = torch.exp(std)
+        if self.use_softplus:
+            std = torch.nn.functional.softplus(std)
+
+        return CustomNormal(mu, std, validate_args=False)
 
 
 def linear_decay(epoch: int, total_num_updates: int) -> float:
@@ -413,3 +505,63 @@ def create_tar_archive(archive_path: str, dataset_path: str) -> None:
 
 def delete_folder(path: str) -> None:
     shutil.rmtree(path)
+
+
+class LagrangeInequalityCoefficient(nn.Module):
+    r"""Implements a learnable lagrange coefficient for a constrained
+    optimization problem.
+
+
+    Given the constrained optimization problem
+        min f(x)
+            st. x < threshold
+
+    The lagrangian relaxation is then the dual problem
+        argmax_alpha argmin_x f(x) + alpha * (x - threshold)
+            st. alpha > 0
+
+    We can optimize the dual problem via coordinate descent as
+        f(x) + [[alpha]]_sg * x - alpha * ([[x]]_sg - threshold)
+    To satisfy the constraint on alpha, we use projected gradient
+    descent and project alpha to be > 0 after every step.
+
+    To enforce x > threshold, we negate x and the threshold.
+    This yields the coordinate descent objective
+       alpha * (threshold - [[x]]_sg) - [[alpha]]_sg * x
+    """
+
+    def __init__(
+        self,
+        threshold: float,
+        init_alpha: float = 1.0,
+        alpha_min: float = 1e-4,
+        alpha_max: float = 1.0,
+        greater_than: bool = False,
+    ):
+        super().__init__()
+        self.log_alpha = nn.Parameter(torch.full((), math.log(init_alpha)))
+        self.threshold = float(threshold)
+        self.log_alpha_min = math.log(alpha_min)
+        self.log_alpha_max = math.log(alpha_max)
+        self._greater_than = greater_than
+
+    def project_into_bounds(self):
+        r"""Projects alpha back into bounds. To be called after each optim step"""
+        with torch.no_grad():
+            self.log_alpha.data.clamp_(self.log_alpha_min, self.log_alpha_max)
+
+    def forward(self):
+        r"""Compute alpha. This is done to allow forward hooks to work,
+        the expected entry point is ref:`lagrangian_loss`"""
+        return torch.exp(self.log_alpha)
+
+    def lagrangian_loss(self, x):
+        r"""Return the coordinate ascent lagrangian loss that keeps x
+        less than or greater than the threshold.
+        """
+        alpha = self()
+
+        if not self._greater_than:
+            return alpha.detach() * x - alpha * (x.detach() - self.threshold)
+        else:
+            return alpha * (self.threshold - x.detach()) - alpha.detach() * x

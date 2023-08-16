@@ -8,7 +8,14 @@ import random
 from typing import List, Type, Union
 
 import habitat
-from habitat import Config, Env, RLEnv, VectorEnv, make_dataset
+from habitat import (
+    Config,
+    Env,
+    RLEnv,
+    ThreadedVectorEnv,
+    VectorEnv,
+    make_dataset,
+)
 
 
 def make_env_fn(
@@ -99,7 +106,9 @@ def construct_envs(
         proc_config.freeze()
         configs.append(proc_config)
 
-    envs = habitat.VectorEnv(
+    vector_env_cls = ThreadedVectorEnv if config.USE_THREADED else VectorEnv
+
+    envs = vector_env_cls(
         make_env_fn=make_env_fn,
         env_fn_args=tuple(zip(configs, env_classes)),
         workers_ignore_signals=workers_ignore_signals,
