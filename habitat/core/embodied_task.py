@@ -131,9 +131,7 @@ class Metrics(dict):
         :param measures: list of :ref:`Measure` whose metrics are fetched and
             packaged.
         """
-        data = [
-            (uuid, measure.get_metric()) for uuid, measure in measures.items()
-        ]
+        data = [(uuid, measure.get_metric()) for uuid, measure in measures.items()]
         super().__init__(data)
 
 
@@ -174,9 +172,7 @@ class Measurements:
     def _get_measure_index(self, measure_name):
         return list(self.measures.keys()).index(measure_name)
 
-    def check_measure_dependencies(
-        self, measure_name: str, dependencies: List[str]
-    ):
+    def check_measure_dependencies(self, measure_name: str, dependencies: List[str]):
         r"""Checks if dependencies measures are enabled and calculatethat the measure
         :param measure_name: a name of the measure for which has dependencies.
         :param dependencies: a list of a measure names that are required by
@@ -229,6 +225,7 @@ class EmbodiedTask:
         from habitat.core.registry import registry
 
         self._config = config
+        print("embodied task config: ", config)
         self._sim = sim
         self._dataset = dataset
 
@@ -298,7 +295,6 @@ class EmbodiedTask:
         assert (
             action_name in self.actions
         ), f"Can't find '{action_name}' action in {self.actions.keys()}."
-
         task_action = self.actions[action_name]
         observations = task_action.step(**action["action_args"], task=self)
         observations.update(
@@ -330,9 +326,7 @@ class EmbodiedTask:
             }
         )
 
-    def overwrite_sim_config(
-        self, sim_config: Config, episode: Episode
-    ) -> Config:
+    def overwrite_sim_config(self, sim_config: Config, episode: Episode) -> Config:
         r"""Update config merging information from :p:`sim_config` and
         :p:`episode`.
 

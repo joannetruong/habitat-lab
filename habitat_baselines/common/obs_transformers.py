@@ -48,9 +48,7 @@ class ObservationTransformer(nn.Module, metaclass=abc.ABCMeta):
     transform_observation_space is only needed if the observation_space ie.
     (resolution, range, or num of channels change)."""
 
-    def transform_observation_space(
-        self, observation_space: spaces.Dict, **kwargs
-    ):
+    def transform_observation_space(self, observation_space: spaces.Dict, **kwargs):
         return observation_space
 
     @classmethod
@@ -58,9 +56,7 @@ class ObservationTransformer(nn.Module, metaclass=abc.ABCMeta):
     def from_config(cls, config: Config):
         pass
 
-    def forward(
-        self, observations: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         return observations
 
 
@@ -119,9 +115,7 @@ class ResizeShortestEdge(ObservationTransformer):
         )
 
     @torch.no_grad()
-    def forward(
-        self, observations: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         if self._size is not None:
             observations.update(
                 {
@@ -194,9 +188,7 @@ class CenterCropper(ObservationTransformer):
         )
 
     @torch.no_grad()
-    def forward(
-        self, observations: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         if self._size is not None:
             observations.update(
                 {
@@ -255,9 +247,7 @@ class CameraProjection(metaclass=abc.ABCMeta):
             self.R = None
 
     @abc.abstractmethod
-    def projection(
-        self, world_pts: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def projection(self, world_pts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Project points in world coord onto image planes.
         Args:
             world_pts: 3D points in world coord
@@ -345,17 +335,13 @@ class PerspectiveProjection(CameraProjection):
         f: (float) the focal length of camera
         R: (torch.Tensor) 3x3 rotation matrix of camera
         """
-        super(PerspectiveProjection, self).__init__(
-            img_h, img_w, R, _DepthFrom.Z_VAL
-        )
+        super(PerspectiveProjection, self).__init__(img_h, img_w, R, _DepthFrom.Z_VAL)
         if f is None:
             self.f = max(img_h, img_w) / 2
         else:
             self.f = f
 
-    def projection(
-        self, world_pts: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def projection(self, world_pts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # Rotate world points according to camera rotation
         world_pts = self.worldcoord2camcoord(world_pts)
 
@@ -379,9 +365,7 @@ class PerspectiveProjection(CameraProjection):
     def unprojection(
         self, with_rotation: bool = True
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        v, u = torch.meshgrid(
-            torch.arange(self.img_h), torch.arange(self.img_w)
-        )
+        v, u = torch.meshgrid(torch.arange(self.img_h), torch.arange(self.img_w))
         x = (u + 0.5) - self.img_w / 2
         y = (v + 0.5) - self.img_h / 2
         z = torch.full_like(x, self.f, dtype=torch.float)
@@ -401,9 +385,7 @@ class PerspectiveProjection(CameraProjection):
 class EquirectProjection(CameraProjection):
     """This is the equirectanglar camera projection class."""
 
-    def __init__(
-        self, img_h: int, img_w: int, R: Optional[torch.Tensor] = None
-    ):
+    def __init__(self, img_h: int, img_w: int, R: Optional[torch.Tensor] = None):
         """Args:
         img_h: (int) the height of equirectanglar camera image
         img_w: (int) the width of equirectanglar camera image
@@ -411,9 +393,7 @@ class EquirectProjection(CameraProjection):
         """
         super(EquirectProjection, self).__init__(img_h, img_w, R)
 
-    def projection(
-        self, world_pts: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def projection(self, world_pts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # Rotate world points according to camera rotation
         world_pts = self.worldcoord2camcoord(world_pts)
 
@@ -463,9 +443,7 @@ class EquirectProjection(CameraProjection):
         cos_theta = torch.cos(theta_map)
         sin_phi = torch.sin(phi_map)
         cos_phi = torch.cos(phi_map)
-        return torch.stack(
-            [cos_phi * sin_theta, sin_phi, cos_phi * cos_theta], dim=-1
-        )
+        return torch.stack([cos_phi * sin_theta, sin_phi, cos_phi * cos_theta], dim=-1)
 
 
 class FisheyeProjection(CameraProjection):
@@ -503,9 +481,7 @@ class FisheyeProjection(CameraProjection):
         self.fov_cos = np.cos(fov_rad / 2)
         self.fish_param = [cx, cy, fx, fy, xi, alpha]
 
-    def projection(
-        self, world_pts: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def projection(self, world_pts: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # Rotate world points according to camera rotation
         world_pts = self.worldcoord2camcoord(world_pts)
 
@@ -554,9 +530,7 @@ class FisheyeProjection(CameraProjection):
         cx, cy, fx, fy, xi, alpha = self.fish_param
 
         # Calculate unprojection
-        v, u = torch.meshgrid(
-            [torch.arange(self.img_h), torch.arange(self.img_w)]
-        )
+        v, u = torch.meshgrid([torch.arange(self.img_h), torch.arange(self.img_w)])
         mx = (u - cx) / fx
         my = (v - cy) / fy
         r2 = mx * mx + my * my
@@ -629,18 +603,14 @@ class ProjectionConverter(nn.Module):
         # If depth is in z value in input, conversion is required
         self.input_zfactor = self.calculate_zfactor(self.input_models)
         # If depth is in z value in output, inverse conversion is required
-        self.output_zfactor = self.calculate_zfactor(
-            self.output_models, inverse=True
-        )
+        self.output_zfactor = self.calculate_zfactor(self.output_models, inverse=True)
 
         # grids shape: (output_len, input_len, output_img_h, output_img_w, 2)
         self.grids = self.generate_grid()
         # _grids_cache shape: (batch_size*output_len*input_len, output_img_h, output_img_w, 2)
         self._grids_cache = None
 
-    def _generate_grid_one_output(
-        self, output_model: CameraProjection
-    ) -> torch.Tensor:
+    def _generate_grid_one_output(self, output_model: CameraProjection) -> torch.Tensor:
         # Obtain points on unit sphere
         world_pts, not_assigned_mask = output_model.unprojection()
         # Generate grid
@@ -663,7 +633,9 @@ class ProjectionConverter(nn.Module):
             grids = self._generate_grid_one_output(output_model)
             multi_output_grids.append(grids.unsqueeze(1))
         multi_output_grids = torch.cat(multi_output_grids, dim=1)
-        return multi_output_grids  # input_len, output_len, output_img_h, output_img_w, 2
+        return (
+            multi_output_grids  # input_len, output_len, output_img_h, output_img_w, 2
+        )
 
     def _convert(self, batch: torch.Tensor) -> torch.Tensor:
         """Takes a batch of images stacked in proper order and converts thems,
@@ -722,9 +694,9 @@ class ProjectionConverter(nn.Module):
             or self._grids_cache.size()[0] != multi_out_batch.size()[0]
         ):
             # batch size is more than one
-            self._grids_cache = self.grids.repeat(
-                num_input_set, 1, 1, 1, 1
-            ).view(batch_size * self.output_len, out_h, out_w, 2)
+            self._grids_cache = self.grids.repeat(num_input_set, 1, 1, 1, 1).view(
+                batch_size * self.output_len, out_h, out_w, 2
+            )
         self._grids_cache = self._grids_cache.to(batch.device)
 
         return self._convert(multi_out_batch)
@@ -752,9 +724,7 @@ class ProjectionConverter(nn.Module):
                 zval_to_optcenter = 1 / pts_on_sphere[..., 2]
                 z_factors.append(zval_to_optcenter.unsqueeze(0))
             else:
-                all_one = torch.full(
-                    (1, cam.img_h, cam.img_w), 1.0, dtype=torch.float
-                )
+                all_one = torch.full((1, cam.img_h, cam.img_w), 1.0, dtype=torch.float)
                 z_factors.append(all_one)
         z_factors = torch.stack(z_factors)
 
@@ -769,9 +739,7 @@ class ProjectionConverter(nn.Module):
                 # for output_models
                 return 1 / z_factors
 
-    def forward(
-        self, batch: torch.Tensor, is_depth: bool = False
-    ) -> torch.Tensor:
+    def forward(self, batch: torch.Tensor, is_depth: bool = False) -> torch.Tensor:
 
         # Depth conversion for input tensors
         if is_depth and self.input_zfactor is not None:
@@ -844,9 +812,7 @@ class Cube2Equirect(ProjectionConverter):
 
         # Equirectangular output
         output_projection = EquirectProjection(equ_h, equ_w)
-        super(Cube2Equirect, self).__init__(
-            input_projections, output_projection
-        )
+        super(Cube2Equirect, self).__init__(input_projections, output_projection)
 
 
 class ProjectionTransformer(ObservationTransformer):
@@ -915,9 +881,7 @@ class ProjectionTransformer(ObservationTransformer):
         return observation_space
 
     @torch.no_grad()
-    def forward(
-        self, observations: Dict[str, torch.Tensor]
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self, observations: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
 
         for i, target_sensor_uuid in enumerate(self.target_uuids):
             # number of input and input sensor uuids
@@ -1039,9 +1003,7 @@ class Cube2Fisheye(ProjectionConverter):
         output_projection = FisheyeProjection(
             fish_h, fish_w, fish_fov, cx, cy, fx, fy, xi, alpha
         )
-        super(Cube2Fisheye, self).__init__(
-            input_projections, output_projection
-        )
+        super(Cube2Fisheye, self).__init__(input_projections, output_projection)
 
 
 @baseline_registry.register_obs_transformer()
@@ -1134,9 +1096,7 @@ class Equirect2Cube(ProjectionConverter):
 
         #  Cubemap output
         output_projections = get_cubemap_projections(img_h, img_w)
-        super(Equirect2Cube, self).__init__(
-            input_projection, output_projections
-        )
+        super(Equirect2Cube, self).__init__(input_projection, output_projections)
 
 
 @baseline_registry.register_obs_transformer()
@@ -1194,13 +1154,9 @@ class Equirect2CubeMap(ProjectionTransformer):
 def get_active_obs_transforms(config: Config) -> List[ObservationTransformer]:
     active_obs_transforms = []
     if hasattr(config.RL.POLICY, "OBS_TRANSFORMS"):
-        obs_transform_names = (
-            config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS
-        )
+        obs_transform_names = config.RL.POLICY.OBS_TRANSFORMS.ENABLED_TRANSFORMS
         for obs_transform_name in obs_transform_names:
-            obs_trans_cls = baseline_registry.get_obs_transformer(
-                obs_transform_name
-            )
+            obs_trans_cls = baseline_registry.get_obs_transformer(obs_transform_name)
             obs_transform = obs_trans_cls.from_config(config)
             active_obs_transforms.append(obs_transform)
     return active_obs_transforms

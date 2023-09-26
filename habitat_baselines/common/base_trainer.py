@@ -98,9 +98,7 @@ class BaseTrainer:
         ) as writer:
             if os.path.isfile(self.config.EVAL_CKPT_PATH_DIR):
                 # evaluate singe checkpoint
-                proposed_index = get_checkpoint_id(
-                    self.config.EVAL_CKPT_PATH_DIR
-                )
+                proposed_index = get_checkpoint_id(self.config.EVAL_CKPT_PATH_DIR)
                 if proposed_index is not None:
                     ckpt_idx = proposed_index
                 else:
@@ -112,7 +110,7 @@ class BaseTrainer:
                 )
             else:
                 # evaluate multiple checkpoints in order
-                prev_ckpt_ind = -1
+                prev_ckpt_ind = 0
                 while True:
                     current_ckpt = None
                     while current_ckpt is None:
@@ -211,10 +209,7 @@ class BaseRLTrainer(BaseTrainer):
         needs_checkpoint = False
         if self.config.NUM_CHECKPOINTS != -1:
             checkpoint_every = 1 / self.config.NUM_CHECKPOINTS
-            if (
-                self._last_checkpoint_percent + checkpoint_every
-                < self.percent_done()
-            ):
+            if self._last_checkpoint_percent + checkpoint_every < self.percent_done():
                 needs_checkpoint = True
                 self._last_checkpoint_percent = self.percent_done()
         else:
@@ -287,9 +282,7 @@ class BaseRLTrainer(BaseTrainer):
                 envs.pause_at(idx)
 
             # indexing along the batch dimensions
-            test_recurrent_hidden_states = test_recurrent_hidden_states[
-                state_index
-            ]
+            test_recurrent_hidden_states = test_recurrent_hidden_states[state_index]
             not_done_masks = not_done_masks[state_index]
             current_episode_reward = current_episode_reward[state_index]
             prev_actions = prev_actions[state_index]

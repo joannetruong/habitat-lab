@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional
 import attr
 from gym import spaces
 
+from habitat.core.dataset import Dataset, Episode
 from habitat.core.registry import registry
 from habitat.core.simulator import Observations, Sensor
 from habitat.core.utils import not_none_validator
@@ -47,9 +48,7 @@ class VLNEpisode(NavigationEpisode):
     reference_path: List[List[float]] = attr.ib(
         default=None, validator=not_none_validator
     )
-    instruction: InstructionData = attr.ib(
-        default=None, validator=not_none_validator
-    )
+    instruction: InstructionData = attr.ib(default=None, validator=not_none_validator)
     trajectory_id: int = attr.ib(default=None, validator=not_none_validator)
 
 
@@ -63,10 +62,7 @@ class InstructionSensor(Sensor):
         return self.uuid
 
     def _get_observation(
-        self,
-        observations: Dict[str, Observations],
-        episode: VLNEpisode,
-        **kwargs
+        self, observations: Dict[str, Observations], episode: VLNEpisode, **kwargs
     ):
         return {
             "text": episode.instruction.instruction_text,
@@ -88,5 +84,22 @@ class VLNTask(NavigationTask):
         examples/vln_reference_path_follower_example.py
     """
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, config, **kwargs) -> None:
+        super().__init__(config, **kwargs)
+        self.config = config
+        auto_stop_config = getattr(config, "AUTO_STOP", False)
+        if auto_stop_config:
+            self.auto_stop = getattr(config.AUTO_STOP, "ENABLED", False)
+            self.stop_distance = getattr(config.AUTO_STOP, "STOP_DISTANCE", 3.0)
+        else:
+            self.auto_stop = False
+            self.stop_distance = 3.0
+
+    def step(self, action: Dict[str, Any], episode: Episode):
+        if (
+            self.auto_stop
+            and self.measurements.measures["distance_to_goal"].get_metric()
+            < self.stop_distance
+        ):
+            action["action"] = 0
+        return super().step(action, episode)

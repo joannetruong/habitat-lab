@@ -44,15 +44,13 @@ class BaseILTrainer(BaseTrainer):
 
     def _make_log_dir(self) -> None:
         r"""Makes directory for writing log files."""
-        if self.config.LOG_METRICS and not os.path.isdir(
-            self.config.OUTPUT_LOG_DIR
-        ):
+        if self.config.LOG_METRICS and not os.path.isdir(self.config.OUTPUT_LOG_DIR):
             os.makedirs(self.config.OUTPUT_LOG_DIR)
 
     def _make_ckpt_dir(self) -> None:
         r"""Makes directory for saving model checkpoints."""
         if not os.path.isdir(self.config.CHECKPOINT_FOLDER):
-            os.makedirs(self.config.CHECKPOINT_FOLDER)
+            os.makedirs(self.config.CHECKPOINT_FOLDER, exist_ok=True)
 
     def _make_results_dir(self) -> None:
         r"""Makes directory for saving eval results."""
@@ -91,9 +89,7 @@ class BaseILTrainer(BaseTrainer):
         Returns:
             None
         """
-        torch.save(
-            state_dict, os.path.join(self.config.CHECKPOINT_FOLDER, file_name)
-        )
+        torch.save(state_dict, os.path.join(self.config.CHECKPOINT_FOLDER, file_name))
 
     def load_checkpoint(self, checkpoint_path, *args, **kwargs) -> Dict:
         raise NotImplementedError
