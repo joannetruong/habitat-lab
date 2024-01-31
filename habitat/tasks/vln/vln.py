@@ -89,7 +89,7 @@ class VLNTask(NavigationTask):
         self.config = config
         auto_stop_config = getattr(config, "AUTO_STOP", False)
         if auto_stop_config:
-            self.auto_stop = getattr(config.AUTO_STOP, "ENABLED", False)
+            self.auto_stop = getattr(config.AUTO_STOP, "ENABLE_AUTO_STOP", False)
             self.stop_distance = getattr(config.AUTO_STOP, "STOP_DISTANCE", 3.0)
         else:
             self.auto_stop = False
