@@ -89,9 +89,7 @@ _C.TASK.POINTGOAL_SENSOR.DIMENSIONALITY = 2
 # POINTGOAL WITH GPS+COMPASS SENSOR
 # -----------------------------------------------------------------------------
 _C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR = _C.TASK.POINTGOAL_SENSOR.clone()
-_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = (
-    "PointGoalWithGPSCompassSensor"
-)
+_C.TASK.POINTGOAL_WITH_GPS_COMPASS_SENSOR.TYPE = "PointGoalWithGPSCompassSensor"
 # -----------------------------------------------------------------------------
 # OBJECTGOAL SENSOR
 # -----------------------------------------------------------------------------
@@ -193,6 +191,12 @@ _C.TASK.INSTRUCTION_SENSOR = CN()
 _C.TASK.INSTRUCTION_SENSOR.TYPE = "InstructionSensor"
 _C.TASK.INSTRUCTION_SENSOR_UUID = "instruction"
 # -----------------------------------------------------------------------------
+# # VLN GT TRAJECTORY SENSOR
+# -----------------------------------------------------------------------------
+_C.TASK.TRAJECTORY_MAP_SENSOR = CN()
+_C.TASK.TRAJECTORY_MAP_SENSOR.TYPE = "TrajectoryMapSensor"
+_C.TASK.TRAJECTORY_MAP_SENSOR_UUID = "trajectory_map"
+# -----------------------------------------------------------------------------
 # # DISTANCE_TO_GOAL MEASUREMENT
 # -----------------------------------------------------------------------------
 _C.TASK.DISTANCE_TO_GOAL = CN()
@@ -210,9 +214,7 @@ _C.SIMULATOR = CN()
 _C.SIMULATOR.TYPE = "Sim-v0"
 _C.SIMULATOR.ACTION_SPACE_CONFIG = "v0"
 _C.SIMULATOR.FORWARD_STEP_SIZE = 0.25  # in metres
-_C.SIMULATOR.SCENE = (
-    "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
-)
+_C.SIMULATOR.SCENE = "data/scene_datasets/habitat-test-scenes/van-gogh-room.glb"
 _C.SIMULATOR.SEED = _C.SEED
 _C.SIMULATOR.TURN_ANGLE = 10  # angle to rotate left or right in degrees
 _C.SIMULATOR.TILT_ANGLE = 15  # angle to tilt the camera up or down in degrees
@@ -276,9 +278,7 @@ _C.SIMULATOR.HABITAT_SIM_V0.GPU_GPU = False
 # Whether or not the agent slides on collisions
 _C.SIMULATOR.HABITAT_SIM_V0.ALLOW_SLIDING = True
 _C.SIMULATOR.HABITAT_SIM_V0.ENABLE_PHYSICS = False
-_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = (
-    "./data/default.physics_config.json"
-)
+_C.SIMULATOR.HABITAT_SIM_V0.PHYSICS_CONFIG_FILE = "./data/default.physics_config.json"
 # -----------------------------------------------------------------------------
 # PYROBOT
 # -----------------------------------------------------------------------------

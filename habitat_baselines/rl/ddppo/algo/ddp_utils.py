@@ -88,8 +88,7 @@ def rank0_only(fn: Optional[Callable] = None) -> Union[Callable, bool]:
     """
     if fn is None:
         return (
-            not torch.distributed.is_initialized()
-            or torch.distributed.get_rank() == 0
+            not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0
         )
 
     @functools.wraps(fn)
@@ -203,7 +202,10 @@ def get_distrib_size() -> Tuple[int, int, int]:
     elif os.environ.get("SLURM_JOBID", None) is not None:
         local_rank = int(os.environ["SLURM_LOCALID"])
         world_rank = int(os.environ["SLURM_PROCID"])
-        world_size = int(os.environ["SLURM_NTASKS"])
+        try:
+            world_size = int(os.environ["SLURM_NTASKS"])
+        except:
+            world_size = 1
     # Otherwise setup for just 1 process, this is nice for testing
     else:
         local_rank = 0
@@ -225,9 +227,7 @@ def init_distrib_slurm(
     :returns: Tuple of the local_rank (aka which GPU to use for this process)
         and the TCPStore used for the rendezvous
     """
-    assert (
-        torch.distributed.is_available()
-    ), "torch.distributed must be available"
+    assert torch.distributed.is_available(), "torch.distributed must be available"
 
     if "GLOO_SOCKET_IFNAME" not in os.environ:
         os.environ["GLOO_SOCKET_IFNAME"] = get_ifname()
