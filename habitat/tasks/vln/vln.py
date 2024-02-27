@@ -11,6 +11,7 @@
 from typing import Any, Dict, List, Optional
 
 import attr
+import numpy as np
 from gym import spaces
 
 from habitat.core.dataset import Dataset, Episode
@@ -48,21 +49,35 @@ class VLNEpisode(NavigationEpisode):
     reference_path: List[List[float]] = attr.ib(
         default=None, validator=not_none_validator
     )
-    instruction: InstructionData = attr.ib(default=None, validator=not_none_validator)
+    instruction: InstructionData = attr.ib(
+        default=None, validator=not_none_validator
+    )
     trajectory_id: int = attr.ib(default=None, validator=not_none_validator)
 
 
 @registry.register_sensor(name="InstructionSensor")
 class InstructionSensor(Sensor):
-    def __init__(self, **kwargs):
+    def __init__(self, config, **kwargs):
         self.uuid = "instruction"
-        self.observation_space = spaces.Discrete(0)
+        dtype_config = getattr(config, "DTYPE", "int")
+        if dtype_config == "int":
+            self.observation_space = spaces.Discrete(0)
+        else:
+            self.observation_space = spaces.Box(
+                low=np.finfo(np.float).min,
+                high=np.finfo(np.float).max,
+                shape=(1,),
+                dtype="float32",
+            )
 
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         return self.uuid
 
     def _get_observation(
-        self, observations: Dict[str, Observations], episode: VLNEpisode, **kwargs
+        self,
+        observations: Dict[str, Observations],
+        episode: VLNEpisode,
+        **kwargs,
     ):
         return {
             "text": episode.instruction.instruction_text,
@@ -89,8 +104,12 @@ class VLNTask(NavigationTask):
         self.config = config
         auto_stop_config = getattr(config, "AUTO_STOP", False)
         if auto_stop_config:
-            self.auto_stop = getattr(config.AUTO_STOP, "ENABLE_AUTO_STOP", False)
-            self.stop_distance = getattr(config.AUTO_STOP, "STOP_DISTANCE", 3.0)
+            self.auto_stop = getattr(
+                config.AUTO_STOP, "ENABLE_AUTO_STOP", False
+            )
+            self.stop_distance = getattr(
+                config.AUTO_STOP, "STOP_DISTANCE", 3.0
+            )
         else:
             self.auto_stop = False
             self.stop_distance = 3.0

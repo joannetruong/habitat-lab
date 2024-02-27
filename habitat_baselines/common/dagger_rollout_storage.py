@@ -29,18 +29,20 @@ class DaggerRolloutStorage(RolloutStorage):
         recurrent_hidden_state_size,
         num_recurrent_layers=1,
         is_double_buffered: bool = False,
+        instruction_encoder_len: int = 200,
     ):
         self.buffers = TensorDict()
         self.buffers["observations"] = TensorDict()
 
         for sensor in observation_space.spaces:
+            print("sensor: ", sensor, observation_space.spaces[sensor].dtype)
             if sensor == "instruction":
                 self.buffers["observations"][sensor] = torch.from_numpy(
                     np.zeros(
                         (
                             numsteps + 1,
                             num_envs,
-                            200,
+                            instruction_encoder_len,
                         ),
                         dtype=observation_space.spaces[sensor].dtype,
                     )

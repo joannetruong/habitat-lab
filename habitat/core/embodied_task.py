@@ -131,7 +131,9 @@ class Metrics(dict):
         :param measures: list of :ref:`Measure` whose metrics are fetched and
             packaged.
         """
-        data = [(uuid, measure.get_metric()) for uuid, measure in measures.items()]
+        data = [
+            (uuid, measure.get_metric()) for uuid, measure in measures.items()
+        ]
         super().__init__(data)
 
 
@@ -172,7 +174,9 @@ class Measurements:
     def _get_measure_index(self, measure_name):
         return list(self.measures.keys()).index(measure_name)
 
-    def check_measure_dependencies(self, measure_name: str, dependencies: List[str]):
+    def check_measure_dependencies(
+        self, measure_name: str, dependencies: List[str]
+    ):
         r"""Checks if dependencies measures are enabled and calculatethat the measure
         :param measure_name: a name of the measure for which has dependencies.
         :param dependencies: a list of a measure names that are required by
@@ -305,7 +309,6 @@ class EmbodiedTask:
                 task=self,
             )
         )
-
         self._is_episode_active = self._check_episode_is_active(
             observations=observations, action=action, episode=episode
         )
@@ -326,7 +329,9 @@ class EmbodiedTask:
             }
         )
 
-    def overwrite_sim_config(self, sim_config: Config, episode: Episode) -> Config:
+    def overwrite_sim_config(
+        self, sim_config: Config, episode: Episode
+    ) -> Config:
         r"""Update config merging information from :p:`sim_config` and
         :p:`episode`.
 

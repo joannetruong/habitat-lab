@@ -96,17 +96,24 @@ class Sensor(metaclass=abc.ABCMeta):
 class Observations(Dict[str, Any]):
     r"""Dictionary containing sensor observations"""
 
-    def __init__(self, sensors: Dict[str, Sensor], *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self, sensors: Dict[str, Sensor], *args: Any, **kwargs: Any
+    ) -> None:
         """Constructor
 
         :param sensors: list of sensors whose observations are fetched and
             packaged.
         """
-
-        data = [
-            (uuid, sensor.get_observation(*args, **kwargs))
-            for uuid, sensor in sensors.items()
-        ]
+        # data = [
+        #     (uuid, sensor.get_observation(*args, **kwargs))
+        #     for uuid, sensor in sensors.items()
+        # ]
+        data = []
+        for uuid, sensor in sensors.items():
+            sensor_data = sensor.get_observation(*args, **kwargs)
+            if "observations" in kwargs:
+                kwargs["observations"][uuid] = sensor_data
+            data.append((uuid, sensor_data))
         super().__init__(data)
 
 
