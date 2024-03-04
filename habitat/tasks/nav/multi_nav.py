@@ -25,6 +25,15 @@ class MultiNavigationTask(NavigationTask):
         self.robot_id = None
         self.robot = self._config.ROBOT
         self.robot_file = self._config.ROBOT_URDF
+
+        # Camera noise
+        self.min_rand_pitch = config.MIN_RAND_PITCH
+        self.max_rand_pitch = config.MAX_RAND_PITCH
+        self.min_rand_roll = config.MIN_RAND_ROLL
+        self.max_rand_roll = config.MAX_RAND_ROLL
+        if self._sim._sensors.get("depth", False):
+            depth_sensor = self._sim._sensors["depth"]
+            self.orig_ori = depth_sensor._spec.orientation.copy()
         # if task reset happens everytime episode is reset, then create previous state deck here
 
     def reset(self, episode: Episode):
@@ -64,6 +73,11 @@ class MultiNavigationTask(NavigationTask):
             depth_pos_offset = (
                 np.array([0.0, 0.0, 0.0]) + self.robot_wrapper.camera_spawn_offset
             )
+
+            rand_tilt = np.random.uniform(self.min_rand_pitch, self.max_rand_pitch)
+            rand_roll = np.random.uniform(self.min_rand_roll, self.max_rand_roll)
+            rand_ori = self.orig_ori + np.array([rand_tilt, 0, rand_roll])
+            depth_sensor._spec.orientation = rand_ori
             depth_sensor._spec.position = depth_pos_offset
             depth_sensor._sensor_object.set_transformation_from_spec()
 
